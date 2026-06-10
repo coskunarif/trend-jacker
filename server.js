@@ -95,55 +95,134 @@ const pingedSlugs = new Set();
 
 // Helper to fetch trends and populate cache
 async function updateTrendsCache() {
+  let googleTrends = [];
+  let redditTrends = [];
+
+  // 1. Fetch Google Trends RSS
   try {
-    const response = await fetch('https://trends.google.com/trending/rss?geo=US');
-    if (!response.ok) {
-      throw new Error(`Failed to fetch Google Trends RSS: ${response.status}`);
-    }
-    const xmlText = await response.text();
-    const result = await parseStringPromise(xmlText);
-    
-    const items = result.rss.channel[0].item || [];
-    latestTrends = items.map((item, index) => {
-      const traffic = item['ht:approx_traffic'] ? item['ht:approx_traffic'][0] : 'N/A';
-      const newsItem = item['ht:news_item'] ? item['ht:news_item'][0] : null;
-      
-      const snippet = newsItem && newsItem['ht:news_item_snippet'] ? newsItem['ht:news_item_snippet'][0] : '';
-      const headline = newsItem && newsItem['ht:news_item_title'] ? newsItem['ht:news_item_title'][0] : '';
-      const newsUrl = newsItem && newsItem['ht:news_item_url'] ? newsItem['ht:news_item_url'][0] : '';
-      const newsSource = newsItem && newsItem['ht:news_item_source'] ? newsItem['ht:news_item_source'][0] : '';
+    const googleResponse = await fetch('https://trends.google.com/trending/rss?geo=US');
+    if (googleResponse.ok) {
+      const xmlText = await googleResponse.text();
+      const result = await parseStringPromise(xmlText);
+      const items = result.rss.channel[0].item || [];
+      googleTrends = items.map((item, index) => {
+        const traffic = item['ht:approx_traffic'] ? item['ht:approx_traffic'][0] : 'N/A';
+        const newsItem = item['ht:news_item'] ? item['ht:news_item'][0] : null;
+        
+        const snippet = newsItem && newsItem['ht:news_item_snippet'] ? newsItem['ht:news_item_snippet'][0] : '';
+        const headline = newsItem && newsItem['ht:news_item_title'] ? newsItem['ht:news_item_title'][0] : '';
+        const newsUrl = newsItem && newsItem['ht:news_item_url'] ? newsItem['ht:news_item_url'][0] : '';
+        const newsSource = newsItem && newsItem['ht:news_item_source'] ? newsItem['ht:news_item_source'][0] : '';
 
-      return {
-        id: index + 1,
-        title: item.title[0],
-        traffic,
-        description: item.description ? item.description[0] : '',
-        news: {
-          headline,
-          snippet,
-          url: newsUrl,
-          source: newsSource
-        }
-      };
-    });
-    console.log(`Successfully cached ${latestTrends.length} trends.`);
-
-    // Trigger search engine indexing pings for newly discovered trends
-    const newSlugs = [];
-    for (const trend of latestTrends) {
-      const slug = titleToSlug(trend.title);
-      if (!pingedSlugs.has(slug)) {
-        pingedSlugs.add(slug);
-        newSlugs.push(slug);
-      }
-    }
-    if (newSlugs.length > 0) {
-      pingSearchEngines(newSlugs).catch(err => {
-        console.error('Failed to trigger search engine pings:', err);
+        return {
+          id: `google-${index}`,
+          title: item.title[0],
+          traffic,
+          description: item.description ? item.description[0] : '',
+          source: 'google',
+          news: {
+            headline,
+            snippet,
+            url: newsUrl,
+            source: newsSource
+          }
+        };
       });
+    } else {
+      console.error(`Failed to fetch Google Trends RSS: ${googleResponse.status}`);
     }
   } catch (err) {
-    console.error('Failed to update trends cache, using fallback:', err.message);
+    console.error('Failed to fetch Google Trends RSS:', err.message);
+  }
+
+  // 2. Fetch Reddit Popular RSS
+  try {
+    const redditResponse = await fetch('https://www.reddit.com/r/popular.rss', {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Cache-Control': 'max-age=0'
+      }
+    });
+
+    if (redditResponse.ok) {
+      const xmlText = await redditResponse.text();
+      const result = await parseStringPromise(xmlText);
+      const entries = (result.feed && result.feed.entry) || [];
+      redditTrends = entries.map((entry, index) => {
+        const title = entry.title ? entry.title[0] : 'Reddit Thread';
+        const link = (entry.link && entry.link[0] && entry.link[0].$) ? entry.link[0].$.href : '';
+        const category = (entry.category && entry.category[0] && entry.category[0].$) 
+          ? (entry.category[0].$.label || entry.category[0].$.term || 'r/popular')
+          : 'r/popular';
+
+        return {
+          id: `reddit-${index}`,
+          title: title.length > 60 ? title.substring(0, 60) + '...' : title,
+          traffic: 'Reddit Spike',
+          description: `Hot post on ${category}`,
+          source: 'reddit',
+          news: {
+            headline: title,
+            snippet: `Early interest spike on Reddit in the ${category} community.`,
+            url: link,
+            source: category
+          }
+        };
+      });
+    } else {
+      console.error(`Failed to fetch Reddit RSS: ${redditResponse.status}`);
+    }
+  } catch (err) {
+    console.error('Failed to fetch Reddit RSS:', err.message);
+  }
+
+  // 3. Merge and Deduplicate by Title Slug
+  const merged = [];
+  const seenSlugs = new Set();
+
+  // Add Google trends first
+  for (const item of googleTrends) {
+    const slug = titleToSlug(item.title);
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      merged.push(item);
+    }
+  }
+
+  // Add Reddit spikes next if not already seen
+  for (const item of redditTrends) {
+    const slug = titleToSlug(item.title);
+    if (!seenSlugs.has(slug)) {
+      seenSlugs.add(slug);
+      merged.push(item);
+    }
+  }
+
+  // If both failed, use default trends
+  if (merged.length === 0) {
+    console.warn('Both Google and Reddit RSS failed. Using fallbacks.');
+  } else {
+    latestTrends = merged;
+    console.log(`Successfully cached ${latestTrends.length} blended trends.`);
+  }
+
+  // Trigger search engine indexing pings for newly discovered trends
+  const newSlugs = [];
+  for (const trend of latestTrends) {
+    const slug = titleToSlug(trend.title);
+    if (!pingedSlugs.has(slug)) {
+      pingedSlugs.add(slug);
+      newSlugs.push(slug);
+    }
+  }
+  if (newSlugs.length > 0) {
+    pingSearchEngines(newSlugs).catch(err => {
+      console.error('Failed to trigger search engine pings:', err);
+    });
   }
 }
 
@@ -610,6 +689,7 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
         title: "Google Gemini",
         traffic: "100K+",
         description: "The latest AI models from Google.",
+        source: "google",
         news: {
           headline: "Google announces Gemini 3.5",
           snippet: "Gemini 3.5 is now live with advanced reasoning capabilities.",
@@ -622,11 +702,25 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
         title: "Fastify framework",
         traffic: "20K+",
         description: "High performance web framework for Node.js.",
+        source: "google",
         news: {
           headline: "Fastify v5 released",
           snippet: "Fastify v5 introduces improved plugin loading and security features.",
           url: "https://fastify.io/v5-release",
           source: "Fastify Blog"
+        }
+      },
+      {
+        id: 3,
+        title: "Reddit Spike Topic",
+        traffic: "Reddit Spike",
+        description: "Hot post on r/technology",
+        source: "reddit",
+        news: {
+          headline: "Reddit Spike Topic: OpenAI leaks new model features",
+          snippet: "A viral post in r/technology outlines upcoming features.",
+          url: "https://www.reddit.com/r/technology/comments/1u1ngzk/openai_leaks_new_model_features",
+          source: "r/technology"
         }
       }
     ];

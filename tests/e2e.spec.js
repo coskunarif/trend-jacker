@@ -8,6 +8,7 @@ test.describe('TrendJacker E2E tests', () => {
       title: 'Google Gemini',
       traffic: '100K+',
       description: 'The latest AI models from Google.',
+      source: 'google',
       news: {
         headline: 'Google announces Gemini 3.5',
         snippet: 'Gemini 3.5 is now live with advanced reasoning capabilities.',
@@ -20,11 +21,25 @@ test.describe('TrendJacker E2E tests', () => {
       title: 'Fastify framework',
       traffic: '20K+',
       description: 'High performance web framework for Node.js.',
+      source: 'google',
       news: {
         headline: 'Fastify v5 released',
         snippet: 'Fastify v5 introduces improved plugin loading and security features.',
         url: 'https://fastify.io/v5-release',
         source: 'Fastify Blog'
+      }
+    },
+    {
+      id: 3,
+      title: 'Reddit Spike Topic',
+      traffic: 'Reddit Spike',
+      description: 'Hot post on r/technology',
+      source: 'reddit',
+      news: {
+        headline: 'Reddit Spike Topic: OpenAI leaks new model features',
+        snippet: 'A viral post in r/technology outlines upcoming features.',
+        url: 'https://www.reddit.com/r/technology/comments/1u1ngzk/openai_leaks_new_model_features',
+        source: 'r/technology'
       }
     }
   ];
@@ -126,7 +141,7 @@ test.describe('TrendJacker E2E tests', () => {
     });
 
     // Select the second trend item
-    const secondTrend = page.locator('.trend-item').last();
+    const secondTrend = page.locator('.trend-item').nth(1);
     await secondTrend.click();
 
     // Verify detail-title is updated to Fastify framework
@@ -440,5 +455,25 @@ test.describe('TrendJacker E2E tests', () => {
 
     await page.locator('#btn-verdict-optimist').click();
     await expect(shareDebateXBtn).toBeVisible();
+  });
+
+  test('should render source badges on trend list items', async ({ page }) => {
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends),
+      });
+    });
+
+    await page.goto('/');
+
+    const googleBadge = page.locator('.trend-item .source-badge.google-spike').first();
+    await expect(googleBadge).toBeVisible();
+    await expect(googleBadge).toHaveText('Google Search Spike');
+
+    const redditBadge = page.locator('.trend-item .source-badge.reddit-spike').first();
+    await expect(redditBadge).toBeVisible();
+    await expect(redditBadge).toHaveText('Reddit Spike');
   });
 });

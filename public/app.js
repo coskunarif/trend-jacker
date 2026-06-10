@@ -282,9 +282,16 @@ document.addEventListener('DOMContentLoaded', () => {
       a.className = 'trend-item';
       a.href = `/t/${titleToSlug(trend.title)}`;
       a.setAttribute('aria-current', 'false');
+
+      const source = trend.source || 'google';
+      const badgeClass = source === 'reddit' ? 'reddit-spike' : 'google-spike';
+      const badgeLabel = source === 'reddit' ? 'Reddit Spike' : 'Google Search Spike';
+      const sourceBadge = `<span class="source-badge ${badgeClass}">${badgeLabel}</span>`;
+
       a.innerHTML = `
         <div class="trend-item-info">
           <span class="trend-item-title">${trend.title}</span>
+          ${sourceBadge}
           <span class="trend-item-desc">${trend.description || (trend.news && trend.news.headline) || 'Tap to investigate'}</span>
         </div>
         <span class="trend-item-traffic">${trend.traffic}</span>
