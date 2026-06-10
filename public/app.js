@@ -188,8 +188,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let activeItem = null;
 
     trends.forEach((trend, index) => {
-      const a = document.createElement('button');
+      const a = document.createElement('a');
       a.className = 'trend-item';
+      a.href = `/t/${titleToSlug(trend.title)}`;
       a.setAttribute('aria-current', 'false');
       a.innerHTML = `
         <div class="trend-item-info">
@@ -216,7 +217,10 @@ document.addEventListener('DOMContentLoaded', () => {
       };
 
       a._clickHandler = clickHandler;
-      a.addEventListener('click', () => clickHandler(false));
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        clickHandler(false);
+      });
       trendsListContainer.appendChild(a);
 
       // Match path-based urlSlug or preloadedData slug, falling back to first
