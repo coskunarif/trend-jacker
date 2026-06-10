@@ -87,11 +87,12 @@ INSTRUCTIONS FOR THE AGENT:
 1. Read PHILOSOPHY.md to understand core design, performance, and infrastructure economy constraints.
 2. Implement the active task outlined above completely (Backend, UI, CSS).
 3. Verify changes locally (start local server, run Playwright verification, check console logs for errors).
-4. Deploy to Production (using the gcloud deployment command in README.md).
-5. Perform a Live Production Check (query the live Production URL, perform a smoke test, and check browser console logs in production to verify zero errors).
-6. Update AGENT_PLAYBOOK.md to mark this task as '[x] Completed'.
-7. Select the next task from the backlog and mark it as '[/] Active'.
-8. Update the walkthrough.md log.
+4. Commit and push the verified changes to GitHub (Conventional Commits e.g. `feat: ...`, `fix: ...`, `docs: ...`, followed by `git push origin main`).
+5. Deploy to Production (using the gcloud deployment command in README.md).
+6. Perform a Live Production Check (query the live Production URL, perform a smoke test, and check browser console logs in production to verify zero errors).
+7. Update AGENT_PLAYBOOK.md to mark this task as '[x] Completed'.
+8. Select the next task from the backlog and mark it as '[/] Active'.
+9. Update the walkthrough.md log.
 ======================================================================
 `);
 }

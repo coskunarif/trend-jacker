@@ -31,7 +31,7 @@ Any agent or developer taking over this project has **complete creative license 
 * **The Principle**:
   * **Self-Inspiration Loop**: The developer agent must not limit itself to user requests. In the absence of prescriptive prompts, the agent should actively audit the application, identify gaps in features, performance, SEO/GEO, or visual aesthetics, and brainstorm creative solutions.
   * **Weighted Playbook Management**: The agent maintains a persistent [AGENT_PLAYBOOK.md](file:///home/ubuntuadmin/projects/trend-jacker/AGENT_PLAYBOOK.md) in the project root to record, score, and execute ideas. Incoming agents should bootstrap by running the trigger command `npm run agent:next` (or reacting to the `/next` or `next task` chat shortcuts) to parse the playbook, display current task details, and obtain immediate instructions.
-  * **Full Execution Autonomy**: The agent is empowered to autonomously complete the entire development lifecycle (brainstorming, implementation, styling, verification, and deployment) for playbook tasks, presenting the completed wow-factor features.
+  * **Full Execution Autonomy & Version Control**: The agent is empowered to autonomously complete the entire development lifecycle (brainstorming, implementation, styling, verification, git version control, and deployment) for playbook tasks, presenting the completed wow-factor features. Every change must be committed with Conventional Commits (e.g. `feat: ...`, `fix: ...`, `refactor: ...`) and pushed to the remote repository (`main` branch) to maintain a clean history and sync workspace state.
   * **Modular Stack**: Keep the codebase modular and stateless (Fastify backend + clean static frontend) so agents can execute playbook tasks with zero architectural friction.
 
 ---
