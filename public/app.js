@@ -1,4 +1,90 @@
 document.addEventListener('DOMContentLoaded', () => {
+  let hasWebShare = false;
+  let hasFileShare = false;
+
+  if (window.isSecureContext && navigator.share) {
+    hasWebShare = true;
+    try {
+      if (navigator.canShare) {
+        const testFile = new File([''], 'test.png', { type: 'image/png' });
+        hasFileShare = navigator.canShare({ files: [testFile] });
+      }
+    } catch (e) {
+      hasFileShare = false;
+    }
+  }
+
+  function updateButtonForSharing(btn, newText, newAriaLabel) {
+    if (!btn) return;
+    btn.setAttribute('aria-label', newAriaLabel);
+    btn.innerHTML = `
+      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      ${newText}
+    `;
+  }
+
+  function triggerDownload(canvas, filename) {
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Failed to generate and download PNG:", err);
+      alert("Could not download image. Please try again.");
+    }
+  }
+
+  async function shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl) {
+    if (hasWebShare) {
+      try {
+        if (hasFileShare) {
+          canvas.toBlob = function(callback, type) {
+            try {
+              const dataUrl = canvas.toDataURL(type);
+              const binStr = atob(dataUrl.split(',')[1]);
+              const len = binStr.length;
+              const arr = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                arr[i] = binStr.charCodeAt(i);
+              }
+              const blob = new Blob([arr], { type: type || 'image/png' });
+              callback(blob);
+            } catch (e) {
+              callback(null);
+            }
+          };
+
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+          if (blob) {
+            const file = new File([blob], filename, { type: 'image/png' });
+            Object.defineProperty(file, 'type', { value: 'image/png', writable: true, configurable: true, enumerable: true });
+            await navigator.share({
+              files: [file],
+              title: title,
+              text: text
+            });
+            return;
+          }
+        }
+        await navigator.share({
+          title: title,
+          text: text,
+          url: fallbackUrl
+        });
+        return;
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          console.log('Sharing was aborted by the user.');
+          return;
+        }
+        console.error('Sharing failed, falling back to download:', err);
+      }
+    }
+    triggerDownload(canvas, filename);
+  }
+
   const trendsListContainer = document.getElementById('trends-list');
   const welcomeView = document.getElementById('welcome-view');
   const explainerView = document.getElementById('explainer-view');
@@ -66,6 +152,15 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSharePollX = document.getElementById('btn-share-poll-x');
   const btnShareDebateX = document.getElementById('btn-share-debate-x');
   const btnDownloadDebateCard = document.getElementById('btn-download-debate-card');
+
+  if (hasWebShare) {
+    if (btnDownloadCard) {
+      updateButtonForSharing(btnDownloadCard, 'Share Card', 'Share Trend Card');
+    }
+    if (btnDownloadDebateCard) {
+      updateButtonForSharing(btnDownloadDebateCard, 'Share Debate Meme', 'Share Debate Meme Card');
+    }
+  }
 
   // Slug generator helper
   function titleToSlug(title) {
@@ -662,17 +757,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
     ctx.fillText("Vote live and investigate trends at viraljacker.com", 80, 560);
 
-    // Trigger image download
-    try {
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `trend-card-${titleToSlug(currentTrend.title)}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error("Failed to generate and download card PNG:", err);
-      alert("Could not download image. Please try again.");
-    }
+    // Trigger image share or download
+    const filename = `trend-card-${titleToSlug(currentTrend.title)}.png`;
+    const title = `TrendJacker — ${currentTrend.title}`;
+    const text = `Check out the viral trend explainer and vote on whether "${currentTrend.title}" is overrated or genius!`;
+    const fallbackUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+
+    await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
   async function generateDebateMemeCard() {
@@ -812,17 +903,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
     ctx.fillText("Who won? Vote in the live Debate Arena at viraljacker.com", 60, 580);
 
-    // Trigger image download
-    try {
-      const dataUrl = canvas.toDataURL('image/png');
-      const link = document.createElement('a');
-      link.download = `debate-meme-${titleToSlug(currentTrend.title)}.png`;
-      link.href = dataUrl;
-      link.click();
-    } catch (err) {
-      console.error("Failed to generate and download debate meme card PNG:", err);
-      alert("Could not download image. Please try again.");
-    }
+    // Trigger image share or download
+    const filename = `debate-meme-${titleToSlug(currentTrend.title)}.png`;
+    const title = `TrendJacker — AI Debate on ${currentTrend.title}`;
+    const text = `AI Debate: Optimist Bot vs Skeptic Bot on "${currentTrend.title}". Who makes the more compelling case?`;
+    const fallbackUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+
+    await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
   function wrapText(ctx, text, x, y, maxWidth, lineHeight) {

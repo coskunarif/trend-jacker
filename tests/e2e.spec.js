@@ -562,4 +562,280 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(redditBadge).toBeVisible();
     await expect(redditBadge).toHaveText('Reddit Spike');
   });
+
+  test.describe('Web Share API Integration', () => {
+    test('should fall back to standard download when Web Share is unsupported', async ({ page }) => {
+      await page.route('**/api/trends', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockTrends),
+        });
+      });
+      await page.route('**/api/explain', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockExplanation),
+        });
+      });
+      await page.route('**/api/poll', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ genius: 18, overrated: 6 }),
+        });
+      });
+
+      await page.addInitScript(() => {
+        try {
+          delete navigator.share;
+          delete navigator.canShare;
+        } catch (e) {
+          Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+          Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true });
+        }
+      });
+
+      await page.goto('/');
+      
+      // Vote first to show the download card button
+      await page.locator('#btn-vote-genius').click();
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.locator('#btn-download-card').click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toContain('trend-card-');
+    });
+
+    test('should use Web Share file sharing when fully supported', async ({ page }) => {
+      await page.route('**/api/trends', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockTrends),
+        });
+      });
+      await page.route('**/api/explain', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockExplanation),
+        });
+      });
+      await page.route('**/api/poll', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ genius: 18, overrated: 6 }),
+        });
+      });
+
+      await page.addInitScript(() => {
+        window.shareCalls = [];
+        
+        Object.defineProperty(navigator, 'canShare', {
+          value: (data) => {
+            return !!(data && data.files);
+          },
+          configurable: true,
+          writable: true
+        });
+        
+        Object.defineProperty(navigator, 'share', {
+          value: async (data) => {
+            window.shareCalls.push(data);
+            return Promise.resolve();
+          },
+          configurable: true,
+          writable: true
+        });
+      });
+
+      await page.goto('/');
+
+      // Vote first to show the download card button
+      await page.locator('#btn-vote-genius').click();
+
+      await page.locator('#btn-download-card').click();
+
+      const shareCalls = await page.evaluate(() => window.shareCalls);
+      expect(shareCalls.length).toBe(1);
+      expect(shareCalls[0].files).toBeDefined();
+      expect(shareCalls[0].files.length).toBe(1);
+      expect(shareCalls[0].files[0].type).toBe('image/png');
+      expect(shareCalls[0].title).toContain('Google Gemini');
+    });
+
+    test('should share text + URL when Web Share is supported but files are not', async ({ page }) => {
+      await page.route('**/api/trends', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockTrends),
+        });
+      });
+      await page.route('**/api/explain', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockExplanation),
+        });
+      });
+      await page.route('**/api/poll', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ genius: 18, overrated: 6 }),
+        });
+      });
+
+      await page.addInitScript(() => {
+        window.shareCalls = [];
+        Object.defineProperty(navigator, 'canShare', {
+          value: () => false,
+          configurable: true,
+          writable: true
+        });
+        Object.defineProperty(navigator, 'share', {
+          value: async (data) => {
+            window.shareCalls.push(data);
+            return Promise.resolve();
+          },
+          configurable: true,
+          writable: true
+        });
+      });
+
+      await page.goto('/');
+
+      // Vote first to show the download card button
+      await page.locator('#btn-vote-genius').click();
+
+      await page.locator('#btn-download-card').click();
+
+      const shareCalls = await page.evaluate(() => window.shareCalls);
+      expect(shareCalls.length).toBe(1);
+      expect(shareCalls[0].files).toBeUndefined();
+      expect(shareCalls[0].title).toContain('Google Gemini');
+      expect(shareCalls[0].url).toContain('/t/google-gemini');
+    });
+
+    test('should fall back to download when Web Share throws a generic error', async ({ page }) => {
+      await page.route('**/api/trends', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockTrends),
+        });
+      });
+      await page.route('**/api/explain', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockExplanation),
+        });
+      });
+      await page.route('**/api/poll', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ genius: 18, overrated: 6 }),
+        });
+      });
+
+      await page.addInitScript(() => {
+        window.shareCalls = [];
+        Object.defineProperty(navigator, 'canShare', {
+          value: () => true,
+          configurable: true,
+          writable: true
+        });
+        Object.defineProperty(navigator, 'share', {
+          value: async (data) => {
+            window.shareCalls.push(data);
+            throw new Error('Generic sharing failure');
+          },
+          configurable: true,
+          writable: true
+        });
+      });
+
+      await page.goto('/');
+
+      // Vote first to show the download card button
+      await page.locator('#btn-vote-genius').click();
+
+      const downloadPromise = page.waitForEvent('download');
+      await page.locator('#btn-download-card').click();
+      const download = await downloadPromise;
+      expect(download.suggestedFilename()).toContain('trend-card-');
+
+      const shareCalls = await page.evaluate(() => window.shareCalls);
+      expect(shareCalls.length).toBe(1);
+    });
+
+    test('should fail silently and not download when Web Share is aborted (AbortError)', async ({ page }) => {
+      await page.route('**/api/trends', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockTrends),
+        });
+      });
+      await page.route('**/api/explain', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify(mockExplanation),
+        });
+      });
+      await page.route('**/api/poll', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ genius: 18, overrated: 6 }),
+        });
+      });
+
+      await page.addInitScript(() => {
+        window.shareCalls = [];
+        Object.defineProperty(navigator, 'canShare', {
+          value: () => true,
+          configurable: true,
+          writable: true
+        });
+        Object.defineProperty(navigator, 'share', {
+          value: async (data) => {
+            window.shareCalls.push(data);
+            const err = new Error('Share canceled');
+            err.name = 'AbortError';
+            throw err;
+          },
+          configurable: true,
+          writable: true
+        });
+      });
+
+      await page.goto('/');
+
+      // Vote first to show the download card button
+      await page.locator('#btn-vote-genius').click();
+
+      let downloadTriggered = false;
+      page.on('download', () => {
+        downloadTriggered = true;
+      });
+
+      await page.locator('#btn-download-card').click();
+
+      // Wait a brief moment to ensure no download is triggered
+      await page.waitForTimeout(1000);
+
+      const shareCalls = await page.evaluate(() => window.shareCalls);
+      expect(shareCalls.length).toBe(1);
+      expect(downloadTriggered).toBe(false);
+    });
+  });
 });
+

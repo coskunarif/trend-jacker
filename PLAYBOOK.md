@@ -20,47 +20,55 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | Task ID | Task Title & Description | UX | SEO | VIR | FEAS | Total | Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | **TJ-13** | **Unified Mobile UX and Navigation Polish Suite**<br>Comprehensive mobile overhaul including: sidebar close button, tab-switcher for trends list vs sentiment feed, scroll-to-top on trend select, main explainer loading skeleton, and viewport overflow/navbar cleanup. | **9.5** | **6.0** | **6.0** | **9.0** | **30.5** | `[x]` Completed |
-| **TJ-14** | **Main Explainer Panel Loading Skeleton & Fetch Feedback**<br>Add an animated CSS skeleton loader to replace the blank main screen while `/api/explain` is fetching, and add loading feedback on selected items. | 9.0 | 4.0 | 5.0 | 9.5 | **27.5** | Pending |
-| **TJ-15** | **Mobile Sidebar Drawer Refactor & Accessibility Fixes**<br>Add mobile close button, fix invalid `aria-controls` reference, and refactor dual nested scroll pane into a single scroll. | 8.0 | 6.5 | 4.0 | 9.0 | **27.5** | Pending |
-| **TJ-16** | **View Scroll Reset & Narrow Screen Header Polish**<br>Reset viewport scroll position to y=0 on trend load, and resolve header wrapping on devices <= 360px wide. | 8.5 | 4.0 | 4.0 | 10.0 | **26.5** | Pending |
+| **TJ-14** | **Main Explainer Panel Loading Skeleton & Fetch Feedback**<br>Add an animated CSS skeleton loader to replace the blank main screen while `/api/explain` is fetching, and add loading feedback on selected items. | 9.0 | 4.0 | 5.0 | 9.5 | **27.5** | `[x]` Completed |
+| **TJ-15** | **Mobile Sidebar Drawer Refactor & Accessibility Fixes**<br>Add mobile close button, fix invalid `aria-controls` reference, and refactor dual nested scroll pane into a single scroll. | 8.0 | 6.5 | 4.0 | 9.0 | **27.5** | `[x]` Completed |
+| **TJ-16** | **View Scroll Reset & Narrow Screen Header Polish**<br>Reset viewport scroll position to y=0 on trend load, and resolve header wrapping on devices <= 360px wide. | 8.5 | 4.0 | 4.0 | 10.0 | **26.5** | `[x]` Completed |
+| **TJ-17** | **Mobile-Native Web Share API Integration for Cards & Links**<br>Replace desktop-focused file downloads with native device share sheets (`navigator.share`) on mobile. Converts canvas explainers/meme cards to Blobs/Files for native sharing to apps like X/Twitter, WhatsApp, Slack, or iOS/Android clipboard. | **9.5** | **6.0** | **10.0** | **9.0** | **34.5** | 🚀 **Selected** |
+| **TJ-18** | **Mobile Explainer Content Accordion & Sub-Tabbing**<br>Group the long vertical stack of details into tabbed segments on mobile ("Overview", "Debate", "Interact") to avoid scroll fatigue. | 9.0 | 5.5 | 7.0 | 9.0 | **30.5** | Pending |
+| **TJ-19** | **Sticky Bottom Quick-Action Toolbar**<br>Provide a persistent bottom navigation/action bar on mobile for instant voting, opening the debate arena, or starting an AI chat. | 8.5 | 5.0 | 8.5 | 8.5 | **30.5** | Pending |
+| **TJ-20** | **High-DPI Retina Scaling for Canvas Analytics**<br>Implement device pixel ratio scaling (`window.devicePixelRatio`) to ensure crystal-clear sparklines and speedometers on modern mobile viewports. | 8.5 | 5.0 | 5.0 | 9.5 | **28.0** | Pending |
 
 ---
 
-## 🚀 Selected Task Details: TJ-13 — Unified Mobile UX and Navigation Polish Suite
+## 🚀 Selected Task Details: TJ-17 — Mobile-Native Web Share API Integration
 
 ### 1. Objective
-Transform the mobile user experience of TrendJacker from a cramped desktop-port feel to a polished, responsive, and intuitive web application. This task targets several critical mobile-specific usability defects:
-*   **The Blank Screen Trap**: When selecting a new trend, the screen goes completely blank for 2 to 4 seconds during API content generation, providing zero loading feedback.
-*   **Cramped Scroll Containers (Scroll Chaining)**: The sidebar drawer splits its vertical space 50/50 between two scrolling containers. This creates nested scrolling areas that clash with native mobile thumb scroll gestures.
-*   **Missing Drawer Dismissal**: There is no explicit "Close" button inside the sidebar panel on mobile, forcing users to click a narrow, non-obvious backdrop strip to exit.
-*   **Scroll Position Lock**: If a user is scrolled down when reading a debate or chat, selecting a new trend leaves the page scrolled down, hiding the header and summary cards of the new trend.
-*   **Narrow Viewport Clipping & Accessibility Violation**: The navbar wraps awkwardly on screens < 360px wide, and the sidebar trigger has a broken accessibility ID reference.
+Transform TrendJacker's share and export loop on mobile devices to behave like a native mobile app. Currently, clicking "Download Card" or "Download Debate Meme" triggers a browser file download of a `1200x630` PNG image. On mobile viewports (iOS Safari, Android Chrome), file downloads are clunky, hidden in system directories, or blocked by default popup blockers. 
+
+By integrating the HTML5 **Web Share API**, the app will convert canvas elements directly into `File` objects and invoke the native device sharing drawer. This allows users to share the actual visual cards directly into X/Twitter, WhatsApp, Messages, or copy them to their native system clipboard in a single tap.
 
 ### 2. Why (Business Value & Rationale)
-*   **Retention**: A blank screen during a 3-second API load on mobile results in massive bounce rates. Introducing visual skeletons reduces perceived latency.
-*   **Usability**: Resetting the scroll position on navigation and providing explicit close controls keeps the user oriented and removes frustration.
-*   **Accessibility & SEO**: Fixing broken ARIA references and ensuring comfortable touch targets improves Google Mobile-Friendliness scoring and technical SEO.
-*   **Engagement**: A fluid, conflict-free scrolling layout increases the time-on-site, encouraging users to scroll to the interactive poll and debate sections.
+*   **Virality (10/10)**: TrendJacker is a viral news-jacking tool. Sharing an image directly to social networks is a 10x lower friction path than forcing a file download and manual upload.
+*   **UX & Native Feel (9.5/10)**: Invoking the native OS share sheet makes the web application feel like a premium, native mobile app, boosting user trust and retention.
+*   **SEO & Citations (6.0/10)**: Direct image-backed shares to social networks increase backlinks and search indexing signals for dynamically generated routes (`/t/:slug`).
 
 ### 3. Execution Plan
 
-#### Step 1: Sidebar Drawer Refactor & Tab Integration
-*   Modify `public/index.html` to add a Close Button (`<button id="sidebar-close" class="sidebar-close" ...>`) inside the sidebar panel header. Make it visible only under the `@media (max-width: 768px)` stylesheet query.
-*   Add `id="sidebar-panel"` to the `<aside>` element so that the header trigger's `aria-controls="sidebar-panel"` has a valid target.
-*   Add a simple Mobile Tab Bar layout (`.sidebar-tabs`) inside the sidebar on mobile, with buttons: "Trending" and "Sentiment Feed".
-*   In `public/app.js`, show either `#trends-list` or `.live-feed-section` based on the active tab when on mobile. Set both to `flex: 1 1 100%` inside their respective views (hiding the inactive one) to eliminate the dual-nested scroll clashing and provide full-height scroll views.
+#### Step 1: Feature Detection & Web Share API Support Check
+*   Implement feature detection in `public/app.js` to check if `navigator.share` and `navigator.canShare` are available and support file sharing.
+*   Update the sharing button text and icon on mobile viewports if native sharing is supported (e.g., changing "Download Card" label to "Share Card").
 
-#### Step 2: Implement Explainer View Loading Skeleton
-*   Create a placeholder loading skeleton in `public/index.html` under `main-panel` with the ID `#explainer-skeleton`.
-*   Style the skeleton with shimmering CSS gradient animations (`@keyframes shimmer`) and card outlines matching the actual trend explainer cards.
-*   In `public/app.js`, when a new trend is clicked:
-    1.  Show the `#explainer-skeleton`.
-    2.  Keep the old explainer view and welcome view hidden.
-    3.  Once the API fetch completes, hide the `#explainer-skeleton` and show `#explainer-view`.
+#### Step 2: Canvas-to-Blob Conversion & File API Wrapping
+*   Update `generateTrendCardImage` and `generateDebateMemeCard` in `public/app.js` to convert the generated `<canvas>` to a PNG Blob via `canvas.toBlob()`.
+*   Wrap the resulting Blob in a standard `File` object:
+    ```javascript
+    const file = new File([blob], `trend-card-${slug}.png`, { type: 'image/png' });
+    ```
 
-#### Step 3: Implement Scroll Position Reset on Selection
-*   In `public/app.js` under the `clickHandler` for trends, add `window.scrollTo({ top: 0, behavior: 'instant' })` (or smooth) so the page scrolls to the top immediately when a new trend details card is rendered.
+#### Step 3: Trigger Native Share Sheet
+*   Invoke `navigator.share` with the constructed `File` object, a title, and the trend page URL (`/t/:slug` or current absolute URL):
+    ```javascript
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({
+        files: [file],
+        title: `TrendJacker Explainer: ${trendTitle}`,
+        text: `Check out why ${trendTitle} is viral right now!`,
+        url: window.location.href
+      });
+    }
+    ```
+*   Fall back gracefully to the standard link-based browser download for desktop devices or unsupported browsers.
 
-#### Step 4: Visual Polish & Narrow Viewport Fixes
-*   Update CSS for the header status indicator on mobile: hide the text label "Live Trends Feed" on viewports <= 380px wide, showing only the pulsing status dot to prevent horizontal overflow and wraps.
-*   Audit and polish all padding/margin variables on mobile viewports to maximize readability.
+#### Step 4: Verification & Automated E2E Testing
+*   Write Playwright test assertions in `tests/e2e.spec.js` to verify fallback behavior on non-supporting desktop browsers.
+*   Simulate Web Share API supports on simulated mobile viewports if possible, or verify fallback download triggers.
