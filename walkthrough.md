@@ -1,5 +1,37 @@
 # TrendJacker Implementation Walkthrough Log
 
+## 🏁 Completed Task: TJ-06 (Playwright E2E Testing in CI/CD)
+
+- **Status**: Completed
+- **Date**: 2026-06-10
+- **Author**: Antigravity (Advanced Agentic Coding Agent)
+
+### 🛠️ Implementation Details
+1. **Added Dependencies**:
+   - Installed `@playwright/test` library as a devDependency.
+   - Installed Chromium browser binary using `npx playwright install chromium`.
+2. **Created Playwright Configuration (`playwright.config.js`)**:
+   - Set up automatic local server boot via `webServer` config running `npm run start` on port `3001` with `NODE_ENV=test` and pipe stdout/stderr logic.
+3. **Modified Fastify Server (`server.js`)**:
+   - Integrated offline test fallback support for `process.env.NODE_ENV === 'test'`.
+   - Bypasses real Google Trends RSS parsing and Google Gemini API calls, responding with deterministic mock objects immediately, speeding up tests to under 100ms.
+4. **Fixed Relative Path Assets in Frontend (`public/index.html`)**:
+   - Resolved a subtle routing collision where direct slug routes (e.g. `/t/google-gemini`) requested relative assets `/t/app.js` and `/t/styles.css` (which collided with the dynamic slug path handler) by replacing them with root-relative paths `/app.js` and `/styles.css`.
+5. **Wrote E2E Test Suite (`tests/e2e.spec.js`)**:
+   - Created E2E test scenarios:
+     - Rendering layout and welcome view on empty trends.
+     - Auto-selecting the first active trend on load and verifying explainer card details.
+     - Changing trend selections from the sidebar.
+     - Community sentiment vote submission and percentage updates.
+     - Dig Deeper Chat Q&A follow-up processing.
+     - Server-Sent Events (SSE) live global sentiment stream processing.
+     - Direct slug route dynamic landing (hydration).
+6. **Configured GitHub Actions (`.github/workflows/deploy.yml`)**:
+   - Installed Chromium browser binaries with system dependencies (`npx playwright install chromium --with-deps`).
+   - Ran `npm test` as a blocking pre-deployment verification step. All E2E tests successfully pass in CI prior to deploying.
+
+---
+
 ## 🏁 Completed Task: TJ-05 (Cloud Firestore Persistence)
 
 - **Status**: Completed
