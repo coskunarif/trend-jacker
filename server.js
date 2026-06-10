@@ -7,6 +7,8 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+import { getPollData, incrementVote } from './db.js';
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -53,70 +55,7 @@ fastify.register(fastifyStatic, {
   prefix: '/',
 });
 
-// In-memory poll storage fallback
-const pollStorage = new Map();
-
-// SQLite database initialization with graceful fallback
-let db = null;
-try {
-  const { DatabaseSync } = await import('node:sqlite');
-  const dbPath = path.join(__dirname, 'polls.db');
-  db = new DatabaseSync(dbPath);
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS votes (
-      trend TEXT PRIMARY KEY,
-      overrated INTEGER DEFAULT 0,
-      genius INTEGER DEFAULT 0
-    )
-  `);
-  console.log('Database initialized successfully at', dbPath);
-} catch (err) {
-  console.warn('WARNING: Failed to load node:sqlite, falling back to in-memory storage:', err.message);
-}
-
-// Helper functions for poll storage
-function getPollData(trend) {
-  if (db) {
-    try {
-      const stmt = db.prepare('SELECT overrated, genius FROM votes WHERE trend = ?');
-      const row = stmt.get(trend);
-      if (row) {
-        return { overrated: row.overrated, genius: row.genius };
-      }
-      return { overrated: 0, genius: 0 };
-    } catch (err) {
-      console.error('Database query failed:', err.message);
-    }
-  }
-  // Fallback to in-memory Map
-  if (!pollStorage.has(trend)) {
-    pollStorage.set(trend, { overrated: 0, genius: 0 });
-  }
-  return pollStorage.get(trend);
-}
-
-function incrementVote(trend, vote) {
-  const current = getPollData(trend);
-  current[vote]++;
-
-  if (db) {
-    try {
-      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
-      if (vote === 'genius') {
-        db.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(trend);
-      } else if (vote === 'overrated') {
-        db.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(trend);
-      }
-      return current;
-    } catch (err) {
-      console.error('Database write failed:', err.message);
-    }
-  }
-
-  // Fallback update in-memory Map
-  pollStorage.set(trend, current);
-  return current;
-}
+// Database initialized via db.js module
 
 // GET /api/trends - Fetches and parses Google Trends RSS feed
 fastify.get('/api/trends', async (request, reply) => {
@@ -200,7 +139,7 @@ Here is the context snippet: "${snippet || ''}".`;
   }
   
   const explanation = JSON.parse(cleanedText);
-  explanation.polls = getPollData(trend);
+  explanation.polls = await getPollData(trend);
   return explanation;
 }
 
@@ -260,7 +199,7 @@ fastify.get('/t/:slug', async (request, reply) => {
       whatIsIt: `Trending search topic: ${trendName}.`,
       whyIsItViral: [`High volume search interest on Google Trends.`],
       takeaway: `Keep an eye on this trend as it develops.`,
-      polls: getPollData(trendName)
+      polls: await getPollData(trendName)
     };
   }
 
@@ -363,7 +302,7 @@ fastify.post('/api/poll', async (request, reply) => {
     return reply.status(400).send({ error: 'Valid trend and vote (overrated/genius) are required.' });
   }
 
-  return incrementVote(trend, vote);
+  return await incrementVote(trend, vote);
 });
 
 // Start the Fastify server
