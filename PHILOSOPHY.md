@@ -77,4 +77,10 @@ These high-level principles apply universally across all codebases and applicati
 * **Exceptional Performance Balance**: While prioritizing low-cost infrastructure, never sacrifice application speed. The app must remain highly optimized, ensuring instant page loading, rapid hydration, low API latency, and lightweight resource utilization.
 * **Decoupled State**: Keep persistent application data completely decoupled from compute instances to leverage economic, stateless serverless scaling.
 
+### 7. Aesthetic Integrity & Visual Auditing
+* **Visual Validation**: Treat visual layout and look-and-feel as core functional requirements. Any agentic modification to the user interface must capture and audit screenshots (e.g. using Playwright or device-based visual diffing) to verify that the layout grid, glow states, custom typography, responsiveness, and dark-mode color palettes remain pristine and visually unbroken.
+
+### 8. AI Token Economy & Rate Limiting
+* **Cost-Safe AI Integrations**: Prevent expensive runaway queries by enforcing aggressive client-side caching of AI responses, strict input/output token limits, and query rate limiting. If an agent loops over LLM calls, it must have built-in threshold safeguards to block execution before generating excessive API costs.
+
 
