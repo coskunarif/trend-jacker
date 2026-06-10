@@ -50,11 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentTrend = null;
   let chatMessages = [];
   let hasVotedCurrent = false;
+  let userPollVote = null;
   let hasVotedDebateCurrent = false;
+  let userDebateVote = null;
   let activeDebateTimer1 = null;
   let activeDebateTimer2 = null;
 
   const btnShareTrend = document.getElementById('btn-share-trend');
+  const btnShareX = document.getElementById('btn-share-x');
+  const btnSharePollX = document.getElementById('btn-share-poll-x');
+  const btnShareDebateX = document.getElementById('btn-share-debate-x');
 
   // Slug generator helper
   function titleToSlug(title) {
@@ -123,6 +128,41 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Failed to copy share link:', err);
     }
   });
+
+  // Post Trend explainer to X
+  if (btnShareX) {
+    btnShareX.addEventListener('click', () => {
+      if (!currentTrend) return;
+      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+      const shareText = `Why is "${currentTrend.title}" trending right now? Check out this just-in-time viral explainer on TrendJacker:`;
+      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
+      window.open(xUrl, '_blank', 'noopener,noreferrer');
+    });
+  }
+
+  // Post Poll Vote results to X
+  if (btnSharePollX) {
+    btnSharePollX.addEventListener('click', () => {
+      if (!currentTrend) return;
+      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+      const voteText = userPollVote ? `I voted that this is totally ${userPollVote}!` : `Is this trend actually genius, or overrated?`;
+      const shareText = `Poll: "${currentTrend.title}" is trending on social media. ${voteText} What's your verdict?`;
+      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
+      window.open(xUrl, '_blank', 'noopener,noreferrer');
+    });
+  }
+
+  // Post Debate Verdict results to X
+  if (btnShareDebateX) {
+    btnShareDebateX.addEventListener('click', () => {
+      if (!currentTrend) return;
+      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+      const verdictText = userDebateVote ? `I judged the debate: ${userDebateVote} Bot won!` : `Who makes the more compelling case?`;
+      const shareText = `AI Debate: Optimist Bot vs Skeptic Bot on "${currentTrend.title}". ${verdictText} Read the transcript and vote:`;
+      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,AIDebate,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
+      window.open(xUrl, '_blank', 'noopener,noreferrer');
+    });
+  }
 
   // Dynamic SEO & Schema.org JSON-LD updates
   function updateSEO(trend, data) {
@@ -327,6 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
     currentTrend = trend;
     chatMessages = [];
     hasVotedCurrent = false;
+    userPollVote = null;
     
     // Smooth fade transition
     explainerView.classList.add('hidden');
@@ -740,6 +781,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelector('.poll-buttons').classList.add('hidden');
       pollResults.classList.remove('hidden');
       hasVotedCurrent = true;
+      userPollVote = choice;
     } catch (err) {
       console.error(err);
     }
@@ -1026,6 +1068,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (activeDebateTimer2) clearTimeout(activeDebateTimer2);
 
     hasVotedDebateCurrent = false;
+    userDebateVote = null;
     debateVerdictPanel.classList.add('hidden');
     debateResults.classList.add('hidden');
     document.querySelector('.verdict-buttons').classList.remove('hidden');
@@ -1135,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelector('.verdict-buttons').classList.add('hidden');
       debateResults.classList.remove('hidden');
       hasVotedDebateCurrent = true;
+      userDebateVote = winner;
     } catch (err) {
       console.error(err);
     }

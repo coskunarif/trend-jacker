@@ -958,7 +958,7 @@ body {
 
 /* Helpers */
 .hidden {
-  display: none;
+  display: none !important;
 }
 
 /* Responsive Breakpoints & Drawer Layout */
@@ -1524,5 +1524,71 @@ body {
   flex-direction: column;
   gap: var(--space-3);
   margin-top: var(--space-2);
+}
+
+/* Share to X (Twitter) Buttons Styling */
+.share-x-btn, .share-poll-x-btn, .share-debate-x-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  color: var(--text-heading);
+  border-radius: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.share-x-btn {
+  padding: 0 var(--space-4);
+  height: 36px;
+  font-size: 0.85rem;
+}
+
+.share-x-btn:hover, .share-poll-x-btn:hover, .share-debate-x-btn:hover {
+  background: var(--text-heading);
+  color: var(--background);
+  border-color: var(--text-heading);
+}
+
+.share-x-icon {
+  flex-shrink: 0;
+}
+
+/* Result Actions Alignment for Poll Results Card */
+.result-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  width: 100%;
+}
+
+.download-card-btn, .share-poll-x-btn {
+  flex: 1;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.85rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+.share-debate-x-btn {
+  width: 100%;
+  max-width: 480px;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  font-size: 0.85rem;
+  margin-top: var(--space-2);
+  align-self: center;
+}
+
+/* Mobile Media Query overrides for share buttons */
+@media (max-width: 768px) {
+  .share-x-btn, .share-poll-x-btn, .share-debate-x-btn {
+    min-height: 48px !important;
+  }
 }
 

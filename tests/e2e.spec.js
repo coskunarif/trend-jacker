@@ -373,4 +373,72 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(page.locator('#explainer-view')).toBeVisible();
     await expect(page.locator('#detail-title')).toHaveText('Google Gemini');
   });
+
+  test('should render Post to X share buttons and show results share options after voting', async ({ page }) => {
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends),
+      });
+    });
+
+    await page.route('**/api/explain', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExplanation),
+      });
+    });
+
+    await page.route('**/api/poll', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ genius: 10, overrated: 10 }),
+      });
+    });
+
+    await page.route('**/api/debate', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          turns: [
+            { speaker: 'optimist', message: 'Optimist opening' },
+            { speaker: 'skeptic', message: 'Skeptic counter' },
+            { speaker: 'optimist', message: 'Optimist rebuttal' }
+          ],
+          votes: { optimistWins: 10, skepticWins: 10 }
+        }),
+      });
+    });
+
+    await page.route('**/api/debate/vote', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ optimistWins: 11, skepticWins: 10 }),
+      });
+    });
+
+    await page.goto('/');
+
+    const shareTrendBtn = page.locator('#btn-share-trend');
+    const shareXBtn = page.locator('#btn-share-x');
+    await expect(shareTrendBtn).toBeVisible();
+    await expect(shareXBtn).toBeVisible();
+
+    const sharePollXBtn = page.locator('#btn-share-poll-x');
+    await expect(sharePollXBtn).not.toBeVisible();
+
+    await page.locator('#btn-vote-genius').click();
+    await expect(sharePollXBtn).toBeVisible();
+
+    const shareDebateXBtn = page.locator('#btn-share-debate-x');
+    await expect(shareDebateXBtn).not.toBeVisible();
+
+    await page.locator('#btn-verdict-optimist').click();
+    await expect(shareDebateXBtn).toBeVisible();
+  });
 });
