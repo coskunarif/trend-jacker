@@ -252,6 +252,46 @@ fastify.get('/t/:slug', async (request, reply) => {
   }
 });
 
+// GET /sitemap.xml - Dynamic sitemap generator
+fastify.get('/sitemap.xml', async (request, reply) => {
+  try {
+    const response = await fetch('https://trends.google.com/trending/rss?geo=US');
+    let slugs = [];
+    if (response.ok) {
+      const xmlText = await response.text();
+      const result = await parseStringPromise(xmlText);
+      const items = result.rss.channel[0].item || [];
+      slugs = items.map(item => titleToSlug(item.title[0]));
+    }
+
+    let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    
+    // Add homepage
+    xml += `  <url>\n`;
+    xml += `    <loc>https://viraljacker.com/</loc>\n`;
+    xml += `    <changefreq>daily</changefreq>\n`;
+    xml += `    <priority>1.0</priority>\n`;
+    xml += `  </url>\n`;
+    
+    // Add trend pages
+    for (const slug of slugs) {
+      xml += `  <url>\n`;
+      xml += `    <loc>https://viraljacker.com/t/${slug}</loc>\n`;
+      xml += `    <changefreq>daily</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `  </url>\n`;
+    }
+    
+    xml += `</urlset>`;
+
+    reply.type('application/xml').send(xml);
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send('Error generating sitemap');
+  }
+});
+
 // POST /api/chat - Follow-up Q&A chat using Gemini
 fastify.post('/api/chat', async (request, reply) => {
   const { trend, query, history } = request.body || {};
