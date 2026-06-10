@@ -8,6 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 import { getPollData, incrementVote, getDebateData, incrementDebateVote } from './db.js';
+import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +91,7 @@ const DEFAULT_TRENDS = [
 ];
 
 let latestTrends = [];
+const pingedSlugs = new Set();
 
 // Helper to fetch trends and populate cache
 async function updateTrendsCache() {
@@ -125,6 +127,21 @@ async function updateTrendsCache() {
       };
     });
     console.log(`Successfully cached ${latestTrends.length} trends.`);
+
+    // Trigger search engine indexing pings for newly discovered trends
+    const newSlugs = [];
+    for (const trend of latestTrends) {
+      const slug = titleToSlug(trend.title);
+      if (!pingedSlugs.has(slug)) {
+        pingedSlugs.add(slug);
+        newSlugs.push(slug);
+      }
+    }
+    if (newSlugs.length > 0) {
+      pingSearchEngines(newSlugs).catch(err => {
+        console.error('Failed to trigger search engine pings:', err);
+      });
+    }
   } catch (err) {
     console.error('Failed to update trends cache, using fallback:', err.message);
   }
@@ -141,6 +158,13 @@ fastify.get('/api/trends', async (request, reply) => {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to fetch trending topics.' });
   }
+});
+
+// GET /<INDEXNOW_KEY>.txt - Serves verification key for IndexNow API ownership checks
+const indexNowKey = getIndexNowKey();
+fastify.get(`/${indexNowKey}.txt`, async (request, reply) => {
+  reply.header('Content-Type', 'text/plain');
+  return indexNowKey;
 });
 
 // Server-Sent Events Clients for live sentiment feed

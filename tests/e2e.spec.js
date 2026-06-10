@@ -315,4 +315,25 @@ test.describe('TrendJacker E2E tests', () => {
     // Verify populated explainer contents for the slug
     await expect(page.locator('#detail-title')).toHaveText('Google Gemini');
   });
+
+  test('should serve a valid XML sitemap at /sitemap.xml', async ({ request }) => {
+    const response = await request.get('/sitemap.xml');
+    expect(response.status()).toBe(200);
+    const contentType = response.headers()['content-type'];
+    expect(contentType).toContain('xml');
+    const text = await response.text();
+    expect(text).toContain('<urlset');
+    expect(text).toContain('<loc>');
+    expect(text).toContain('/t/google-gemini');
+    expect(text).toContain('/t/fastify-framework');
+  });
+
+  test('should serve the IndexNow verification key at /trendjackerkey2026.txt', async ({ request }) => {
+    const response = await request.get('/trendjackerkey2026.txt');
+    expect(response.status()).toBe(200);
+    const contentType = response.headers()['content-type'];
+    expect(contentType).toContain('text/plain');
+    const text = await response.text();
+    expect(text.trim()).toBe('trendjackerkey2026');
+  });
 });
