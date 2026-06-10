@@ -220,6 +220,16 @@ fastify.get('/api/sentiment-stream', (request, reply) => {
 
 // Helper to get explanation from Gemini
 async function getTrendExplanation(trend, headline = '', snippet = '') {
+  if (process.env.NODE_ENV === 'test') {
+    return {
+      hook: 'Gemini is capturing developer mindshare with low latency and long context.',
+      whatIsIt: 'Google Gemini is a suite of multimodal generative AI models.',
+      whyIsItViral: ['Long context window', 'Low latency API', 'Reasoning capability'],
+      takeaway: 'Expect Gemini to power next-gen agentic workflows.',
+      polls: await getPollData(trend)
+    };
+  }
+
   if (!genAI) {
     throw new Error('Gemini API not configured.');
   }
@@ -426,6 +436,10 @@ fastify.post('/api/chat', async (request, reply) => {
     return reply.status(400).send({ error: 'Trend and query are required.' });
   }
 
+  if (process.env.NODE_ENV === 'test') {
+    return { reply: 'This is a mock reply for: ' + query };
+  }
+
   if (!genAI) {
     return reply.status(500).send({ error: 'Gemini API not configured.' });
   }
@@ -482,7 +496,37 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
   console.log(`Trend-Jacker PoC running at http://localhost:${port}`);
   
   // Initialize trends cache
-  await updateTrendsCache();
-  // Refresh cache every 10 minutes
-  setInterval(updateTrendsCache, 10 * 60 * 1000);
+  if (process.env.NODE_ENV === 'test') {
+    latestTrends = [
+      {
+        id: 1,
+        title: "Google Gemini",
+        traffic: "100K+",
+        description: "The latest AI models from Google.",
+        news: {
+          headline: "Google announces Gemini 3.5",
+          snippet: "Gemini 3.5 is now live with advanced reasoning capabilities.",
+          url: "https://blog.google/gemini-3.5",
+          source: "Google Blog"
+        }
+      },
+      {
+        id: 2,
+        title: "Fastify framework",
+        traffic: "20K+",
+        description: "High performance web framework for Node.js.",
+        news: {
+          headline: "Fastify v5 released",
+          snippet: "Fastify v5 introduces improved plugin loading and security features.",
+          url: "https://fastify.io/v5-release",
+          source: "Fastify Blog"
+        }
+      }
+    ];
+    console.log("Running in test mode. Populated cache with mock trends.");
+  } else {
+    await updateTrendsCache();
+    // Refresh cache every 10 minutes
+    setInterval(updateTrendsCache, 10 * 60 * 1000);
+  }
 });

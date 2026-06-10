@@ -24,6 +24,12 @@ jobs:
       - name: Verify Server Syntax
         run: node --check server.js
 
+      - name: Install Playwright Browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E Tests
+        run: npm test
+
   deploy:
     needs: test
     runs-on: ubuntu-latest
