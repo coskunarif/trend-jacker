@@ -27,17 +27,16 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-04** | **Real-Time Global Sentiment Live Feed** (simulating active votes across regions). | 8 | 4 | 8 | 7 | **27** | `[x]` Completed |
 | **TJ-07** | **AI-Driven Sentiment Debate Arena** (Optimist vs Pessimist bot agents debating the trend). | 9 | 6 | 9 | 8 | **32** | `[x]` Completed |
 | **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | `[x]` Completed |
-| **TJ-09** | **Mobile-First Responsiveness & Premium Touch Interactions** (optimized typography, flex column stack, >=48px touch targets, zero overflow scroll). | 9 | 7 | 5 | 10 | **31** | **[/] Active** |
-| **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | `[ ]` Proposed |
+| **TJ-09** | **Mobile-First Responsiveness & Premium Touch Interactions** (optimized typography, flex column stack, >=48px touch targets, zero overflow scroll). | 9 | 7 | 5 | 10 | **31** | `[x]` Completed |
+| **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | **[/] Active** |
 
 ---
 
-## 🛠️ Active Task Details: TJ-09
-- **Objective**: Optimize the layout to be fully responsive and feel like a premium native mobile application on mobile screens, meeting Google Mobile-Friendly standards. Ensure touch targets are at least 48x48px, typography sizes adapt, navigation/sidebar stacks cleanly into a swipeable drawer or collapsible header, and horizontal overflow is strictly zero.
-- **Why**: Captures the huge share of traffic originating from mobile search engines, improves Google Mobile Search rankings, and increases mobile user retention.
+## 🛠️ Active Task Details: TJ-10
+- **Objective**: Implement a prominent share button for each trend and debate outcome. Integrate the native Web Share API (so users on mobile get their native share sheet) and a custom Share-to-X (Twitter) button on desktop/fallback that generates pre-populated post text with the trend's title, custom summary, and dynamic link `/t/:slug`.
+- **Why**: Promotes virality, loops, and organic traffic growth, encouraging users to share debate outcomes and JIT explainer details directly to social platforms.
 - **Execution Plan**:
-  1. Audit the current mobile layout using browser emulation.
-  2. Implement a responsive `@media (max-width: 768px)` stylesheet block in `public/styles.css` that collapses the 3-panel layout (sidebar, main explainer, right info feed) into a clean stacked structure.
-  3. Design a responsive navigation bar for mobile that lets users open the trends sidebar or collapse it.
-  4. Expand all buttons and interactive items (votes, debate judgment buttons, chat inputs) to have a minimum 48x48px tap target size.
-  5. Add E2E tests verifying viewport layout elements scale correctly without overflowing.
+  1. Add a Share button to the header of the Explainer Card and the results section of the Sentiment Poll / Debate Arena.
+  2. Implement native `navigator.share` fallback to a popup window for Share-to-X with custom query string parameters.
+  3. Prefill post template: "Just read a debate on [Trend]! I voted [Verdict]. What do you think? [Link]"
+  4. Write E2E Playwright tests to verify the share button click and share parameters trigger correctly.
