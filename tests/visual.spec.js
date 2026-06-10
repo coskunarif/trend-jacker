@@ -25,6 +25,12 @@ const mockExplanation = {
 };
 
 test.describe('Visual Verification & Accessibility Audit', () => {
+  const getScreenshotPath = (filename) => {
+    if (process.env.CI) {
+      return `./test-results/${filename}`;
+    }
+    return `/home/ubuntuadmin/.gemini/antigravity-cli/brain/5e714099-9678-486e-bfda-8b7ac04b401e/${filename}`;
+  };
 
   test('Desktop viewport: Download fallback buttons (No Web Share)', async ({ page }) => {
     // Intercept API routes
@@ -90,7 +96,7 @@ test.describe('Visual Verification & Accessibility Audit', () => {
 
     // Take screenshot of desktop view showing the fallback buttons
     await page.screenshot({
-      path: '/home/ubuntuadmin/.gemini/antigravity-cli/brain/5e714099-9678-486e-bfda-8b7ac04b401e/desktop_download_view.png',
+      path: getScreenshotPath('desktop_download_view.png'),
       fullPage: true
     });
   });
@@ -169,7 +175,7 @@ test.describe('Visual Verification & Accessibility Audit', () => {
 
     // Take screenshot of mobile view showing the Share buttons
     await page.screenshot({
-      path: '/home/ubuntuadmin/.gemini/antigravity-cli/brain/5e714099-9678-486e-bfda-8b7ac04b401e/mobile_share_view.png',
+      path: getScreenshotPath('mobile_share_view.png'),
       fullPage: true
     });
   });
