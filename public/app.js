@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const trendsListContainer = document.getElementById('trends-list');
   const welcomeView = document.getElementById('welcome-view');
   const explainerView = document.getElementById('explainer-view');
+  const explainerSkeleton = document.getElementById('explainer-skeleton');
   
   // Detail elements
   const detailTitle = document.getElementById('detail-title');
@@ -46,6 +47,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnSidebarToggle = document.getElementById('sidebar-toggle');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
   const sidebarPanel = document.querySelector('.sidebar-panel');
+  const btnSidebarClose = document.getElementById('sidebar-close');
+  const tabButtons = document.querySelectorAll('.tab-btn');
+  const liveFeedSection = document.querySelector('.live-feed-section');
+  const panelHeaderText = document.querySelector('.panel-header-text');
 
   let currentTrend = null;
   let chatMessages = [];
@@ -240,6 +245,33 @@ document.addEventListener('DOMContentLoaded', () => {
     sidebarBackdrop.addEventListener('click', () => {
       closeMobileSidebar();
     });
+
+    if (btnSidebarClose) {
+      btnSidebarClose.addEventListener('click', () => {
+        closeMobileSidebar();
+      });
+    }
+
+    // Tab switching for mobile layout
+    if (tabButtons && tabButtons.length > 0) {
+      tabButtons.forEach(button => {
+        button.addEventListener('click', () => {
+          // Remove active class from all buttons
+          tabButtons.forEach(btn => btn.classList.remove('active'));
+          // Add active to current button
+          button.classList.add('active');
+
+          const tabName = button.getAttribute('data-tab');
+          if (tabName === 'trending') {
+            sidebarPanel.classList.remove('show-sentiment');
+            sidebarPanel.classList.add('show-trending');
+          } else {
+            sidebarPanel.classList.remove('show-trending');
+            sidebarPanel.classList.add('show-sentiment');
+          }
+        });
+      });
+    }
   }
 
   // Initialize: Load Trends
@@ -313,6 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         loadTrendDetails(trend);
         closeMobileSidebar();
+        window.scrollTo({ top: 0, behavior: 'instant' });
       };
 
       a._clickHandler = clickHandler;
@@ -380,6 +413,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Smooth fade transition
     explainerView.classList.add('hidden');
     welcomeView.classList.add('hidden');
+    if (explainerSkeleton) explainerSkeleton.classList.remove('hidden');
     
     try {
       let data;
@@ -479,9 +513,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       
       // Show View
+      if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
       explainerView.classList.remove('hidden');
     } catch (err) {
       console.error(err);
+      if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
+      welcomeView.classList.remove('hidden');
       alert('Had trouble generating AI explanation. Please try again.');
     }
   }

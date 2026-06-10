@@ -352,7 +352,7 @@ test.describe('TrendJacker E2E tests', () => {
     expect(text.trim()).toBe('trendjackerkey2026');
   });
 
-  test('should support responsive layout, mobile sidebar toggling, and auto-close on select', async ({ page }) => {
+  test('should support responsive layout, mobile sidebar toggling, tabs and close button', async ({ page }) => {
     await page.route('**/api/trends', async (route) => {
       await route.fulfill({
         status: 200,
@@ -381,12 +381,87 @@ test.describe('TrendJacker E2E tests', () => {
     await toggleBtn.click();
     await expect(sidebar).toHaveClass(/open/);
 
+    // Verify mobile tabs are visible
+    const tabsContainer = page.locator('.sidebar-tabs');
+    await expect(tabsContainer).toBeVisible();
+
+    // Verify default tab is 'trending' (list is visible, feed is hidden)
+    const trendsList = page.locator('#trends-list');
+    await expect(trendsList).toBeVisible();
+    const liveFeed = page.locator('.live-feed-section');
+    await expect(liveFeed).not.toBeVisible();
+
+    // Switch to sentiment tab
+    const sentimentTabBtn = page.locator('.tab-btn[data-tab="sentiment"]');
+    await sentimentTabBtn.click();
+    await expect(trendsList).not.toBeVisible();
+    await expect(liveFeed).toBeVisible();
+
+    // Switch back to trending tab
+    const trendingTabBtn = page.locator('.tab-btn[data-tab="trending"]');
+    await trendingTabBtn.click();
+    await expect(trendsList).toBeVisible();
+    await expect(liveFeed).not.toBeVisible();
+
+    // Verify close button closes the sidebar
+    const closeBtn = page.locator('#sidebar-close');
+    await expect(closeBtn).toBeVisible();
+    await closeBtn.click();
+    await expect(sidebar).not.toHaveClass(/open/);
+
+    // Reopen sidebar to select a trend
+    await toggleBtn.click();
+    await expect(sidebar).toHaveClass(/open/);
+
     const firstTrend = page.locator('.trend-item').first();
     await firstTrend.click();
     await expect(sidebar).not.toHaveClass(/open/);
 
     await expect(page.locator('#explainer-view')).toBeVisible();
     await expect(page.locator('#detail-title')).toHaveText('Google Gemini');
+  });
+
+  test('should display loading skeleton when explaining a trend', async ({ page }) => {
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends),
+      });
+    });
+
+    let explainPromiseResolve;
+    const explainPromise = new Promise(resolve => {
+      explainPromiseResolve = resolve;
+    });
+
+    await page.route('**/api/explain', async (route) => {
+      await explainPromise;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExplanation),
+      });
+    });
+
+    await page.goto('/');
+
+    // Select second trend item to trigger fetch (since first is loaded on startup)
+    const secondTrend = page.locator('.trend-item').nth(1);
+    await secondTrend.click();
+
+    // Skeleton should be visible while explaining is pending
+    const skeleton = page.locator('#explainer-skeleton');
+    await expect(skeleton).toBeVisible();
+    await expect(page.locator('#explainer-view')).not.toBeVisible();
+
+    // Resolve the API call
+    explainPromiseResolve();
+
+    // Skeleton should disappear and explainer-view should be visible
+    await expect(skeleton).not.toBeVisible();
+    await expect(page.locator('#explainer-view')).toBeVisible();
+    await expect(page.locator('#detail-title')).toHaveText('Fastify framework');
   });
 
   test('should render Post to X share buttons and show results share options after voting', async ({ page }) => {

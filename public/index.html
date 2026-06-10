@@ -45,11 +45,23 @@
   <!-- Main Grid Layout -->
   <main class="dashboard-grid">
     <!-- Left Sidebar: Trends List & Live Sentiment Feed -->
-    <aside class="sidebar-panel">
+    <aside class="sidebar-panel" id="sidebar-panel">
       <!-- Section 1: Trends List -->
       <div class="panel-header">
-        <h2 class="section-title">Trending Searches</h2>
-        <p class="section-subtitle">Pinging Google Trends API</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+          <div class="panel-header-text">
+            <h2 class="section-title">Trending Searches</h2>
+            <p class="section-subtitle">Pinging Google Trends API</p>
+          </div>
+          <button id="sidebar-close" class="sidebar-close" aria-label="Close trends sidebar">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="close-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <!-- Mobile Tab Bar -->
+        <div class="sidebar-tabs">
+          <button type="button" class="tab-btn active" data-tab="trending">Trending</button>
+          <button type="button" class="tab-btn" data-tab="sentiment">Sentiment Feed</button>
+        </div>
       </div>
       <div id="trends-list" class="scroll-container">
         <!-- Skeleton Loaders -->
@@ -89,6 +101,44 @@
         </div>
         <h3>Select a trending topic</h3>
         <p>Choose any spike-query from the left side panel. Our AI agent will fetch live search context and generate a real-time explainer instantly.</p>
+      </div>
+
+      <!-- Loading Skeleton (Shown during details fetch) -->
+      <div id="explainer-skeleton" class="explainer-container hidden" aria-hidden="true">
+        <div class="trend-hero-card skeleton-card">
+          <div class="trend-meta-row">
+            <div class="skeleton-pill"></div>
+            <div class="skeleton-pill wide"></div>
+          </div>
+          <div class="skeleton-line title"></div>
+          <div class="skeleton-line subtitle"></div>
+          
+          <div class="hook-box skeleton-box">
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
+
+        <div class="explainer-grid">
+          <div class="glass-card skeleton-card">
+            <div class="skeleton-line heading"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+          <div class="glass-card skeleton-card">
+            <div class="skeleton-line heading"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line long"></div>
+            <div class="skeleton-line short"></div>
+          </div>
+        </div>
+
+        <div class="glass-card full-width skeleton-card">
+          <div class="skeleton-line heading"></div>
+          <div class="skeleton-line long"></div>
+        </div>
       </div>
 
       <!-- Explainer View (Loads dynamically) -->
