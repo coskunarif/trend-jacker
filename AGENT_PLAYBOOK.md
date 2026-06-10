@@ -26,16 +26,18 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-06** | **Playwright E2E testing in CI/CD pipeline** (verifying stability before deploys). | 5 | 5 | 4 | 9 | **23** | `[x]` Completed |
 | **TJ-04** | **Real-Time Global Sentiment Live Feed** (simulating active votes across regions). | 8 | 4 | 8 | 7 | **27** | `[x]` Completed |
 | **TJ-07** | **AI-Driven Sentiment Debate Arena** (Optimist vs Pessimist bot agents debating the trend). | 9 | 6 | 9 | 8 | **32** | `[x]` Completed |
-| **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | **[/] Active** |
+| **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | `[x]` Completed |
+| **TJ-09** | **Mobile-First Responsiveness & Premium Touch Interactions** (optimized typography, flex column stack, >=48px touch targets, zero overflow scroll). | 9 | 7 | 5 | 10 | **31** | **[/] Active** |
+| **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | `[ ]` Proposed |
 
 ---
 
-## 🛠️ Active Task Details: TJ-08
-- **Objective**: Automatically notify search engines (via IndexNow API and Google/Bing sitemap/indexing triggers) when a new trending search is discovered and saved to our database, ensuring search engines crawl and index the trend's dynamic URL (`/t/:slug`) immediately.
-- **Why**: Speeds up organic traffic acquisition, improves SEO visibility of dynamic pages, and ensures TrendJacker dynamic URLs appear in search engine results while the trend is still hot.
+## 🛠️ Active Task Details: TJ-09
+- **Objective**: Optimize the layout to be fully responsive and feel like a premium native mobile application on mobile screens, meeting Google Mobile-Friendly standards. Ensure touch targets are at least 48x48px, typography sizes adapt, navigation/sidebar stacks cleanly into a swipeable drawer or collapsible header, and horizontal overflow is strictly zero.
+- **Why**: Captures the huge share of traffic originating from mobile search engines, improves Google Mobile Search rankings, and increases mobile user retention.
 - **Execution Plan**:
-  1. Add an indexing integration module `indexing.js` or write logic in `server.js` that compiles URL entries.
-  2. Implement an HTTP helper to submit newly discovered trend URLs to the IndexNow API endpoint (supported by Bing, Yandex, Seznam, etc.) using a generated verification key.
-  3. Provide a dynamically generated XML sitemap endpoint `/sitemap.xml` that updates dynamically with the current trend cache.
-  4. Trigger sitemap pings to search engines immediately upon caching new trends.
-  5. Add E2E tests verifying sitemap and ping logic.
+  1. Audit the current mobile layout using browser emulation.
+  2. Implement a responsive `@media (max-width: 768px)` stylesheet block in `public/styles.css` that collapses the 3-panel layout (sidebar, main explainer, right info feed) into a clean stacked structure.
+  3. Design a responsive navigation bar for mobile that lets users open the trends sidebar or collapse it.
+  4. Expand all buttons and interactive items (votes, debate judgment buttons, chat inputs) to have a minimum 48x48px tap target size.
+  5. Add E2E tests verifying viewport layout elements scale correctly without overflowing.
