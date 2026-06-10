@@ -25,16 +25,17 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-05** | **Cloud Firestore Persistence** (keyless production auth + local mock fallback). | 6 | 5 | 5 | 9 | **25** | `[x]` Completed |
 | **TJ-06** | **Playwright E2E testing in CI/CD pipeline** (verifying stability before deploys). | 5 | 5 | 4 | 9 | **23** | `[x]` Completed |
 | **TJ-04** | **Real-Time Global Sentiment Live Feed** (simulating active votes across regions). | 8 | 4 | 8 | 7 | **27** | `[x]` Completed |
-| **TJ-07** | **AI-Driven Sentiment Debate Arena** (Optimist vs Pessimist bot agents debating the trend). | 9 | 6 | 9 | 8 | **32** | **[/] Active** |
-| **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | `[ ]` Proposed |
+| **TJ-07** | **AI-Driven Sentiment Debate Arena** (Optimist vs Pessimist bot agents debating the trend). | 9 | 6 | 9 | 8 | **32** | `[x]` Completed |
+| **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | **[/] Active** |
 
 ---
 
-## 🛠️ Active Task Details: TJ-07
-- **Objective**: Implement an AI-driven "Sentiment Debate Arena" that generates simulated real-time debates between two distinct bot personas ("Optimist Bot" arguing why the trend is genius vs "Skeptic Bot" arguing why it is overrated).
-- **Why**: Keeps users highly engaged and on the page longer (retention), creates shareable conversational snippets (virality), and provides structured, citation-friendly debate text for AI search bots to index (GEO).
+## 🛠️ Active Task Details: TJ-08
+- **Objective**: Automatically notify search engines (via IndexNow API and Google/Bing sitemap/indexing triggers) when a new trending search is discovered and saved to our database, ensuring search engines crawl and index the trend's dynamic URL (`/t/:slug`) immediately.
+- **Why**: Speeds up organic traffic acquisition, improves SEO visibility of dynamic pages, and ensures TrendJacker dynamic URLs appear in search engine results while the trend is still hot.
 - **Execution Plan**:
-  1. Add a visual "Debate Arena" card in the center panel layout below the explanation grid.
-  2. Implement an endpoint `/api/debate` that triggers Gemini to produce a back-and-forth 3-turn debate on the active trend topic.
-  3. Load and render the debate with unique bot avatars, styled bubble layouts, and micro-animations.
-  4. Allow the user to "judge" the debate by voting who won (updating Firestore state).
+  1. Add an indexing integration module `indexing.js` or write logic in `server.js` that compiles URL entries.
+  2. Implement an HTTP helper to submit newly discovered trend URLs to the IndexNow API endpoint (supported by Bing, Yandex, Seznam, etc.) using a generated verification key.
+  3. Provide a dynamically generated XML sitemap endpoint `/sitemap.xml` that updates dynamically with the current trend cache.
+  4. Trigger sitemap pings to search engines immediately upon caching new trends.
+  5. Add E2E tests verifying sitemap and ping logic.
