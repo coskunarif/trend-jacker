@@ -19,7 +19,7 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 
 | Task ID | Task Title & Description | UX | SEO | VIR | FEAS | Total | Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **TJ-13** | **Unified Mobile UX and Navigation Polish Suite**<br>Comprehensive mobile overhaul including: sidebar close button, tab-switcher for trends list vs sentiment feed, scroll-to-top on trend select, main explainer loading skeleton, and viewport overflow/navbar cleanup. | **9.5** | **6.0** | **6.0** | **9.0** | **30.5** | 🚀 **Selected** |
+| **TJ-13** | **Unified Mobile UX and Navigation Polish Suite**<br>Comprehensive mobile overhaul including: sidebar close button, tab-switcher for trends list vs sentiment feed, scroll-to-top on trend select, main explainer loading skeleton, and viewport overflow/navbar cleanup. | **9.5** | **6.0** | **6.0** | **9.0** | **30.5** | `[x]` Completed |
 | **TJ-14** | **Main Explainer Panel Loading Skeleton & Fetch Feedback**<br>Add an animated CSS skeleton loader to replace the blank main screen while `/api/explain` is fetching, and add loading feedback on selected items. | 9.0 | 4.0 | 5.0 | 9.5 | **27.5** | Pending |
 | **TJ-15** | **Mobile Sidebar Drawer Refactor & Accessibility Fixes**<br>Add mobile close button, fix invalid `aria-controls` reference, and refactor dual nested scroll pane into a single scroll. | 8.0 | 6.5 | 4.0 | 9.0 | **27.5** | Pending |
 | **TJ-16** | **View Scroll Reset & Narrow Screen Header Polish**<br>Reset viewport scroll position to y=0 on trend load, and resolve header wrapping on devices <= 360px wide. | 8.5 | 4.0 | 4.0 | 10.0 | **26.5** | Pending |

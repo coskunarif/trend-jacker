@@ -31,6 +31,8 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | `[x]` Completed |
 | **TJ-11** | **Multi-Source Ingestion: Early Reddit Popular RSS Feed Parser** (merging early interest spikes from Reddit into trends feed). | 7 | 6 | 9 | 8 | **30** | `[x]` Completed |
 | **TJ-12** | **Visual Meme Card Generator** (HTML canvas rendering custom visual shareable meme assets). | 9 | 5 | 10 | 7 | **31** | `[x]` Completed |
+| **TJ-13** | **Unified Mobile UX and Navigation Polish Suite** (Mobile close, tabs switcher, scroll reset, explainer skeleton, header responsive layout). | 9.5 | 6.0 | 6.0 | 9.0 | **30.5** | `[x]` Completed |
+
 
 ---
 
