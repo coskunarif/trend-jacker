@@ -1163,3 +1163,216 @@ body {
   animation: textGlow 0.8s ease-in-out;
   display: inline-block;
 }
+
+/* Sentiment Debate Arena Styles */
+.debate-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.debate-intro {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.debate-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+}
+
+.debate-messages {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 100px;
+}
+
+.debate-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  padding: var(--space-6) 0;
+}
+
+/* Spinner */
+.spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  border-top-color: var(--primary);
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.debate-bubble-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 85%;
+  animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.debate-bubble-wrap.optimist {
+  align-self: flex-start;
+}
+
+.debate-bubble-wrap.skeptic {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.debate-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.debate-bubble-wrap.optimist .debate-avatar {
+  border-color: var(--genius);
+  background: var(--genius-bg);
+  color: var(--genius);
+}
+
+.debate-bubble-wrap.skeptic .debate-avatar {
+  border-color: var(--overrated);
+  background: var(--overrated-bg);
+  color: var(--overrated);
+}
+
+.debate-bubble {
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--space-3);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--text);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.debate-bubble-wrap.optimist .debate-bubble {
+  border-top-left-radius: 2px;
+}
+
+.debate-bubble-wrap.skeptic .debate-bubble {
+  border-top-right-radius: 2px;
+  background: hsl(228, 12%, 14%);
+}
+
+.debate-bot-name {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-1);
+  display: block;
+}
+
+.debate-bubble-wrap.optimist .debate-bot-name {
+  color: var(--genius);
+}
+
+.debate-bubble-wrap.skeptic .debate-bot-name {
+  color: var(--overrated);
+  text-align: right;
+}
+
+/* Animations */
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Verdict Panel */
+.debate-verdict-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-2);
+  animation: fadeIn 0.4s ease both;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.debate-verdict-panel h4 {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-heading);
+}
+
+.verdict-buttons {
+  display: flex;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 480px;
+}
+
+.verdict-btn {
+  flex: 1;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-heading);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--space-2);
+  font-size: 0.85rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+}
+
+.verdict-btn.optimist-btn:hover {
+  background: var(--genius-bg);
+  border-color: var(--genius);
+  color: var(--genius);
+  box-shadow: 0 0 16px rgba(16, 185, 129, 0.15);
+}
+
+.verdict-btn.skeptic-btn:hover {
+  background: var(--overrated-bg);
+  border-color: var(--overrated);
+  color: var(--overrated);
+  box-shadow: 0 0 16px rgba(244, 63, 94, 0.15);
+}
+
+.debate-results {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+

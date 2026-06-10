@@ -31,9 +31,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const newsSnippet = document.getElementById('detail-news-snippet');
   const newsLink = document.getElementById('detail-news-link');
 
+  // Debate Arena elements
+  const debateMessages = document.getElementById('debate-messages');
+  const debateVerdictPanel = document.getElementById('debate-verdict-panel');
+  const btnVerdictOptimist = document.getElementById('btn-verdict-optimist');
+  const btnVerdictSkeptic = document.getElementById('btn-verdict-skeptic');
+  const debateResults = document.getElementById('debate-results');
+  const barOptimist = document.getElementById('bar-optimist');
+  const barSkeptic = document.getElementById('bar-skeptic');
+  const pctOptimist = document.getElementById('pct-optimist');
+  const pctSkeptic = document.getElementById('pct-skeptic');
+
   let currentTrend = null;
   let chatMessages = [];
   let hasVotedCurrent = false;
+  let hasVotedDebateCurrent = false;
+  let activeDebateTimer1 = null;
+  let activeDebateTimer2 = null;
 
   const btnShareTrend = document.getElementById('btn-share-trend');
 
@@ -364,6 +378,9 @@ document.addEventListener('DOMContentLoaded', () => {
           Ask me any follow-up question about the viral rise of <strong>${trend.title}</strong>.
         </div>
       `;
+
+      // Fetch and Render Debate Arena (TJ-07)
+      fetchAndRenderDebate(trend.title);
 
       // News Footer
       if (trend.news && trend.news.headline) {
@@ -964,4 +981,127 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Debate Arena Helper functions (TJ-07)
+  async function fetchAndRenderDebate(trendTitle) {
+    if (activeDebateTimer1) clearTimeout(activeDebateTimer1);
+    if (activeDebateTimer2) clearTimeout(activeDebateTimer2);
+
+    hasVotedDebateCurrent = false;
+    debateVerdictPanel.classList.add('hidden');
+    debateResults.classList.add('hidden');
+    document.querySelector('.verdict-buttons').classList.remove('hidden');
+
+    debateMessages.innerHTML = `
+      <div class="debate-loading">
+        <span class="spinner"></span> Generating debate arguments...
+      </div>
+    `;
+
+    try {
+      const res = await fetch('/api/debate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trend: trendTitle })
+      });
+      if (!res.ok) throw new Error('Debate API failed');
+      const data = await res.json();
+
+      debateMessages.innerHTML = '';
+      
+      const turns = data.turns || [];
+      if (turns.length === 0) {
+        debateMessages.innerHTML = '<p class="empty-msg">No arguments recorded for this trend.</p>';
+        return;
+      }
+
+      // Render Turn 1 immediately
+      renderDebateTurn(turns[0]);
+
+      // Render Turn 2 with a delay
+      activeDebateTimer1 = setTimeout(() => {
+        renderDebateTurn(turns[1]);
+
+        // Render Turn 3 with another delay
+        activeDebateTimer2 = setTimeout(() => {
+          renderDebateTurn(turns[2]);
+
+          // Once complete, show verdict panel
+          updateDebatePercentages(data.votes);
+          debateVerdictPanel.classList.remove('hidden');
+        }, 1500);
+
+      }, 1500);
+
+    } catch (err) {
+      console.error('Error fetching debate:', err);
+      debateMessages.innerHTML = '<p class="error-msg">Failed to load AI debate card. Please retry.</p>';
+    }
+  }
+
+  function renderDebateTurn(turn) {
+    const wrap = document.createElement('div');
+    const isOptimist = turn.speaker === 'optimist';
+    wrap.className = `debate-bubble-wrap ${isOptimist ? 'optimist' : 'skeptic'}`;
+
+    const avatarChar = isOptimist ? '⚡' : '🥱';
+    const nameStr = isOptimist ? 'Optimist Bot' : 'Skeptic Bot';
+
+    wrap.innerHTML = `
+      <div class="debate-avatar">${avatarChar}</div>
+      <div class="debate-bubble">
+        <span class="debate-bot-name">${nameStr}</span>
+        ${turn.message}
+      </div>
+    `;
+    debateMessages.appendChild(wrap);
+  }
+
+  function updateDebatePercentages(votes) {
+    const total = (votes.optimistWins || 0) + (votes.skepticWins || 0);
+    let optimistPct = 0;
+    let skepticPct = 0;
+
+    if (total > 0) {
+      optimistPct = Math.round((votes.optimistWins / total) * 100);
+      skepticPct = 100 - optimistPct;
+    } else {
+      optimistPct = 50;
+      skepticPct = 50;
+    }
+
+    barOptimist.style.width = `${optimistPct}%`;
+    barSkeptic.style.width = `${skepticPct}%`;
+    pctOptimist.textContent = `${optimistPct}%`;
+    pctSkeptic.textContent = `${skepticPct}%`;
+  }
+
+  async function submitDebateVote(winner) {
+    if (hasVotedDebateCurrent || !currentTrend) return;
+
+    try {
+      const res = await fetch('/api/debate/vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trend: currentTrend.title,
+          winner: winner
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to record debate vote');
+      const newVotes = await res.json();
+
+      updateDebatePercentages(newVotes);
+
+      document.querySelector('.verdict-buttons').classList.add('hidden');
+      debateResults.classList.remove('hidden');
+      hasVotedDebateCurrent = true;
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  btnVerdictOptimist.addEventListener('click', () => submitDebateVote('optimist'));
+  btnVerdictSkeptic.addEventListener('click', () => submitDebateVote('skeptic'));
 });

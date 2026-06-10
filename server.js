@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote } from './db.js';
+import { getPollData, incrementVote, getDebateData, incrementDebateVote } from './db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -287,6 +287,89 @@ fastify.post('/api/explain', async (request, reply) => {
     return reply.status(500).send({ error: 'Failed to generate trend explanation.' });
   }
 });
+
+// Helper to generate debate turns using Gemini
+async function generateDebate(trend) {
+  if (process.env.NODE_ENV === 'test' || !genAI) {
+    return {
+      turns: [
+        { speaker: 'optimist', message: `The trend "${trend}" is absolutely revolutionary because it opens up brand new user experiences!` },
+        { speaker: 'skeptic', message: `It's just pure overhyped marketing that will be forgotten in three weeks.` },
+        { speaker: 'optimist', message: `Even if there's hype, the underlying technology has true long-term utility.` }
+      ]
+    };
+  }
+
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-3.5-flash',
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: "OBJECT",
+        properties: {
+          turns: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                speaker: { type: "STRING", enum: ["optimist", "skeptic"] },
+                message: { type: "STRING" }
+              },
+              required: ["speaker", "message"]
+            }
+          }
+        },
+        required: ["turns"]
+      },
+      thinkingConfig: { thinkingLevel: 'LOW' }
+    }
+  });
+
+  const prompt = `You are hosting a debate arena between two bots: "Optimist Bot" (argues why the trend is genius and revolutionary) and "Skeptic Bot" (argues why the trend is overrated, hype, or flawed).
+Produce a back-and-forth 3-turn debate on the topic: "${trend}".
+Turn 1: Optimist Bot makes a sharp opening argument.
+Turn 2: Skeptic Bot counters with a strong, skeptical rebuttal.
+Turn 3: Optimist Bot closes with a quick, witty defense.
+Keep each argument short (under 2 sentences) and make them witty, punchy, and highly conversational.`;
+
+  const result = await model.generateContent(prompt);
+  const textResponse = result.response.text();
+  
+  let cleanedText = textResponse.trim();
+  if (cleanedText.startsWith('```')) {
+    cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+  }
+  
+  return JSON.parse(cleanedText);
+}
+
+// POST /api/debate - Generates debate turns and gets debate votes
+fastify.post('/api/debate', async (request, reply) => {
+  const { trend } = request.body || {};
+  if (!trend) {
+    return reply.status(400).send({ error: 'Trend name is required.' });
+  }
+
+  try {
+    const debate = await generateDebate(trend);
+    debate.votes = await getDebateData(trend);
+    return debate;
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to generate debate.' });
+  }
+});
+
+// POST /api/debate/vote - Records a vote for the debate winner
+fastify.post('/api/debate/vote', async (request, reply) => {
+  const { trend, winner } = request.body || {};
+  if (!trend || !['optimist', 'skeptic'].includes(winner)) {
+    return reply.status(400).send({ error: 'Valid trend and winner (optimist/skeptic) are required.' });
+  }
+
+  return await incrementDebateVote(trend, winner);
+});
+
 
 // GET /t/:slug - Dynamically renders a trend explainer page with SEO/GEO metadata
 fastify.get('/t/:slug', async (request, reply) => {
