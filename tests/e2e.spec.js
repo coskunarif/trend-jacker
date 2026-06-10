@@ -464,7 +464,7 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(page.locator('#detail-title')).toHaveText('Fastify framework');
   });
 
-  test('should render Post to X share buttons and show results share options after voting', async ({ page }) => {
+  test('should render unified share buttons and show results share options after voting', async ({ page }) => {
     await page.route('**/api/trends', async (route) => {
       await route.fulfill({
         status: 200,
@@ -515,25 +515,17 @@ test.describe('TrendJacker E2E tests', () => {
     await page.goto('/');
 
     const shareTrendBtn = page.locator('#btn-share-trend');
-    const shareXBtn = page.locator('#btn-share-x');
+    const sharePollBtn = page.locator('#btn-share-poll');
+    const shareDebateBtn = page.locator('#btn-share-debate');
+
     await expect(shareTrendBtn).toBeVisible();
-    await expect(shareXBtn).toBeVisible();
+    await expect(sharePollBtn).toBeVisible();
+    await expect(shareDebateBtn).toBeVisible();
 
-    const sharePollXBtn = page.locator('#btn-share-poll-x');
-    await expect(sharePollXBtn).not.toBeVisible();
-
-    await page.locator('#btn-vote-genius').click();
-    await expect(sharePollXBtn).toBeVisible();
-
-    const shareDebateXBtn = page.locator('#btn-share-debate-x');
     const downloadDebateCardBtn = page.locator('#btn-download-debate-card');
-    
-    await expect(shareDebateXBtn).not.toBeVisible();
     await expect(downloadDebateCardBtn).not.toBeVisible();
 
     await page.locator('#btn-verdict-optimist').click();
-    
-    await expect(shareDebateXBtn).toBeVisible();
     await expect(downloadDebateCardBtn).toBeVisible();
 
     // Verify download triggers successfully

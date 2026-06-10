@@ -17,7 +17,7 @@ async function run() {
   
   console.log('Navigating to http://localhost:3005');
   await page.goto('http://localhost:3005');
-  await page.waitForLoadState('networkidle');
+  await page.waitForLoadState('domcontentloaded');
   
   // Take initial screenshot
   await page.screenshot({ path: './dogfood-output/screenshots/initial.png' });
@@ -25,7 +25,7 @@ async function run() {
 
   // Click on a trend (e.g., england vs india)
   console.log('Clicking on trend link: england vs india');
-  await page.locator('text=england vs india').first().click();
+  await page.locator('.trend-item').first().click();
   
   // Wait for explanation and debate to generate
   console.log('Waiting for AI content...');
