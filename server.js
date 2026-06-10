@@ -57,8 +57,42 @@ fastify.register(fastifyStatic, {
 
 // Database initialized via db.js module
 
-// GET /api/trends - Fetches and parses Google Trends RSS feed
-fastify.get('/api/trends', async (request, reply) => {
+// Locations for simulated votes
+const LOCATIONS = [
+  { city: 'Tokyo', country: 'Japan', flag: '🇯🇵' },
+  { city: 'Paris', country: 'France', flag: '🇫🇷' },
+  { city: 'New York', country: 'United States', flag: '🇺🇸' },
+  { city: 'London', country: 'United Kingdom', flag: '🇬🇧' },
+  { city: 'Sydney', country: 'Australia', flag: '🇦🇺' },
+  { city: 'Berlin', country: 'Germany', flag: '🇩🇪' },
+  { city: 'Toronto', country: 'Canada', flag: '🇨🇦' },
+  { city: 'Mumbai', country: 'India', flag: '🇮🇳' },
+  { city: 'São Paulo', country: 'Brazil', flag: '🇧🇷' },
+  { city: 'Cape Town', country: 'South Africa', flag: '🇿🇦' },
+  { city: 'Singapore', country: 'Singapore', flag: '🇸🇬' },
+  { city: 'Seoul', country: 'South Korea', flag: '🇰🇷' },
+  { city: 'Mexico City', country: 'Mexico', flag: '🇲🇽' },
+  { city: 'Dubai', country: 'United Arab Emirates', flag: '🇦🇪' },
+  { city: 'Stockholm', country: 'Sweden', flag: '🇸🇪' }
+];
+
+const DEFAULT_TRENDS = [
+  { title: "AI Agent", traffic: "100K+", description: "Autonomous software agents taking over tasks." },
+  { title: "Apple Vision Pro", traffic: "50K+", description: "Spatial computing and virtual reality headset." },
+  { title: "ChatGPT", traffic: "200K+", description: "Conversational language model by OpenAI." },
+  { title: "Claude 3.5", traffic: "100K+", description: "Anthropic's latest state-of-the-art model." },
+  { title: "Remote Work", traffic: "20K+", description: "The shifting landscape of work environments." },
+  { title: "Electric Vehicles", traffic: "50K+", description: "Transition from internal combustion engines." },
+  { title: "Self-Driving Cars", traffic: "30K+", description: "Autonomous vehicle technology updates." },
+  { title: "Quantum Computing", traffic: "10K+", description: "Computing using quantum-mechanical phenomena." },
+  { title: "Fusion Energy", traffic: "10K+", description: "Clean power generation technology." },
+  { title: "Web3", traffic: "20K+", description: "Decentralized web technologies and blockchain." }
+];
+
+let latestTrends = [];
+
+// Helper to fetch trends and populate cache
+async function updateTrendsCache() {
   try {
     const response = await fetch('https://trends.google.com/trending/rss?geo=US');
     if (!response.ok) {
@@ -68,8 +102,7 @@ fastify.get('/api/trends', async (request, reply) => {
     const result = await parseStringPromise(xmlText);
     
     const items = result.rss.channel[0].item || [];
-    const trends = items.map((item, index) => {
-      // Safely parse custom namespaces
+    latestTrends = items.map((item, index) => {
       const traffic = item['ht:approx_traffic'] ? item['ht:approx_traffic'][0] : 'N/A';
       const newsItem = item['ht:news_item'] ? item['ht:news_item'][0] : null;
       
@@ -91,12 +124,98 @@ fastify.get('/api/trends', async (request, reply) => {
         }
       };
     });
+    console.log(`Successfully cached ${latestTrends.length} trends.`);
+  } catch (err) {
+    console.error('Failed to update trends cache, using fallback:', err.message);
+  }
+}
 
-    return trends.slice(0, 15);
+// GET /api/trends - Fetches and parses Google Trends RSS feed
+fastify.get('/api/trends', async (request, reply) => {
+  try {
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    return latestTrends.slice(0, 15);
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to fetch trending topics.' });
   }
+});
+
+// Server-Sent Events Clients for live sentiment feed
+const sseClients = new Set();
+let globalSimulationInterval = null;
+
+function broadcastSSE(data) {
+  const message = `data: ${JSON.stringify(data)}\n\n`;
+  for (const client of sseClients) {
+    try {
+      client.write(message);
+    } catch (err) {
+      // Client disconnected
+    }
+  }
+}
+
+function startGlobalSimulation() {
+  if (globalSimulationInterval) return;
+  console.log('Starting global sentiment simulation timer.');
+  globalSimulationInterval = setInterval(async () => {
+    if (sseClients.size === 0) {
+      stopGlobalSimulation();
+      return;
+    }
+
+    const trendsList = latestTrends.length > 0 ? latestTrends : DEFAULT_TRENDS;
+    const randomTrend = trendsList[Math.floor(Math.random() * trendsList.length)];
+    const vote = Math.random() > 0.55 ? 'genius' : 'overrated';
+    const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+
+    let updatedPolls = null;
+    try {
+      updatedPolls = await incrementVote(randomTrend.title, vote);
+    } catch (err) {
+      console.error(`Failed to increment simulated vote for "${randomTrend.title}":`, err.message);
+    }
+
+    broadcastSSE({
+      trend: randomTrend.title,
+      vote,
+      location,
+      updatedPolls,
+      timestamp: new Date().toISOString()
+    });
+  }, 4000); // Simulated vote broadcasted every 4 seconds
+}
+
+function stopGlobalSimulation() {
+  if (globalSimulationInterval) {
+    clearInterval(globalSimulationInterval);
+    globalSimulationInterval = null;
+    console.log('Stopped global sentiment simulation (no clients connected).');
+  }
+}
+
+// GET /api/sentiment-stream - SSE endpoint for global activity feed
+fastify.get('/api/sentiment-stream', (request, reply) => {
+  reply.raw.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'Access-Control-Allow-Origin': '*'
+  });
+
+  reply.raw.write('retry: 5000\n\n');
+  sseClients.add(reply.raw);
+  startGlobalSimulation();
+
+  request.raw.on('close', () => {
+    sseClients.delete(reply.raw);
+    if (sseClients.size === 0) {
+      stopGlobalSimulation();
+    }
+  });
 });
 
 // Helper to get explanation from Gemini
@@ -172,17 +291,29 @@ fastify.get('/t/:slug', async (request, reply) => {
   let snippet = '';
 
   try {
-    const response = await fetch('https://trends.google.com/trending/rss?geo=US');
-    if (response.ok) {
-      const xmlText = await response.text();
-      const result = await parseStringPromise(xmlText);
-      const items = result.rss.channel[0].item || [];
-      const match = items.find(item => titleToSlug(item.title[0]) === slug);
-      if (match) {
-        trendName = match.title[0];
-        const newsItem = match['ht:news_item'] ? match['ht:news_item'][0] : null;
-        snippet = newsItem && newsItem['ht:news_item_snippet'] ? newsItem['ht:news_item_snippet'][0] : '';
-        headline = newsItem && newsItem['ht:news_item_title'] ? newsItem['ht:news_item_title'][0] : '';
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    const match = latestTrends.find(item => titleToSlug(item.title) === slug);
+    if (match) {
+      trendName = match.title;
+      const newsItem = match.news || {};
+      snippet = newsItem.snippet || '';
+      headline = newsItem.headline || '';
+    } else {
+      // Fallback
+      const response = await fetch('https://trends.google.com/trending/rss?geo=US');
+      if (response.ok) {
+        const xmlText = await response.text();
+        const result = await parseStringPromise(xmlText);
+        const items = result.rss.channel[0].item || [];
+        const liveMatch = items.find(item => titleToSlug(item.title[0]) === slug);
+        if (liveMatch) {
+          trendName = liveMatch.title[0];
+          const newsItem = liveMatch['ht:news_item'] ? liveMatch['ht:news_item'][0] : null;
+          snippet = newsItem && newsItem['ht:news_item_snippet'] ? newsItem['ht:news_item_snippet'][0] : '';
+          headline = newsItem && newsItem['ht:news_item_title'] ? newsItem['ht:news_item_title'][0] : '';
+        }
       }
     }
   } catch (err) {
@@ -255,14 +386,10 @@ fastify.get('/t/:slug', async (request, reply) => {
 // GET /sitemap.xml - Dynamic sitemap generator
 fastify.get('/sitemap.xml', async (request, reply) => {
   try {
-    const response = await fetch('https://trends.google.com/trending/rss?geo=US');
-    let slugs = [];
-    if (response.ok) {
-      const xmlText = await response.text();
-      const result = await parseStringPromise(xmlText);
-      const items = result.rss.channel[0].item || [];
-      slugs = items.map(item => titleToSlug(item.title[0]));
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
     }
+    const slugs = latestTrends.map(item => titleToSlug(item.title));
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
@@ -347,10 +474,15 @@ fastify.post('/api/poll', async (request, reply) => {
 
 // Start the Fastify server
 const port = process.env.PORT || 3000;
-fastify.listen({ port, host: '0.0.0.0' }, (err) => {
+fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
   if (err) {
     fastify.log.error(err);
     process.exit(1);
   }
   console.log(`Trend-Jacker PoC running at http://localhost:${port}`);
+  
+  // Initialize trends cache
+  await updateTrendsCache();
+  // Refresh cache every 10 minutes
+  setInterval(updateTrendsCache, 10 * 60 * 1000);
 });

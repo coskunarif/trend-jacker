@@ -705,10 +705,24 @@ document.addEventListener('DOMContentLoaded', () => {
       overratedPct = 50;
     }
     
+    const prevGeniusText = pctGenius.textContent;
+    const prevOverratedText = pctOverrated.textContent;
+    const geniusChanged = prevGeniusText && prevGeniusText !== `${geniusPct}%`;
+    const overratedChanged = prevOverratedText && prevOverratedText !== `${overratedPct}%`;
+
     barGenius.style.width = `${geniusPct}%`;
     barOverrated.style.width = `${overratedPct}%`;
     pctGenius.textContent = `${geniusPct}%`;
     pctOverrated.textContent = `${overratedPct}%`;
+
+    if (geniusChanged) {
+      pctGenius.classList.add('pulse-text');
+      setTimeout(() => pctGenius.classList.remove('pulse-text'), 800);
+    }
+    if (overratedChanged) {
+      pctOverrated.classList.add('pulse-text');
+      setTimeout(() => pctOverrated.classList.remove('pulse-text'), 800);
+    }
   }
 
   // Chat Follow-Up Submit
@@ -767,6 +781,93 @@ document.addEventListener('DOMContentLoaded', () => {
     chatHistory.scrollTop = chatHistory.scrollHeight;
     return div;
   }
+
+  // Initialize Global Live Sentiment Feed
+  function initSentimentFeed() {
+    const feedContainer = document.getElementById('live-sentiment-feed');
+    if (!feedContainer) return;
+
+    const eventSource = new EventSource('/api/sentiment-stream');
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // Remove empty state if present
+        const emptyState = feedContainer.querySelector('.feed-empty-state');
+        if (emptyState) {
+          emptyState.remove();
+        }
+
+        // Create feed item element
+        const item = document.createElement('div');
+        item.className = 'feed-item';
+        
+        const timestamp = new Date(data.timestamp);
+        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+        item.innerHTML = `
+          <span class="feed-item-flag">${data.location.flag || '📍'}</span>
+          <div class="feed-item-content">
+            <span class="feed-item-user">${data.location.city}, ${data.location.country}</span>
+            voted
+            <span class="feed-item-vote ${data.vote}">${data.vote}</span>
+            on
+            <span class="feed-item-trend">${data.trend}</span>
+          </div>
+          <span class="feed-item-time">${timeStr}</span>
+        `;
+
+        // Wire click listener to load trend details if clicked
+        const trendLink = item.querySelector('.feed-item-trend');
+        if (trendLink) {
+          trendLink.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const slug = titleToSlug(data.trend);
+            // Search in sidebar items
+            const itemEl = Array.from(document.querySelectorAll('.trend-item'))
+              .find(el => titleToSlug(el.querySelector('.trend-item-title').textContent.trim()) === slug);
+            
+            if (itemEl && itemEl._clickHandler) {
+              itemEl._clickHandler(false);
+            } else {
+              // Fallback load manual details
+              loadTrendDetails({
+                title: data.trend,
+                traffic: 'Rising',
+                news: { headline: '', snippet: '', url: '' }
+              });
+              const newUrl = window.location.origin + '/t/' + slug;
+              window.history.pushState({ path: newUrl }, '', newUrl);
+            }
+          });
+        }
+
+        // Insert at the top
+        feedContainer.insertBefore(item, feedContainer.firstChild);
+
+        // Keep maximum 15 items in the feed list
+        while (feedContainer.children.length > 15) {
+          feedContainer.lastChild.remove();
+        }
+
+        // If the incoming simulated vote matches current trend, update percentages
+        if (currentTrend && currentTrend.title === data.trend && data.updatedPolls) {
+          updatePollPercentages(data.updatedPolls);
+        }
+
+      } catch (err) {
+        console.error('Error handling SSE live vote event:', err);
+      }
+    };
+
+    eventSource.onerror = (err) => {
+      console.error('SSE Connection error (sentiment stream):', err);
+    };
+  }
+
+  // Start the feed
+  initSentimentFeed();
 
   // WebMCP Integration: Expose client-side functions as tools to user AI agents (e.g. Claude Code, Siri, etc.)
   const modelContext = document.modelContext || window.modelContext;

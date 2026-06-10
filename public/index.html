@@ -38,8 +38,9 @@
 
   <!-- Main Grid Layout -->
   <main class="dashboard-grid">
-    <!-- Left Sidebar: Trends List -->
+    <!-- Left Sidebar: Trends List & Live Sentiment Feed -->
     <aside class="sidebar-panel">
+      <!-- Section 1: Trends List -->
       <div class="panel-header">
         <h2 class="section-title">Trending Searches</h2>
         <p class="section-subtitle">Pinging Google Trends API</p>
@@ -51,6 +52,25 @@
         <div class="skeleton-item"></div>
         <div class="skeleton-item"></div>
         <div class="skeleton-item"></div>
+      </div>
+
+      <!-- Section 2: Global Sentiment Feed -->
+      <div class="live-feed-section">
+        <div class="panel-header feed-header">
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+            <div>
+              <h2 class="section-title">Global Sentiment Feed</h2>
+              <p class="section-subtitle">Real-time simulated votes</p>
+            </div>
+            <span class="live-indicator">
+              <span class="status-dot animate-pulse"></span>
+              <span class="status-label">Live</span>
+            </span>
+          </div>
+        </div>
+        <div id="live-sentiment-feed" class="feed-scroll-container" role="log" aria-live="polite">
+          <div class="feed-empty-state">Waiting for activity...</div>
+        </div>
       </div>
     </aside>
 
