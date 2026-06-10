@@ -17,6 +17,7 @@ Any agent or developer taking over this project has **complete creative license 
 * **The Principle**: 
   * **Traditional SEO**: Implement pristine semantic HTML5 structure, schema markup (JSON-LD), lightning-fast PageSpeed/Core Web Vitals, and unique metadata.
   * **Generative Engine Optimization (GEO)**: Format trend responses with clear entity relationships, credible context, and direct summaries that AI scrapers can easily cite.
+  * **Dynamic Indexation & Sitemap**: Maintain a dynamic `sitemap.xml` that updates automatically as new trends are ingested. The application should programmatically ping new and updated URLs to search engines via the Google Indexing API and Bing IndexNow API, triggering instant crawls and indexing within minutes of trend detection.
 * **Imagine**: How can we automatically generate dynamic Schema tags, sitemaps, and citation-friendly layouts for every trending page?
 
 ## 📡 3. Cross-Platform Trend Ingestion
