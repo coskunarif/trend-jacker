@@ -247,74 +247,7 @@ test.describe('TrendJacker E2E tests', () => {
     expect(feedContent).toContain('on');
   });
 
-  test('should load debate arena, render turns, and submit verdict', async ({ page }) => {
-    // Intercept trends, explain, debate, and debate vote API
-    await page.route('**/api/trends', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(mockTrends),
-      });
-    });
 
-    await page.route('**/api/explain', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(mockExplanation),
-      });
-    });
-
-    await page.route('**/api/debate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          turns: [
-            { speaker: 'optimist', message: 'Optimist opening argument' },
-            { speaker: 'skeptic', message: 'Skeptic counter argument' },
-            { speaker: 'optimist', message: 'Optimist final rebuttal' }
-          ],
-          votes: { optimistWins: 10, skepticWins: 10 }
-        }),
-      });
-    });
-
-    await page.route('**/api/debate/vote', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ optimistWins: 15, skepticWins: 10 }),
-      });
-    });
-
-    await page.goto('/');
-
-    // Verify debate messages are loading initially
-    const optimistBubble = page.locator('.debate-bubble-wrap.optimist').first();
-    const skepticBubble = page.locator('.debate-bubble-wrap.skeptic').first();
-
-    // Verify turn 1 renders
-    await expect(optimistBubble).toBeVisible();
-    await expect(optimistBubble.locator('.debate-bubble')).toHaveText(/Optimist opening argument/);
-
-    // Wait for Turn 2 and Turn 3 to render sequentially (within 4 seconds total)
-    await expect(skepticBubble).toBeVisible({ timeout: 5000 });
-    await expect(skepticBubble.locator('.debate-bubble')).toHaveText(/Skeptic counter argument/);
-
-    // Verify verdict panel is revealed after turns finish
-    const verdictPanel = page.locator('#debate-verdict-panel');
-    await expect(verdictPanel).toBeVisible({ timeout: 5000 });
-
-    // Click Optimist wins button
-    await page.locator('#btn-verdict-optimist').click();
-
-    // Check results visibility and updated percentages (15 wins vs 10 wins => 60% vs 40%)
-    const results = page.locator('#debate-results');
-    await expect(results).toBeVisible();
-    await expect(page.locator('#pct-optimist')).toHaveText('60%');
-    await expect(page.locator('#pct-skeptic')).toHaveText('40%');
-  });
 
   test('should load trend details directly from slug-based route', async ({ page }) => {
     await page.goto('/t/google-gemini');
@@ -464,7 +397,7 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(page.locator('#detail-title')).toHaveText('Fastify framework');
   });
 
-  test('should render unified share buttons and show results share options after voting', async ({ page }) => {
+  test('should render unified share buttons and download infographic card', async ({ page }) => {
     await page.route('**/api/trends', async (route) => {
       await route.fulfill({
         status: 200,
@@ -481,58 +414,22 @@ test.describe('TrendJacker E2E tests', () => {
       });
     });
 
-    await page.route('**/api/poll', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ genius: 10, overrated: 10 }),
-      });
-    });
-
-    await page.route('**/api/debate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          turns: [
-            { speaker: 'optimist', message: 'Optimist opening' },
-            { speaker: 'skeptic', message: 'Skeptic counter' },
-            { speaker: 'optimist', message: 'Optimist rebuttal' }
-          ],
-          votes: { optimistWins: 10, skepticWins: 10 }
-        }),
-      });
-    });
-
-    await page.route('**/api/debate/vote', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ optimistWins: 11, skepticWins: 10 }),
-      });
-    });
-
     await page.goto('/');
 
     const shareTrendBtn = page.locator('#btn-share-trend');
     const sharePollBtn = page.locator('#btn-share-poll');
-    const shareDebateBtn = page.locator('#btn-share-debate');
 
     await expect(shareTrendBtn).toBeVisible();
     await expect(sharePollBtn).toBeVisible();
-    await expect(shareDebateBtn).toBeVisible();
 
-    const downloadDebateCardBtn = page.locator('#btn-download-debate-card');
-    await expect(downloadDebateCardBtn).not.toBeVisible();
-
-    await page.locator('#btn-verdict-optimist').click();
-    await expect(downloadDebateCardBtn).toBeVisible();
+    const downloadInfographicBtn = page.locator('#btn-download-infographic');
+    await expect(downloadInfographicBtn).toBeVisible();
 
     // Verify download triggers successfully
     const downloadPromise = page.waitForEvent('download');
-    await downloadDebateCardBtn.click();
+    await downloadInfographicBtn.click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toContain('debate-meme-');
+    expect(download.suggestedFilename()).toContain('infographic-');
   });
 
   test('should render source badges on trend list items', async ({ page }) => {

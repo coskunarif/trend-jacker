@@ -78,14 +78,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await page.locator('#btn-close-share-modal').click();
     await expect(shareModal).not.toBeVisible();
 
-    // Click the unified Share Debate button
-    const shareDebateBtn = page.locator('#btn-share-debate');
-    await expect(shareDebateBtn).toBeVisible();
-    await shareDebateBtn.click();
-    await expect(shareModal).toBeVisible();
 
-    // Assert modal opens with "Debate Summary" context pre-selected
-    await expect(contextSelect).toHaveValue('debate');
   });
 
   test('3. Verify Generation & Platform Switching', async ({ page }) => {
@@ -197,11 +190,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     // Assert that legacy share buttons are removed from the DOM
     const legacyShareTrendBtn = page.locator('#btn-share-x');
     const legacySharePollBtn = page.locator('#btn-share-poll-x');
-    const legacyShareDebateBtn = page.locator('#btn-share-debate-x');
 
     await expect(legacyShareTrendBtn).not.toBeAttached();
     await expect(legacySharePollBtn).not.toBeAttached();
-    await expect(legacyShareDebateBtn).not.toBeAttached();
   });
 
   test('7. Verify Platform-Specific Formatting and URL Inclusion', async ({ page }) => {

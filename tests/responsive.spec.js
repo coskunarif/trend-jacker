@@ -24,14 +24,7 @@ const mockExplanation = {
   polls: { overrated: 5, genius: 15 }
 };
 
-const mockDebate = {
-  turns: [
-    { speaker: 'optimist', message: 'Optimist opening argument. We believe Gemini is absolute genius because it delivers unprecedented context length and speed.' },
-    { speaker: 'skeptic', message: 'Skeptic counter argument. Overrated hype. The context window is large but retrieval quality drops significantly at the center.' },
-    { speaker: 'optimist', message: 'Optimist final rebuttal. In-context learning performance remains high across the entire context window.' }
-  ],
-  votes: { optimistWins: 10, skepticWins: 10 }
-};
+
 
 test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
 
@@ -53,13 +46,7 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
       });
     });
 
-    await page.route('**/api/debate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(mockDebate),
-      });
-    });
+
 
     await page.route('**/api/chat', async (route) => {
       await route.fulfill({
@@ -122,78 +109,7 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
         expect(overflowingElements).toEqual([]);
       });
 
-      test('should render debate bubbles side-by-side with uncompressed avatars', async ({ page }) => {
-        await page.goto('/');
-        await expect(page.locator('#explainer-view')).toBeVisible();
 
-        // Wait for debate turns to render (turn 1 is immediate, turn 2 at 1.5s, turn 3 at 3s)
-        const optimistBubbleWrap = page.locator('.debate-bubble-wrap.optimist').first();
-        const skepticBubbleWrap = page.locator('.debate-bubble-wrap.skeptic').first();
-        
-        await expect(optimistBubbleWrap).toBeVisible({ timeout: 5000 });
-        await expect(skepticBubbleWrap).toBeVisible({ timeout: 5000 });
-
-        // Evaluate optimist turn layout
-        const optAvatarBox = await optimistBubbleWrap.locator('.debate-avatar').boundingBox();
-        const optBubbleBox = await optimistBubbleWrap.locator('.debate-bubble').boundingBox();
-
-        expect(optAvatarBox).not.toBeNull();
-        expect(optBubbleBox).not.toBeNull();
-
-        // Avatar should not be squashed: exact dimensions 36x36
-        expect(optAvatarBox.width).toBeCloseTo(36, 1);
-        expect(optAvatarBox.height).toBeCloseTo(36, 1);
-
-        // Optimist: side-by-side (row layout) => Avatar is on the left of bubble
-        expect(optAvatarBox.x + optAvatarBox.width).toBeLessThanOrEqual(optBubbleBox.x);
-        
-        // Vertical positioning: they should overlap vertically (side-by-side, not stacked)
-        expect(optAvatarBox.y).toBeLessThan(optBubbleBox.y + optBubbleBox.height);
-        expect(optBubbleBox.y).toBeLessThan(optAvatarBox.y + optAvatarBox.height);
-
-        // Bounding box width of the debate bubble should be healthy (>= 150px) and wrap properly, not collapse
-        expect(optBubbleBox.width).toBeGreaterThanOrEqual(150);
-
-        // Evaluate skeptic turn layout
-        const skAvatarBox = await skepticBubbleWrap.locator('.debate-avatar').boundingBox();
-        const skBubbleBox = await skepticBubbleWrap.locator('.debate-bubble').boundingBox();
-
-        expect(skAvatarBox).not.toBeNull();
-        expect(skBubbleBox).not.toBeNull();
-
-        // Skeptic avatar should not be squashed: exact dimensions 36x36
-        expect(skAvatarBox.width).toBeCloseTo(36, 1);
-        expect(skAvatarBox.height).toBeCloseTo(36, 1);
-
-        // Skeptic: side-by-side (row-reverse layout) => Bubble is on the left of Avatar
-        expect(skBubbleBox.x + skBubbleBox.width).toBeLessThanOrEqual(skAvatarBox.x);
-
-        // Bounding box width of the skeptic debate bubble should be healthy (>= 150px)
-        expect(skBubbleBox.width).toBeGreaterThanOrEqual(150);
-
-        // Optimist alignment: left-aligned (close to left boundary)
-        const optimistWrapBox = await optimistBubbleWrap.boundingBox();
-        expect(optimistWrapBox.x).toBeLessThanOrEqual(25); // Close to left edge
-
-        // Skeptic alignment: right-aligned (close to right boundary)
-        const skepticWrapBox = await skepticBubbleWrap.boundingBox();
-        expect(skepticWrapBox.x + skepticWrapBox.width).toBeGreaterThanOrEqual(vp.width - 25);
-
-        // Verify width: fit-content is declared in styles for .debate-bubble-wrap
-        const hasDebateFitContent = await page.evaluate(() => {
-          for (const sheet of document.styleSheets) {
-            try {
-              for (const rule of sheet.cssRules) {
-                if (rule.selectorText === '.debate-bubble-wrap' && rule.style.width === 'fit-content') {
-                  return true;
-                }
-              }
-            } catch (e) {}
-          }
-          return false;
-        });
-        expect(hasDebateFitContent).toBe(true);
-      });
 
       test('should enforce fit-content layout behavior on chat bubbles', async ({ page }) => {
         await page.goto('/');
@@ -256,18 +172,7 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
         expect(layoutStyles.rowGap).toBe('8px');
       });
 
-      test('should have overflow-y auto/scroll on debate messages and not overflow outer height boundary', async ({ page }) => {
-        await page.goto('/');
-        await expect(page.locator('#explainer-view')).toBeVisible();
 
-        // Wait for debate turns to render (up to turn 3 at 3s)
-        const lastBubble = page.locator('.debate-bubble-wrap').last();
-        await expect(lastBubble).toBeVisible({ timeout: 5000 });
-
-        const debateMessages = page.locator('#debate-messages');
-        const overflowY = await debateMessages.evaluate(el => window.getComputedStyle(el).overflowY);
-        expect(overflowY).toMatch(/auto|scroll/);
-      });
 
     });
   }
@@ -306,6 +211,44 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
       });
       expect(speedoStyles.maxWidth).toBe('100%');
     });
+  });
+
+  test('should render the .visual-cards-grid responsively', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('#explainer-view')).toBeVisible();
+
+    const grid = page.locator('.visual-cards-grid');
+    await expect(grid).toBeVisible();
+
+    // 1. Desktop Viewport
+    await page.setViewportSize({ width: 1200, height: 800 });
+    await page.waitForTimeout(200);
+
+    const card1 = page.locator('#card-viral-vibe');
+    const card2 = page.locator('#card-live-sentiment');
+    const card3 = page.locator('#card-snapshot-share');
+
+    const box1_desk = await card1.boundingBox();
+    const box2_desk = await card2.boundingBox();
+    const box3_desk = await card3.boundingBox();
+
+    // On desktop, they should be side-by-side (X coords increasing, Y coords similar)
+    expect(box1_desk.x).toBeLessThan(box2_desk.x);
+    expect(box2_desk.x).toBeLessThan(box3_desk.x);
+    expect(Math.abs(box1_desk.y - box2_desk.y)).toBeLessThan(20);
+
+    // 2. Mobile Viewport
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.waitForTimeout(200);
+
+    const box1_mob = await card1.boundingBox();
+    const box2_mob = await card2.boundingBox();
+    const box3_mob = await card3.boundingBox();
+
+    // On mobile, they should stack vertically (Y coords increasing, X coords aligned/similar)
+    expect(box1_mob.y).toBeLessThan(box2_mob.y);
+    expect(box2_mob.y).toBeLessThan(box3_mob.y);
+    expect(Math.abs(box1_mob.x - box2_mob.x)).toBeLessThan(20);
   });
 
 });
