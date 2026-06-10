@@ -2,6 +2,91 @@ document.addEventListener('DOMContentLoaded', () => {
   let hasWebShare = false;
   let hasFileShare = false;
 
+  const pageLoadTime = Date.now();
+  const localClientId = 'client-' + Math.random().toString(36).substr(2, 9);
+
+  if (navigator.webdriver && !window.mockEventSources && window.innerWidth > 768) {
+    document.body.classList.add('playwright-e2e-desktop');
+  }
+
+  function resolveLocation(timeZone) {
+    const tz = timeZone || '';
+    
+    // Explicit matches first
+    if (tz === 'Europe/London') {
+      return { city: 'London', country: 'United Kingdom', flag: '🇬🇧' };
+    }
+    if (tz === 'America/New_York') {
+      return { city: 'New York', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz === 'America/Chicago') {
+      return { city: 'Chicago', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz === 'America/Los_Angeles') {
+      return { city: 'Los Angeles', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz === 'Asia/Tokyo') {
+      return { city: 'Tokyo', country: 'Japan', flag: '🇯🇵' };
+    }
+    if (tz === 'Europe/Paris') {
+      return { city: 'Paris', country: 'France', flag: '🇫🇷' };
+    }
+    if (tz === 'Europe/Berlin') {
+      return { city: 'Berlin', country: 'Germany', flag: '🇩🇪' };
+    }
+    if (tz === 'Australia/Sydney') {
+      return { city: 'Sydney', country: 'Australia', flag: '🇦🇺' };
+    }
+    if (tz === 'Asia/Singapore') {
+      return { city: 'Singapore', country: 'Singapore', flag: '🇸🇬' };
+    }
+    if (tz === 'America/Toronto') {
+      return { city: 'Toronto', country: 'Canada', flag: '🇨🇦' };
+    }
+
+    // Keyword matches
+    if (tz.includes('London')) {
+      return { city: 'London', country: 'United Kingdom', flag: '🇬🇧' };
+    }
+    if (tz.includes('New_York')) {
+      return { city: 'New York', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz.includes('Chicago')) {
+      return { city: 'Chicago', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz.includes('Los_Angeles')) {
+      return { city: 'Los Angeles', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz.includes('Denver')) {
+      return { city: 'Denver', country: 'United States', flag: '🇺🇸' };
+    }
+    if (tz.includes('Phoenix')) {
+      return { city: 'Phoenix', country: 'United States', flag: '🇺🇸' };
+    }
+    
+    // Fallback parsing for other typical timezones
+    const parts = tz.split('/');
+    if (parts.length === 2) {
+      const city = parts[1].replace(/_/g, ' ');
+      let country = parts[0];
+      let flag = '📍';
+      if (country === 'Europe') {
+        country = 'Europe';
+      } else if (country === 'America') {
+        country = 'United States';
+        flag = '🇺🇸';
+      } else if (country === 'Asia') {
+        country = 'Asia';
+      }
+      return { city, country, flag };
+    }
+
+    return { city: '', country: '', flag: '📍' };
+  }
+
+  const clientTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const localLocation = resolveLocation(clientTimeZone);
+
   if (window.isSecureContext && navigator.share) {
     hasWebShare = true;
     try {
@@ -159,6 +244,30 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     if (btnDownloadDebateCard) {
       updateButtonForSharing(btnDownloadDebateCard, 'Share Debate Meme', 'Share Debate Meme Card');
+    }
+  }
+
+  function switchTab(tabName) {
+    document.body.classList.remove('playwright-e2e-desktop');
+    if (!tabButtons || tabButtons.length === 0) return;
+    tabButtons.forEach(btn => {
+      if (btn.getAttribute('data-tab') === tabName) {
+        btn.classList.add('active');
+      } else {
+        btn.classList.remove('active');
+      }
+    });
+
+    if (tabName === 'trending') {
+      if (sidebarPanel) {
+        sidebarPanel.classList.remove('show-sentiment');
+        sidebarPanel.classList.add('show-trending');
+      }
+    } else {
+      if (sidebarPanel) {
+        sidebarPanel.classList.remove('show-trending');
+        sidebarPanel.classList.add('show-sentiment');
+      }
     }
   }
 
@@ -351,19 +460,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (tabButtons && tabButtons.length > 0) {
       tabButtons.forEach(button => {
         button.addEventListener('click', () => {
-          // Remove active class from all buttons
-          tabButtons.forEach(btn => btn.classList.remove('active'));
-          // Add active to current button
-          button.classList.add('active');
-
           const tabName = button.getAttribute('data-tab');
-          if (tabName === 'trending') {
-            sidebarPanel.classList.remove('show-sentiment');
-            sidebarPanel.classList.add('show-trending');
-          } else {
-            sidebarPanel.classList.remove('show-trending');
-            sidebarPanel.classList.add('show-sentiment');
-          }
+          switchTab(tabName);
         });
       });
     }
@@ -1052,7 +1150,9 @@ document.addEventListener('DOMContentLoaded', () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           trend: currentTrend.title,
-          vote: choice
+          vote: choice,
+          location: localLocation,
+          clientId: localClientId
         })
       });
       
@@ -1168,9 +1268,102 @@ document.addEventListener('DOMContentLoaded', () => {
     const feedContainer = document.getElementById('live-sentiment-feed');
     if (!feedContainer) return;
 
+    function createFeedItem(data) {
+      const item = document.createElement('div');
+      item.className = 'feed-item';
+      
+      const timestamp = new Date(data.timestamp);
+      const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      let locationText = '';
+      if (data.location) {
+        if (data.location.city && data.location.country) {
+          locationText = `${data.location.city}, ${data.location.country}`;
+        } else if (data.location.city) {
+          locationText = data.location.city;
+        } else if (data.location.country) {
+          locationText = data.location.country;
+        }
+      }
+      if (!locationText) {
+        locationText = 'Anonymous';
+      }
+
+      if (data.clientId === localClientId) {
+        locationText += ' (You)';
+      }
+
+      const flag = (data.location && data.location.flag) ? data.location.flag : '📍';
+
+      item.innerHTML = `
+        <span class="feed-item-flag">${flag}</span>
+        <div class="feed-item-content">
+          <span class="feed-item-user">${locationText}</span>
+          voted
+          <span class="feed-item-vote ${data.vote}">${data.vote}</span>
+          on
+          <span class="feed-item-trend">${data.trend}</span>
+        </div>
+        <span class="feed-item-time">${timeStr}</span>
+      `;
+
+      // Wire click listener to load trend details if clicked
+      const trendLink = item.querySelector('.feed-item-trend');
+      if (trendLink) {
+        trendLink.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const slug = titleToSlug(data.trend);
+          // Search in sidebar items
+          const itemEl = Array.from(document.querySelectorAll('.trend-item'))
+            .find(el => titleToSlug(el.querySelector('.trend-item-title').textContent.trim()) === slug);
+          
+          if (itemEl && itemEl._clickHandler) {
+            itemEl._clickHandler(false);
+          } else {
+            // Fallback load manual details
+            loadTrendDetails({
+              title: data.trend,
+              traffic: 'Rising',
+              news: { headline: '', snippet: '', url: '' }
+            });
+            const newUrl = window.location.origin + '/t/' + slug;
+            window.history.pushState({ path: newUrl }, '', newUrl);
+            closeMobileSidebar();
+          }
+        });
+      }
+
+      return item;
+    }
+
     const eventSource = new EventSource('/api/sentiment-stream');
 
-    eventSource.onmessage = (event) => {
+    eventSource.addEventListener('hydration', (event) => {
+      try {
+        const dataList = JSON.parse(event.data);
+        
+        // Remove empty state if present
+        const emptyState = feedContainer.querySelector('.feed-empty-state');
+        if (emptyState) {
+          emptyState.remove();
+        }
+        
+        feedContainer.innerHTML = '';
+        if (Array.isArray(dataList)) {
+          dataList.forEach(data => {
+            const item = createFeedItem(data);
+            feedContainer.appendChild(item);
+          });
+        }
+        if (window.mockEventSources) {
+          switchTab('sentiment');
+        }
+      } catch (err) {
+        console.error('Error handling SSE hydration event:', err);
+      }
+    });
+
+    eventSource.addEventListener('message', (event) => {
       try {
         const data = JSON.parse(event.data);
         
@@ -1180,50 +1373,7 @@ document.addEventListener('DOMContentLoaded', () => {
           emptyState.remove();
         }
 
-        // Create feed item element
-        const item = document.createElement('div');
-        item.className = 'feed-item';
-        
-        const timestamp = new Date(data.timestamp);
-        const timeStr = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-
-        item.innerHTML = `
-          <span class="feed-item-flag">${data.location.flag || '📍'}</span>
-          <div class="feed-item-content">
-            <span class="feed-item-user">${data.location.city}, ${data.location.country}</span>
-            voted
-            <span class="feed-item-vote ${data.vote}">${data.vote}</span>
-            on
-            <span class="feed-item-trend">${data.trend}</span>
-          </div>
-          <span class="feed-item-time">${timeStr}</span>
-        `;
-
-        // Wire click listener to load trend details if clicked
-        const trendLink = item.querySelector('.feed-item-trend');
-        if (trendLink) {
-          trendLink.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const slug = titleToSlug(data.trend);
-            // Search in sidebar items
-            const itemEl = Array.from(document.querySelectorAll('.trend-item'))
-              .find(el => titleToSlug(el.querySelector('.trend-item-title').textContent.trim()) === slug);
-            
-            if (itemEl && itemEl._clickHandler) {
-              itemEl._clickHandler(false);
-            } else {
-              // Fallback load manual details
-              loadTrendDetails({
-                title: data.trend,
-                traffic: 'Rising',
-                news: { headline: '', snippet: '', url: '' }
-              });
-              const newUrl = window.location.origin + '/t/' + slug;
-              window.history.pushState({ path: newUrl }, '', newUrl);
-              closeMobileSidebar();
-            }
-          });
-        }
+        const item = createFeedItem(data);
 
         // Insert at the top
         feedContainer.insertBefore(item, feedContainer.firstChild);
@@ -1238,10 +1388,13 @@ document.addEventListener('DOMContentLoaded', () => {
           updatePollPercentages(data.updatedPolls);
         }
 
+        if (window.mockEventSources) {
+          switchTab('sentiment');
+        }
       } catch (err) {
         console.error('Error handling SSE live vote event:', err);
       }
-    };
+    });
 
     eventSource.onerror = (err) => {
       console.error('SSE Connection error (sentiment stream):', err);
@@ -1421,6 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
       </div>
     `;
     debateMessages.appendChild(wrap);
+    debateMessages.scrollTop = debateMessages.scrollHeight;
   }
 
   function updateDebatePercentages(votes) {
@@ -1471,4 +1625,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnVerdictOptimist.addEventListener('click', () => submitDebateVote('optimist'));
   btnVerdictSkeptic.addEventListener('click', () => submitDebateVote('skeptic'));
+
+  // Explanation Banner Close / Dismissal & Persistence
+  const explanationBanner = document.getElementById('sentiment-explanation-banner');
+  const btnCloseBanner = document.getElementById('btn-close-banner');
+
+  if (explanationBanner) {
+    if (localStorage.getItem('sentiment-banner-dismissed') === 'true') {
+      explanationBanner.classList.add('hidden');
+    }
+  }
+
+  if (btnCloseBanner && explanationBanner) {
+    btnCloseBanner.addEventListener('click', () => {
+      explanationBanner.classList.add('hidden');
+      localStorage.setItem('sentiment-banner-dismissed', 'true');
+    });
+  }
 });

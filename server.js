@@ -92,6 +92,34 @@ const DEFAULT_TRENDS = [
 
 let latestTrends = [];
 const pingedSlugs = new Set();
+let recentActivityLog = [];
+const MAX_ACTIVITY_LOG_SIZE = 15;
+
+function logActivity(activity) {
+  recentActivityLog.unshift(activity);
+  if (recentActivityLog.length > MAX_ACTIVITY_LOG_SIZE) {
+    recentActivityLog = recentActivityLog.slice(0, MAX_ACTIVITY_LOG_SIZE);
+  }
+}
+
+function seedRecentActivityLog() {
+  const trendsList = latestTrends.length > 0 ? latestTrends : DEFAULT_TRENDS;
+  recentActivityLog = [];
+  const now = Date.now();
+  for (let i = 0; i < 10; i++) {
+    const randomTrend = trendsList[Math.floor(Math.random() * trendsList.length)];
+    const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+    const vote = i % 2 === 0 ? 'genius' : 'overrated';
+    recentActivityLog.push({
+      trend: randomTrend.title,
+      vote,
+      location,
+      clientId: `mock-client-${i}`,
+      timestamp: now - i * 90000
+    });
+  }
+  console.log(`Seeded recentActivityLog with ${recentActivityLog.length} items.`);
+}
 
 // Helper to fetch trends and populate cache
 async function updateTrendsCache() {
@@ -282,12 +310,20 @@ function startGlobalSimulation() {
       console.error(`Failed to increment simulated vote for "${randomTrend.title}":`, err.message);
     }
 
-    broadcastSSE({
+    const timestamp = new Date().toISOString();
+    const activity = {
       trend: randomTrend.title,
       vote,
       location,
-      updatedPolls,
-      timestamp: new Date().toISOString()
+      clientId: 'simulated-client',
+      timestamp
+    };
+
+    logActivity(activity);
+
+    broadcastSSE({
+      ...activity,
+      updatedPolls
     });
   }, 4000); // Simulated vote broadcasted every 4 seconds
 }
@@ -309,6 +345,7 @@ fastify.get('/api/sentiment-stream', (request, reply) => {
     'Access-Control-Allow-Origin': '*'
   });
 
+  reply.raw.write(`event: hydration\ndata: ${JSON.stringify(recentActivityLog)}\n\n`);
   reply.raw.write('retry: 5000\n\n');
   sseClients.add(reply.raw);
   startGlobalSimulation();
@@ -340,6 +377,7 @@ async function getTrendExplanation(trend, headline = '', snippet = '') {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.5-flash',
     generationConfig: { 
+      thinkingConfig: { thinkingLevel: 'LOW' },
       responseMimeType: 'application/json',
       responseSchema: {
         type: "OBJECT",
@@ -406,6 +444,7 @@ async function generateDebate(trend) {
   const model = genAI.getGenerativeModel({
     model: 'gemini-3.5-flash',
     generationConfig: {
+      thinkingConfig: { thinkingLevel: 'LOW' },
       responseMimeType: 'application/json',
       responseSchema: {
         type: "OBJECT",
@@ -664,12 +703,30 @@ Response:`;
 
 // POST /api/poll - Records a sentiment vote for a trend
 fastify.post('/api/poll', async (request, reply) => {
-  const { trend, vote } = request.body || {};
+  const { trend, vote, location, clientId } = request.body || {};
   if (!trend || !['overrated', 'genius'].includes(vote)) {
     return reply.status(400).send({ error: 'Valid trend and vote (overrated/genius) are required.' });
   }
 
-  return await incrementVote(trend, vote);
+  const updatedPolls = await incrementVote(trend, vote);
+
+  const timestamp = new Date().toISOString();
+  const activity = {
+    trend,
+    vote,
+    location: location || { city: 'Unknown', country: 'Unknown', flag: '📍' },
+    clientId: clientId || 'anonymous',
+    timestamp
+  };
+
+  logActivity(activity);
+
+  broadcastSSE({
+    ...activity,
+    updatedPolls
+  });
+
+  return updatedPolls;
 });
 
 // Start the Fastify server
@@ -729,5 +786,15 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
     await updateTrendsCache();
     // Refresh cache every 10 minutes
     setInterval(updateTrendsCache, 10 * 60 * 1000);
+  }
+
+  // Seed recentActivityLog queue on startup
+  seedRecentActivityLog();
+
+  // Verification step
+  if (recentActivityLog.length === 10) {
+    console.log(`Verification: recentActivityLog seeded successfully with ${recentActivityLog.length} items.`);
+  } else {
+    console.error(`Verification: Failed to seed recentActivityLog queue properly. Size is ${recentActivityLog.length}`);
   }
 });

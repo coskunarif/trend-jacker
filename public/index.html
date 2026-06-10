@@ -45,7 +45,7 @@
   <!-- Main Grid Layout -->
   <main class="dashboard-grid">
     <!-- Left Sidebar: Trends List & Live Sentiment Feed -->
-    <aside class="sidebar-panel" id="sidebar-panel">
+    <aside class="sidebar-panel show-trending" id="sidebar-panel">
       <!-- Section 1: Trends List -->
       <div class="panel-header">
         <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
@@ -85,6 +85,10 @@
               <span class="status-label">Live</span>
             </span>
           </div>
+        </div>
+        <div id="sentiment-explanation-banner" class="explanation-banner">
+          <span>This feed displays live community sentiment from around the world. Select any trending topic to cast your vote!</span>
+          <button id="btn-close-banner" aria-label="Dismiss banner">&times;</button>
         </div>
         <div id="live-sentiment-feed" class="feed-scroll-container" role="log" aria-live="polite">
           <div class="feed-empty-state">Waiting for activity...</div>

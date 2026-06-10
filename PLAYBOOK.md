@@ -27,36 +27,45 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-18** | **Mobile Explainer Content Accordion & Sub-Tabbing** | 9.0 | 5.5 | 7.0 | 9.0 | **30.5** | Pending |
 | **TJ-19** | **Sticky Bottom Quick-Action Toolbar** | 8.5 | 5.0 | 8.5 | 8.5 | **30.5** | Pending |
 | **TJ-20** | **High-DPI Retina Scaling for Canvas Analytics** | 8.5 | 5.0 | 5.0 | 9.5 | **28.0** | Pending |
-| **TJ-21** | **Mobile Layout and Responsiveness Overhaul**<br>Fix critical visual and layout bugs on mobile viewports: (1) prevent debate bubbles from collapsing to min-content width (single-word columns); (2) resolve horizontal scroll/viewport overflow caused by non-wrapping metadata row; (3) ensure chat bubbles use fit-content layout. | **9.5** | **7.5** | **8.0** | **9.5** | **34.5** | `[x]` Completed |
-| **TJ-22** | **Container Queries & Fluid Typography for Explainer Panel**<br>Refactor headings and card copy using CSS container queries and `clamp()` to guarantee elegant line wrapping on devices <= 360px. | 8.0 | 6.0 | 5.0 | 8.5 | **27.5** | Pending |
-| **TJ-23** | **Mobile Touch Targets & Swipe gesture Drawer**<br>Implement left/right swipe gestures to open/close the mobile trends sidebar and ensure all buttons meet WCAG 48x48px target minimums. | 8.5 | 7.0 | 6.0 | 8.0 | **29.5** | Pending |
+| **TJ-21** | **Mobile Layout and Responsiveness Overhaul** | 9.5 | 7.5 | 8.0 | 9.5 | **34.5** | `[x]` Completed |
+| **TJ-22** | **Container Queries & Fluid Typography for Explainer Panel** | 8.0 | 6.0 | 5.0 | 8.5 | **27.5** | Pending |
+| **TJ-23** | **Mobile Touch Targets & Swipe gesture Drawer** | 8.5 | 7.0 | 6.0 | 8.0 | **29.5** | Pending |
+| **TJ-24** | **Desktop Tabbed Sidebar & Live Feed Hydration**<br>Overhaul the sidebar layout on desktop to match mobile's tabbed switcher, resolving the dual scrollbar problem. Implement server-side activity logging to immediately hydrate the "Global Sentiment Feed" with recent vote history upon connection, and broadcast live user votes in real-time. Style feed items and segmented controls with a modern, high-fidelity design. | **9.5** | **7.5** | **8.5** | **9.5** | **35.0** | `[x]` Completed |
 
 ---
 
-## 🚀 Selected Task Details: TJ-21 — Mobile Layout and Responsiveness Overhaul
+## 🚀 Selected Task Details: TJ-24 — Desktop Tabbed Sidebar & Live Feed Hydration
 
 ### 1. Objective
-Identify and fix the critical mobile-view layout issues reported by the user:
-1. **Debate Bubble Layout Collapse**: The debate messages shrink-wrap to `min-content` width on narrow mobile viewports, displaying arguments as a single vertical column of individual words.
-2. **Horizontal Viewport Overflow**: The trend header's metadata row (`.trend-meta-row`) contains multiple elements (traffic-pill, velocity-gauge-container with sparkline, and share buttons) that do not wrap on mobile. This pushes the page width beyond 100vw, causing massive horizontal overflow and cutting off text on the left/right.
+Redesign and rebuild the TrendJacker sidebar for desktop and mobile using modern UX principles, addressing two key issues:
+1. **Empty Feed Gaps**: The "Global Sentiment Feed" is empty upon connection, leaving users questioning if it works. We will build a server-side memory log of recent votes to hydrate the feed instantly upon connection, and route live user-submitted votes directly to it.
+2. **Stacked Layout with Dual Scrollbars**: The desktop view splits the sidebar vertically into stacked "Trending Searches" and "Global Sentiment Feed" sections, creating dual scrollbars and cramped list containers. We will expand the mobile tab-switching controller to desktop to toggle between tabs dynamically, giving the active view 100% of the sidebar scroll height.
+3. **UX Polish**: Style the tab selector as a high-fidelity pill segmented control and feed items with elegant cards, status badges, and interactive trend links.
 
 ### 2. Why (Business Value & Rationale)
-*   **UX & Retention (9.5/10)**: Readable debates and a perfectly bounded page are non-negotiable for mobile user retention. Users leaving due to a broken layout is a high-risk drop-off path.
-*   **SEO & Mobile Friendliness (7.5/10)**: Google penalizes pages that overflow horizontally or have text elements overlapping or too close to each other.
-*   **Feasibility (9.5/10)**: This task requires pure CSS layout corrections (e.g., using `width: fit-content;` and `flex-wrap: wrap;`) without introducing extra frameworks or libraries.
+*   **UX & Retention (9.5/10)**: Eliminates confusing dual scrollbars. Provides instant value to users via an populated, active feed upon loading the page.
+*   **SEO & Mobile Friendliness (7.5/10)**: Guarantees unified responsive design and semantic tab elements.
+*   **Viral Potential (8.5/10)**: Seeing a live stream of global votes builds a sense of active community. Showing the user's own votes in the live stream immediately reinforces their interaction.
+*   **Feasibility (9.5/10)**: Straightforward server-side memory queue + SSE emission, with vanilla CSS tabs and layout.
 
 ### 3. Execution Plan
 
-#### Step 1: Fix Debate and Chat Bubble Collapse
-*   Identify CSS selectors `.debate-bubble-wrap` and `.chat-bubble`.
-*   Change their width properties to `width: fit-content;` combined with `max-width: 90%;` (or `85%` for desktop/mobile consistency) to ensure they shrink-wrap short messages but stretch correctly up to their bounds for longer paragraphs instead of collapsing to single-word column widths.
+#### Step 1: Server-Side Hydration and Broadcast Overhaul
+*   In [server.js](file:///home/ubuntuadmin/projects/trend-jacker/server.js), introduce a `recentActivityLog` queue capped at 15 items.
+*   Write a helper to seed the queue with 10 mock historical votes on startup so it is never empty.
+*   Upon initial SSE connection at `/api/sentiment-stream`, immediately stream all queue items to the client.
+*   Update the POST `/api/poll` endpoint to log and broadcast user-submitted votes in real-time.
 
-#### Step 2: Fix Horizontal Overflow on Metadata Row
-*   Target `.trend-meta-row` inside the `@media (max-width: 768px)` media query in `public/styles.css`.
-*   Set `.trend-meta-row` to `flex-wrap: wrap;` and configure appropriate spacing and gap rules so that the velocity speedometer, sparkline, traffic pill, and sharing buttons stack beautifully on narrow viewports rather than overflowing the page.
-*   Apply general cleanups (e.g. `box-sizing: border-box`, `max-width: 100%`) on components inside `.main-panel` to guarantee viewport safety.
+#### Step 2: Tabbed Sidebar Layout & CSS Modernization
+*   In [styles.css](file:///home/ubuntuadmin/projects/trend-jacker/public/styles.css), make `.sidebar-tabs` visible on desktop and style it as a modern pill-segmented controller.
+*   Move the tab visibility classes (e.g. `.sidebar-panel.show-sentiment .scroll-container`, `.sidebar-panel:not(.show-sentiment) .live-feed-section`) outside the mobile media query so they govern the layout on all viewports.
+*   Set both container elements to take 100% height when active.
 
-#### Step 3: End-to-End Visual Verification
-*   Add E2E tests in Playwright (e.g., in `tests/responsive.spec.js` or `tests/e2e.spec.js`) to verify mobile viewport widths (e.g. `360px`, `375px`).
-*   Assert that there is no horizontal page overflow (i.e. `window.innerWidth` matches the scrollable content width).
-*   Verify that debate text wraps normally and is fully readable on mobile.
+#### Step 3: Client-Side Feed and UI Updates
+*   In [app.js](file:///home/ubuntuadmin/projects/trend-jacker/public/app.js), ensure click events on feed item trend links load details and navigate correctly.
+*   Add a prominent explanation banner at the top of the Global Sentiment Feed tab.
+
+#### Step 4: Verification and Automated Tests
+*   Update Playwright tests to cover desktop tabbed behavior and ensure the live feed loads hydrated records on startup.
+*   **TDD Verification status**: Tests written under [sidebar-hydration.spec.js](file:///home/ubuntuadmin/projects/trend-jacker/tests/sidebar-hydration.spec.js) and verified to fail on current codebase (4/4 tests failing).
+

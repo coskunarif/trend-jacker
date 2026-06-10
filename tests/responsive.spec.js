@@ -256,6 +256,19 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
         expect(layoutStyles.rowGap).toBe('8px');
       });
 
+      test('should have overflow-y auto/scroll on debate messages and not overflow outer height boundary', async ({ page }) => {
+        await page.goto('/');
+        await expect(page.locator('#explainer-view')).toBeVisible();
+
+        // Wait for debate turns to render (up to turn 3 at 3s)
+        const lastBubble = page.locator('.debate-bubble-wrap').last();
+        await expect(lastBubble).toBeVisible({ timeout: 5000 });
+
+        const debateMessages = page.locator('#debate-messages');
+        const overflowY = await debateMessages.evaluate(el => window.getComputedStyle(el).overflowY);
+        expect(overflowY).toMatch(/auto|scroll/);
+      });
+
     });
   }
 
