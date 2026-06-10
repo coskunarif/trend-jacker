@@ -177,10 +177,6 @@
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 Share
               </button>
-              <button id="btn-share-x" class="share-x-btn" aria-label="Share this trend on X">
-                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="share-x-icon"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                Post
-              </button>
             </div>
           </div>
           <h1 id="detail-title" class="trend-title">Topic Name</h1>
@@ -241,6 +237,10 @@
                 <span class="btn-label">Overrated 🥱</span>
               </button>
             </div>
+            <button id="btn-share-poll" class="share-poll-btn" style="margin-top: var(--space-3); width: 100%;" aria-label="Share vote results">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              Share Poll Verdict
+            </button>
             
             <!-- Poll Results (hidden until vote) -->
             <div id="poll-results" class="poll-results hidden" role="status" aria-live="polite">
@@ -262,10 +262,6 @@
                 <button id="btn-download-card" class="download-card-btn" aria-label="Download trend explainer card image">
                   <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                   Download Card
-                </button>
-                <button id="btn-share-poll-x" class="share-poll-x-btn" aria-label="Share vote results on X">
-                  <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="share-x-icon"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                  Share Vote
                 </button>
               </div>
             </div>
@@ -298,6 +294,10 @@
             AI-Driven Sentiment Debate Arena
           </h3>
           <p class="debate-intro">Optimist Bot (Genius) vs Skeptic Bot (Overrated) debate this trend. Who makes the more compelling case?</p>
+          <button id="btn-share-debate" class="share-debate-btn" style="margin-top: var(--space-2); margin-bottom: var(--space-2); width: auto;" aria-label="Share debate verdict results">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            Share Debate Verdict
+          </button>
           
           <div id="debate-container" class="debate-container">
             <div id="debate-messages" class="debate-messages">
@@ -336,10 +336,6 @@
                   <span id="pct-skeptic" class="result-pct">0%</span>
                 </div>
                 <div class="result-actions" style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;">
-                  <button id="btn-share-debate-x" class="share-debate-x-btn" aria-label="Share debate verdict results on X">
-                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" class="share-x-icon"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-                    Share Debate Verdict
-                  </button>
                   <button id="btn-download-debate-card" class="download-debate-card-btn" aria-label="Download debate meme card">
                     <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                     Download Debate Meme
@@ -370,6 +366,43 @@
 
   <!-- Backdrop for mobile sidebar drawer -->
   <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
+  <!-- Unified Share Modal -->
+  <div id="share-modal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="share-modal-title">Share Trend</h2>
+        <button id="btn-close-share-modal" class="close-btn" aria-label="Close modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label for="share-context-select">Angle/Context</label>
+          <select id="share-context-select" class="modal-select">
+            <option value="general">General Explainer</option>
+            <option value="poll">Poll Verdict</option>
+            <option value="debate">Debate Summary</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Select Platform</label>
+          <div class="platform-pills">
+            <button class="platform-pill active" data-platform="x">X / Twitter</button>
+            <button class="platform-pill" data-platform="linkedin">LinkedIn</button>
+            <button class="platform-pill" data-platform="facebook">Facebook</button>
+            <button class="platform-pill" data-platform="reddit">Reddit</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="share-preview-text">Post Preview</label>
+          <textarea id="share-preview-text" class="modal-textarea" rows="5"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-copy-share" class="modal-btn secondary-btn">Copy</button>
+        <button id="btn-post-share" class="modal-btn primary-btn">Post Now</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Dynamic CSS Variables Loader -->
   <script src="/app.js"></script>

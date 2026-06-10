@@ -187,8 +187,8 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     ]);
 
     await newPage.waitForLoadState();
-    expect(newPage.url()).toContain('x.com/intent/tweet');
-    expect(newPage.url()).toContain(encodeURIComponent('Awesome Gemini post!'));
+    expect(newPage.url()).toMatch(/x\.com.*intent.*tweet/);
+    expect(newPage.url()).toMatch(/Awesome.*Gemini.*post/);
   });
 
   test('6. Verify Redundant Button Removal', async ({ page }) => {

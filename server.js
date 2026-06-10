@@ -729,6 +729,38 @@ fastify.post('/api/poll', async (request, reply) => {
   return updatedPolls;
 });
 
+// POST /api/generate-post - Generates a viral social media post using Gemini
+fastify.post('/api/generate-post', async (request, reply) => {
+  const { trendTitle, platform, contextType } = request.body || {};
+  if (!trendTitle) {
+    return reply.status(400).send({ error: 'Trend title is required.' });
+  }
+  const targetPlatform = platform || 'x';
+  const targetContext = contextType || 'general';
+
+  if (process.env.NODE_ENV === 'test' || !genAI) {
+    return {
+      postText: `This is a mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!`
+    };
+  }
+
+  try {
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+    });
+    const prompt = `You are a social media expert. Generate a highly engaging, viral social media post about the topic "${trendTitle}".
+The post should be optimized for the platform "${targetPlatform}".
+The context/angle for the post is "${targetContext}".
+Write a natural, professional yet catchy post. Do not include meta-commentary, just output the post content itself.`;
+    const result = await model.generateContent(prompt);
+    const postText = result.response.text().trim();
+    return { postText };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to generate post.' });
+  }
+});
+
 // Start the Fastify server
 const port = process.env.PORT || 3000;
 fastify.listen({ port, host: '0.0.0.0' }, async (err) => {

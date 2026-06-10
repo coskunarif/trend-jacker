@@ -233,10 +233,20 @@ document.addEventListener('DOMContentLoaded', () => {
   let activeDebateTimer2 = null;
 
   const btnShareTrend = document.getElementById('btn-share-trend');
-  const btnShareX = document.getElementById('btn-share-x');
-  const btnSharePollX = document.getElementById('btn-share-poll-x');
-  const btnShareDebateX = document.getElementById('btn-share-debate-x');
+  const btnSharePoll = document.getElementById('btn-share-poll');
+  const btnShareDebate = document.getElementById('btn-share-debate');
   const btnDownloadDebateCard = document.getElementById('btn-download-debate-card');
+
+  const shareModal = document.getElementById('share-modal');
+  const btnCloseShareModal = document.getElementById('btn-close-share-modal');
+  const shareContextSelect = document.getElementById('share-context-select');
+  const platformPills = document.querySelectorAll('.platform-pill');
+  const sharePreviewText = document.getElementById('share-preview-text');
+  const btnCopyShare = document.getElementById('btn-copy-share');
+  const btnPostShare = document.getElementById('btn-post-share');
+
+  let activeSharePlatform = 'x';
+  let activeShareContext = 'general';
 
   if (hasWebShare) {
     if (btnDownloadCard) {
@@ -303,74 +313,122 @@ document.addEventListener('DOMContentLoaded', () => {
     document.documentElement.style.setProperty('--glow-y', `${y}%`);
   });
 
-  // Share Explainer Handler
-  btnShareTrend.addEventListener('click', async () => {
+  // Generate social media post using backend API
+  async function generatePost() {
     if (!currentTrend) return;
-    const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
-    const shareText = `Check out the viral trend explainer and vote on whether "${currentTrend.title}" is overrated or genius!`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: `TrendJacker — ${currentTrend.title}`,
-          text: shareText,
-          url: shareUrl
-        });
-        return;
-      } catch (err) {
-        console.log("Navigator share failed, falling back to copy:", err);
-      }
-    }
-    
+    sharePreviewText.value = 'Generating post...';
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      btnShareTrend.classList.add('copied');
-      const originalHTML = btnShareTrend.innerHTML;
-      btnShareTrend.innerHTML = `
-        <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><polyline points="20 6 9 17 4 12"/></svg>
-        Copied!
-      `;
-      setTimeout(() => {
-        btnShareTrend.classList.remove('copied');
-        btnShareTrend.innerHTML = originalHTML;
-      }, 2000);
+      const response = await fetch('/api/generate-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          trendTitle: currentTrend.title,
+          platform: activeSharePlatform,
+          contextType: activeShareContext
+        })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate post');
+      }
+      const data = await response.json();
+      sharePreviewText.value = data.postText || '';
     } catch (err) {
-      console.error('Failed to copy share link:', err);
+      console.error(err);
+      sharePreviewText.value = 'Error generating post. Please try again.';
     }
+  }
+
+  // Open unified share modal
+  function openShareModal(context) {
+    if (!currentTrend) return;
+    activeShareContext = context;
+    shareContextSelect.value = context;
+    
+    // Set default/active platform pill state
+    platformPills.forEach(pill => {
+      if (pill.getAttribute('data-platform') === activeSharePlatform) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+
+    shareModal.classList.remove('hidden');
+    generatePost();
+  }
+
+  // Close unified share modal
+  function closeShareModal() {
+    shareModal.classList.add('hidden');
+  }
+
+  // Bind new unified share buttons
+  if (btnShareTrend) {
+    btnShareTrend.addEventListener('click', () => openShareModal('general'));
+  }
+  if (btnSharePoll) {
+    btnSharePoll.addEventListener('click', () => openShareModal('poll'));
+  }
+  if (btnShareDebate) {
+    btnShareDebate.addEventListener('click', () => openShareModal('debate'));
+  }
+  if (btnCloseShareModal) {
+    btnCloseShareModal.addEventListener('click', closeShareModal);
+  }
+
+  // Bind modal settings selectors
+  if (shareContextSelect) {
+    shareContextSelect.addEventListener('change', (e) => {
+      activeShareContext = e.target.value;
+      generatePost();
+    });
+  }
+
+  platformPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      platformPills.forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      activeSharePlatform = pill.getAttribute('data-platform');
+      generatePost();
+    });
   });
 
-  // Post Trend explainer to X
-  if (btnShareX) {
-    btnShareX.addEventListener('click', () => {
-      if (!currentTrend) return;
-      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
-      const shareText = `Why is "${currentTrend.title}" trending right now? Check out this just-in-time viral explainer on TrendJacker:`;
-      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
-      window.open(xUrl, '_blank', 'noopener,noreferrer');
+  // Copy to clipboard
+  if (btnCopyShare) {
+    btnCopyShare.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(sharePreviewText.value);
+        const originalText = btnCopyShare.textContent;
+        btnCopyShare.textContent = 'Copied!';
+        setTimeout(() => {
+          btnCopyShare.textContent = originalText;
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy text:', err);
+      }
     });
   }
 
-  // Post Poll Vote results to X
-  if (btnSharePollX) {
-    btnSharePollX.addEventListener('click', () => {
+  // Outbound sharing intent
+  if (btnPostShare) {
+    btnPostShare.addEventListener('click', () => {
       if (!currentTrend) return;
-      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
-      const voteText = userPollVote ? `I voted that this is totally ${userPollVote}!` : `Is this trend actually genius, or overrated?`;
-      const shareText = `Poll: "${currentTrend.title}" is trending on social media. ${voteText} What's your verdict?`;
-      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
-      window.open(xUrl, '_blank', 'noopener,noreferrer');
-    });
-  }
-
-  // Post Debate Verdict results to X
-  if (btnShareDebateX) {
-    btnShareDebateX.addEventListener('click', () => {
-      if (!currentTrend) return;
-      const shareUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
-      const verdictText = userDebateVote ? `I judged the debate: ${userDebateVote} Bot won!` : `Who makes the more compelling case?`;
-      const shareText = `AI Debate: Optimist Bot vs Skeptic Bot on "${currentTrend.title}". ${verdictText} Read the transcript and vote:`;
-      const xUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}&hashtags=TrendJacker,AIDebate,${titleToSlug(currentTrend.title).replace(/-/g, '')}`;
-      window.open(xUrl, '_blank', 'noopener,noreferrer');
+      const text = sharePreviewText.value;
+      let shareUrl = '';
+      if (activeSharePlatform === 'x') {
+        shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
+      } else if (activeSharePlatform === 'linkedin') {
+        shareUrl = `https://www.linkedin.com/shareArticle?mini=true&title=${encodeURIComponent(currentTrend.title)}&summary=${encodeURIComponent(text)}`;
+      } else if (activeSharePlatform === 'facebook') {
+        shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(text)}`;
+      } else if (activeSharePlatform === 'reddit') {
+        shareUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(currentTrend.title)}&text=${encodeURIComponent(text)}`;
+      } else {
+        shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
+      }
+      window.open(shareUrl, '_blank', 'noopener,noreferrer');
     });
   }
 
