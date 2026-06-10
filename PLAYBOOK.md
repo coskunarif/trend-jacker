@@ -34,55 +34,38 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-25** | **AI-Powered Viral Social Post Generator**<br>Build an interactive viral post generator using the Gemini API. Users select their platform (X/Twitter, LinkedIn, Facebook, Instagram, Reddit) and post type (general trend explainer, poll results, or debate highlight). The AI generates a tailored, SEO/GEO-optimized post with catchy hooks, hashtags, and formatting. | **9.5** | **8.5** | **10.0** | **9.0** | **37.0** | `[x]` Completed |
 | **TJ-26** | **Unified Share and Social Modal UI**<br>Refactor the fragmented static sharing buttons into a single high-fidelity modal dialog. It displays a live preview of the AI-generated post, platform selectors, and quick actions to copy to clipboard or open native share links. | **9.0** | **7.0** | **8.5** | **9.5** | **34.0** | Pending |
 | **TJ-27** | **Static Social Share Logic Subtraction**<br>Remove the old hardcoded static tweet generation logic from the client-side JavaScript (`app.js`) and clear out the redundant individual share buttons from various sections of the UI, consolidating everything into the new generator. | **7.5** | **6.0** | **5.0** | **10.0** | **28.5** | Pending |
+| **TJ-28** | **AI Post Generator Consistency & Virality Polish**<br>Refactor the post generator prompt and backend routing to consistently embed relevant hashtags and the dynamic app URL (`viraljacker.com/t/<slug>`). Tune the content output to be highly concise, catchy, creative, and human-sounding, matching the reference designs. | **9.5** | **9.0** | **10.0** | **9.5** | **38.0** | In Progress (TDD Tests Failing) |
 
 ---
 
-## 🚀 Selected Task Details: TJ-25 — AI-Powered Viral Social Post Generator
+## 🚀 Selected Task Details: TJ-28 — AI Post Generator Consistency & Virality Polish
 
 ### 1. Objective
-Build an interactive, AI-driven social post generator inside TrendJacker that creates context-aware, viral-ready, and SEO/GEO-optimized posts for various platforms:
-1. **Multi-Platform Support**: Generate posts tailored for X (Twitter), Facebook, Instagram, LinkedIn, and Reddit.
-2. **Context-Aware Templates**: Allow generating a post based on three different contexts:
-   - **General Trend**: An engaging overview of why the topic is trending.
-   - **Poll / Verdict**: Highlighting user sentiment, voting statistics, and public consensus.
-   - **AI Debate Summary**: Highlighting the clash between the Optimist and Skeptic bots with key highlights.
-3. **AI Generation Backend**: Create an API endpoint `/api/generate-post` that prompts Gemini with the trend data and outputs a tailored response containing a catchy hook, platform-specific tone, hashtags, and relevant keywords.
-4. **Copy & Share Integration**: Implement copy-to-clipboard functionality and direct link opening for each platform.
+Refactor and optimize the AI post generation system to fix inconsistencies in output formatting, particularly hashtags and URL inclusion:
+1. **Dynamic URL Integration**: Pass or compute the correct trend detail page URL (`https://viraljacker.com/t/<slug>`) on the backend and enforce its inclusion in the generated social post.
+2. **Consistent Hashtags**: Define precise guidelines for the number and context of hashtags for each platform (X, LinkedIn, Facebook, Reddit).
+3. **High-Virality & Human Tone**: Instruct Gemini to output concise, catchy, creative, and human-sounding posts that avoid typical AI genericisms and robotic structures, drawing inspiration from the reference screenshot.
 
 ### 2. Why (Business Value & Rationale)
-*   **UX & Retention (9.5/10)**: Lets users easily interact and create high-quality content without leaving the application.
-*   **SEO & GEO Optimization (8.5/10)**: Embeds targeted hashtags, trending keywords, and backlinks, driving organic traffic back to TrendJacker.
-*   **Viral Potential (10.0/10)**: AI-optimized hooks and tailored messaging drastically increase click-through and sharing rates.
-*   **Feasibility (9.0/10)**: Extends existing Gemini API backend structure and uses standard vanilla web integrations.
+*   **UX & Retention (9.5/10)**: Clearer, more engaging posts encourage users to share their discoveries, raising viral loops.
+*   **SEO & GEO Optimization (9.0/10)**: Consistent backlinks (`viraljacker.com/t/<slug>`) direct post readers back to specific trend landing pages, driving organic crawlers and traffic.
+*   **Viral Potential (10.0/10)**: Punchy, human-sounding, high-emotion hooks significantly outperform dry, robotic summaries.
+*   **Feasibility (9.5/10)**: Purely backend changes in `server.js` (prompt engineering and URL mapping) with high-impact outcomes.
 
 ### 3. Execution Plan
 
-#### Step 1: Create the Backend API Endpoint
-*   In [server.js](file:///home/ubuntuadmin/projects/trend-jacker/server.js), add a `POST /api/generate-post` route.
-*   The route should accept `trendTitle`, `platform` (X, Facebook, Instagram, LinkedIn, Reddit), and `contextType` (general, poll, debate).
-*   Formulate a robust system prompt for Gemini (`gemini-3.5-flash`) that specifies rules for each platform:
-    - **X**: Short, snappy, hook-first, max 280 chars, 2-3 hashtags.
-    - **LinkedIn**: Professional, analytical, structured, bullet points, question at the end, relevant tags.
-    - **Facebook**: Conversational, engaging hook, emoji-rich, call to action.
-    - **Instagram**: Bold headline, visual-centric caption structure, rich block of 10+ relevant hashtags.
-    - **Reddit**: Informative, community-oriented, self-post style with title + body, no excessive emoji.
-*   Incorporate trend facts (the hook, summary, poll stats, or debate turns) into the prompt context to ground the generation.
+#### Step 1: Update backend `/api/generate-post` endpoint
+*   In `server.js`, compute the trend slug using `titleToSlug(trendTitle)` inside the route.
+*   Construct the reference URL: `https://viraljacker.com/t/${slug}`.
+*   Enhance the system prompt for Gemini (`gemini-3.5-flash`) with strict requirements:
+    - Include the target URL `https://viraljacker.com/t/${slug}` in the output naturally.
+    - Generate 2-3 highly relevant, trending hashtags (e.g., `#CricketTwitter` if the topic is about Cricket/India/England match) based on the title.
+    - Dictate a concise, human, creative, and catchy tone: avoid generic phrases like "In a surprising turn of events", "Furthermore", "Delve into", "Revolutionize", etc. Use punchy sentences, hooks, and natural human styling (e.g., questions, friendly emojis).
+    - Ensure character limits are strictly followed (especially for X/Twitter: under 280 characters, including the URL).
 
-#### Step 2: Implement the Frontend UI (Modal & Panel)
-*   In [index.html](file:///home/ubuntuadmin/projects/trend-jacker/public/index.html), add a dialog markup/modal representing the "AI Viral Post Generator".
-*   Provide dropdowns/pill selectors for Platform and Context Type.
-*   Add a prominent text area displaying the generated post preview with a loading spinner.
-*   Include buttons for:
-    - **Generate / Regenerate**: Triggers the API call.
-    - **Copy to Clipboard**: Copies the generated text.
-    - **Share / Open**: Redirects to the native posting intent if supported (e.g., `https://x.com/intent/tweet?text=...`).
+#### Step 2: Implement and Verify Code Changes
+*   Verify the prompt returns beautiful posts with the URL and hashtags.
+*   Run the test suite using `npx playwright test` to ensure there are no regressions on the endpoints or UI.
 
-#### Step 3: Connect Frontend Logic
-*   In [app.js](file:///home/ubuntuadmin/projects/trend-jacker/public/app.js), handle modal open/close states.
-*   Wire up event listeners for platform selection and regenerate actions to perform the fetch request to `/api/generate-post`.
-*   Connect the copy and sharing behaviors.
-
-#### Step 4: Verification and Testing
-*   Write Playwright integration tests under `tests/viral-generator.spec.js` to ensure the modal opens, calls the API successfully, and handles responses/copy correctly.
 
 

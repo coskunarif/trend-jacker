@@ -203,4 +203,62 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await expect(legacySharePollBtn).not.toBeAttached();
     await expect(legacyShareDebateBtn).not.toBeAttached();
   });
+
+  test('7. Verify Platform-Specific Formatting and URL Inclusion', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+
+    // Open share modal
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    const previewTextarea = page.locator('#share-preview-text');
+
+    // 1. Verify X (Twitter) formatting & URL
+    const xPill = page.locator('.platform-pill[data-platform="x"]');
+    await xPill.click();
+    await expect(previewTextarea).not.toHaveValue('');
+    const xText = await previewTextarea.inputValue();
+    expect(xText).toContain('https://viraljacker.com/t/google-gemini');
+    expect(xText.length).toBeLessThanOrEqual(280);
+    const xHashtags = xText.match(/#[a-zA-Z0-9]+/g) || [];
+    expect(xHashtags.length).toBeGreaterThanOrEqual(2);
+    expect(xHashtags.length).toBeLessThanOrEqual(3);
+
+    // 2. Verify LinkedIn formatting & URL
+    const linkedinPill = page.locator('.platform-pill[data-platform="linkedin"]');
+    await linkedinPill.click();
+    // Wait for the text to change from X text to LinkedIn text
+    await expect(previewTextarea).not.toHaveValue(xText);
+    const liText = await previewTextarea.inputValue();
+    expect(liText).toContain('https://viraljacker.com/t/google-gemini');
+    const liHashtags = liText.match(/#[a-zA-Z0-9]+/g) || [];
+    expect(liHashtags.length).toBe(3);
+    // LinkedIn hashtags should be at the bottom
+    const lines = liText.trim().split('\n');
+    const bottomLine = lines[lines.length - 1];
+    expect(bottomLine).toContain('#');
+
+    // 3. Verify Facebook formatting & URL
+    const fbPill = page.locator('.platform-pill[data-platform="facebook"]');
+    await fbPill.click();
+    await expect(previewTextarea).not.toHaveValue(liText);
+    const fbText = await previewTextarea.inputValue();
+    expect(fbText).toContain('https://viraljacker.com/t/google-gemini');
+    const fbHashtags = fbText.match(/#[a-zA-Z0-9]+/g) || [];
+    expect(fbHashtags.length).toBeGreaterThanOrEqual(1);
+    expect(fbHashtags.length).toBeLessThanOrEqual(2);
+
+    // 4. Verify Reddit formatting & URL
+    const redditPill = page.locator('.platform-pill[data-platform="reddit"]');
+    await redditPill.click();
+    await expect(previewTextarea).not.toHaveValue(fbText);
+    const redditText = await previewTextarea.inputValue();
+    expect(redditText).toContain('https://viraljacker.com/t/google-gemini');
+    const redditHashtags = redditText.match(/#[a-zA-Z0-9]+/g) || [];
+    expect(redditHashtags.length).toBe(0);
+    // Reddit should have a headline hook and structured body
+    expect(redditText).toContain('\n');
+  });
 });
+
