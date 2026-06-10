@@ -218,6 +218,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     const xPill = page.locator('.platform-pill[data-platform="x"]');
     await xPill.click();
     await expect(previewTextarea).not.toHaveValue('');
+    await expect(previewTextarea).not.toHaveValue('Generating post...');
     const xText = await previewTextarea.inputValue();
     expect(xText).toContain('https://viraljacker.com/t/google-gemini');
     expect(xText.length).toBeLessThanOrEqual(280);
@@ -230,6 +231,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await linkedinPill.click();
     // Wait for the text to change from X text to LinkedIn text
     await expect(previewTextarea).not.toHaveValue(xText);
+    await expect(previewTextarea).not.toHaveValue('Generating post...');
     const liText = await previewTextarea.inputValue();
     expect(liText).toContain('https://viraljacker.com/t/google-gemini');
     const liHashtags = liText.match(/#[a-zA-Z0-9]+/g) || [];
@@ -243,6 +245,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     const fbPill = page.locator('.platform-pill[data-platform="facebook"]');
     await fbPill.click();
     await expect(previewTextarea).not.toHaveValue(liText);
+    await expect(previewTextarea).not.toHaveValue('Generating post...');
     const fbText = await previewTextarea.inputValue();
     expect(fbText).toContain('https://viraljacker.com/t/google-gemini');
     const fbHashtags = fbText.match(/#[a-zA-Z0-9]+/g) || [];
@@ -253,6 +256,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     const redditPill = page.locator('.platform-pill[data-platform="reddit"]');
     await redditPill.click();
     await expect(previewTextarea).not.toHaveValue(fbText);
+    await expect(previewTextarea).not.toHaveValue('Generating post...');
     const redditText = await previewTextarea.inputValue();
     expect(redditText).toContain('https://viraljacker.com/t/google-gemini');
     const redditHashtags = redditText.match(/#[a-zA-Z0-9]+/g) || [];

@@ -1,6 +1,6 @@
-# Walkthrough: AI-Powered Viral Social Post Generator (TJ-25)
+# Walkthrough: AI-Powered Viral Social Post Generator (TJ-25 & TJ-28)
 
-This walkthrough documents the features, backend API, user interface, and testing suite implemented for the AI-Powered Viral Social Post Generator.
+This walkthrough documents the features, backend API, user interface, and testing suite implemented for the AI-Powered Viral Social Post Generator, including the consistency and virality polish.
 
 ---
 
@@ -20,6 +20,10 @@ This walkthrough documents the features, backend API, user interface, and testin
 
 ### Backend (`server.js`)
 * **`POST /api/generate-post` Route**: Resolves context and uses Gemini (`gemini-3.5-flash`) to generate platform-specific templates using system prompts configured for character count limits, layout formatting, hashtags, and tone.
+* **Consistency & Virality Polish (TJ-28)**:
+  - **Dynamic URL Integration**: Computes the trend slug using `titleToSlug(trendTitle)` on the backend to construct and embed `https://viraljacker.com/t/<slug>` in the generated social post.
+  - **Strict Platform Constraints**: Enforces specific hashtag guidelines (2-3 targeted hashtags for X/Twitter, exactly 3 professional hashtags for LinkedIn, 1-2 for Facebook, and strictly 0 hashtags with structured headline formatting for Reddit).
+  - **High-Virality Tone Rules**: Added prompt engineering rules instructing Gemini to output highly creative, human-sounding posts while avoiding standard AI boilerplate (e.g. "In a surprising turn of events", "Furthermore", "Delve into").
 
 ### Frontend (`public/`)
 * **Structure (`index.html`)**: Added markup for the Share Modal and the centralized triggers (`#btn-share-trend`, `#btn-share-poll`, `#btn-share-debate`).
@@ -40,7 +44,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ### 2. Verify Functionality Manually
 1. Open TrendJacker and click on any trend card.
 2. Click **Share Trend**. The Share Modal will open with "General Trend" preselected.
-3. Toggle between X, LinkedIn, or Instagram to regenerate post templates optimized for each platform.
+3. Toggle between X, LinkedIn, or Reddit to regenerate post templates optimized for each platform.
 4. Cast a vote on a poll, and click **Share Poll**. The modal will open with "Poll Results" preselected.
 5. Click **Copy** to copy the text to your clipboard, or **Share** to redirect to the platform's native share composer.
 
@@ -49,4 +53,5 @@ Verify all integration behaviors via Playwright:
 ```bash
 npm test
 ```
-All 41 tests should pass successfully.
+All 42 tests should pass successfully.
+

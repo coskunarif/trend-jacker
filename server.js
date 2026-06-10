@@ -738,20 +738,71 @@ fastify.post('/api/generate-post', async (request, reply) => {
   const targetPlatform = platform || 'x';
   const targetContext = contextType || 'general';
 
+  const slug = titleToSlug(trendTitle);
+  const targetUrl = `https://viraljacker.com/t/${slug}`;
+
   if (process.env.NODE_ENV === 'test' || !genAI) {
-    return {
-      postText: `This is a mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!`
-    };
+    let postText = '';
+    if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+      postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
+      if (postText.length > 280) {
+        postText = postText.substring(0, 277) + '...';
+      }
+    } else if (targetPlatform === 'linkedin') {
+      postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
+    } else if (targetPlatform === 'facebook') {
+      postText = `What do you think about ${trendTitle}? It's viral right now under ${targetContext}. Read here: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Viral`;
+    } else if (targetPlatform === 'reddit') {
+      postText = `Why is ${trendTitle} trending? (${targetContext})\n\nHere is a quick summary of the trend. Check out the full breakdown and vote here: ${targetUrl}`;
+    } else {
+      postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
+    }
+    return { postText };
   }
 
   try {
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash',
     });
-    const prompt = `You are a social media expert. Generate a highly engaging, viral social media post about the topic "${trendTitle}".
-The post should be optimized for the platform "${targetPlatform}".
-The context/angle for the post is "${targetContext}".
-Write a natural, professional yet catchy post. Do not include meta-commentary, just output the post content itself.`;
+
+    let platformInstructions = '';
+    if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+      platformInstructions = `
+- Platform: X (Twitter).
+- Length constraint: The entire post must be strictly under 280 characters, including the target URL.
+- Hashtags: Include 2 to 3 highly relevant, hyper-targeted hashtags (e.g., #CricketTwitter, #AIAgents) based on the trend topic.`;
+    } else if (targetPlatform === 'linkedin') {
+      platformInstructions = `
+- Platform: LinkedIn.
+- Style: Professional, engaging.
+- Hashtags: Include exactly 3 professional, structured hashtags on the very last line of the post (e.g., #AI #Innovation #Technology).`;
+    } else if (targetPlatform === 'facebook') {
+      platformInstructions = `
+- Platform: Facebook.
+- Style: Broadly appealing, clean.
+- Hashtags: Include exactly 1 to 2 generic, relevant hashtags.`;
+    } else if (targetPlatform === 'reddit') {
+      platformInstructions = `
+- Platform: Reddit.
+- Style: Reddit formatting. Do NOT include any hashtags. Frame the post with a catchy title/headline as the first line, followed by a double newline and a brief structured summary/body.`;
+    } else {
+      platformInstructions = `- Platform: ${targetPlatform}`;
+    }
+
+    const prompt = `You are a world-class viral social media marketer. Generate a highly engaging, professional yet catchy social media post about the trending topic "${trendTitle}".
+
+The angle/context for the post is: "${targetContext}".
+You MUST explicitly include the following target URL in the post: "${targetUrl}"
+
+Platform-Specific Constraints:
+${platformInstructions}
+
+Tone & Style Rules:
+- Output ONLY the final post content. No meta-commentary, no introductory sentences ("Here is your post:"), no wrapping quotes around the entire post.
+- Use a concise, human-sounding, active tone. Start with a compelling hook or curiosity-inducing question.
+- Avoid generic AI transitions/jargon (e.g., "In a surprising turn of events", "Furthermore", "Delve into", "Unlock", "In conclusion", "Embark", "Revolutionize").
+- Use clean spacing and strategic emojis where appropriate to match high-quality human styling.`;
+
     const result = await model.generateContent(prompt);
     const postText = result.response.text().trim();
     return { postText };
