@@ -85,4 +85,7 @@ These high-level principles apply universally across all codebases and applicati
 ### 8. AI Token Economy & Rate Limiting
 * **Cost-Safe AI Integrations**: Prevent expensive runaway queries by enforcing aggressive client-side caching of AI responses, strict input/output token limits, and query rate limiting. If an agent loops over LLM calls, it must have built-in threshold safeguards to block execution before generating excessive API costs.
 
+### 9. Mobile-First & Responsive Responsiveness
+* **Mobile Native Feel**: Every application must be built using mobile-first responsive design principles. When accessed on a mobile browser (e.g. from a mobile search result), it must render like a premium, high-performance native mobile application. This means touch-optimized layout structures, thumb-friendly tap targets (minimum 48x48px), fluid responsive typography, zero horizontal scrolling issues, and instant mobile load speeds.
+
 
