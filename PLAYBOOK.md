@@ -19,56 +19,44 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 
 | Task ID | Task Title & Description | UX | SEO | VIR | FEAS | Total | Status |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **TJ-13** | **Unified Mobile UX and Navigation Polish Suite**<br>Comprehensive mobile overhaul including: sidebar close button, tab-switcher for trends list vs sentiment feed, scroll-to-top on trend select, main explainer loading skeleton, and viewport overflow/navbar cleanup. | **9.5** | **6.0** | **6.0** | **9.0** | **30.5** | `[x]` Completed |
-| **TJ-14** | **Main Explainer Panel Loading Skeleton & Fetch Feedback**<br>Add an animated CSS skeleton loader to replace the blank main screen while `/api/explain` is fetching, and add loading feedback on selected items. | 9.0 | 4.0 | 5.0 | 9.5 | **27.5** | `[x]` Completed |
-| **TJ-15** | **Mobile Sidebar Drawer Refactor & Accessibility Fixes**<br>Add mobile close button, fix invalid `aria-controls` reference, and refactor dual nested scroll pane into a single scroll. | 8.0 | 6.5 | 4.0 | 9.0 | **27.5** | `[x]` Completed |
-| **TJ-16** | **View Scroll Reset & Narrow Screen Header Polish**<br>Reset viewport scroll position to y=0 on trend load, and resolve header wrapping on devices <= 360px wide. | 8.5 | 4.0 | 4.0 | 10.0 | **26.5** | `[x]` Completed |
-| **TJ-17** | **Mobile-Native Web Share API Integration for Cards & Links**<br>Replace desktop-focused file downloads with native device share sheets (`navigator.share`) on mobile. Converts canvas explainers/meme cards to Blobs/Files for native sharing to apps like X/Twitter, WhatsApp, Slack, or iOS/Android clipboard. | **9.5** | **6.0** | **10.0** | **9.0** | **34.5** | `[x]` Completed |
-| **TJ-18** | **Mobile Explainer Content Accordion & Sub-Tabbing**<br>Group the long vertical stack of details into tabbed segments on mobile ("Overview", "Debate", "Interact") to avoid scroll fatigue. | 9.0 | 5.5 | 7.0 | 9.0 | **30.5** | Pending |
-| **TJ-19** | **Sticky Bottom Quick-Action Toolbar**<br>Provide a persistent bottom navigation/action bar on mobile for instant voting, opening the debate arena, or starting an AI chat. | 8.5 | 5.0 | 8.5 | 8.5 | **30.5** | Pending |
-| **TJ-20** | **High-DPI Retina Scaling for Canvas Analytics**<br>Implement device pixel ratio scaling (`window.devicePixelRatio`) to ensure crystal-clear sparklines and speedometers on modern mobile viewports. | 8.5 | 5.0 | 5.0 | 9.5 | **28.0** | Pending |
+| **TJ-13** | **Unified Mobile UX and Navigation Polish Suite** | 9.5 | 6.0 | 6.0 | 9.0 | **30.5** | `[x]` Completed |
+| **TJ-14** | **Main Explainer Panel Loading Skeleton & Fetch Feedback** | 9.0 | 4.0 | 5.0 | 9.5 | **27.5** | `[x]` Completed |
+| **TJ-15** | **Mobile Sidebar Drawer Refactor & Accessibility Fixes** | 8.0 | 6.5 | 4.0 | 9.0 | **27.5** | `[x]` Completed |
+| **TJ-16** | **View Scroll Reset & Narrow Screen Header Polish** | 8.5 | 4.0 | 4.0 | 10.0 | **26.5** | `[x]` Completed |
+| **TJ-17** | **Mobile-Native Web Share API Integration for Cards & Links** | 9.5 | 6.0 | 10.0 | 9.0 | **34.5** | `[x]` Completed |
+| **TJ-18** | **Mobile Explainer Content Accordion & Sub-Tabbing** | 9.0 | 5.5 | 7.0 | 9.0 | **30.5** | Pending |
+| **TJ-19** | **Sticky Bottom Quick-Action Toolbar** | 8.5 | 5.0 | 8.5 | 8.5 | **30.5** | Pending |
+| **TJ-20** | **High-DPI Retina Scaling for Canvas Analytics** | 8.5 | 5.0 | 5.0 | 9.5 | **28.0** | Pending |
+| **TJ-21** | **Mobile Layout and Responsiveness Overhaul**<br>Fix critical visual and layout bugs on mobile viewports: (1) prevent debate bubbles from collapsing to min-content width (single-word columns); (2) resolve horizontal scroll/viewport overflow caused by non-wrapping metadata row; (3) ensure chat bubbles use fit-content layout. | **9.5** | **7.5** | **8.0** | **9.5** | **34.5** | `[x]` Completed |
+| **TJ-22** | **Container Queries & Fluid Typography for Explainer Panel**<br>Refactor headings and card copy using CSS container queries and `clamp()` to guarantee elegant line wrapping on devices <= 360px. | 8.0 | 6.0 | 5.0 | 8.5 | **27.5** | Pending |
+| **TJ-23** | **Mobile Touch Targets & Swipe gesture Drawer**<br>Implement left/right swipe gestures to open/close the mobile trends sidebar and ensure all buttons meet WCAG 48x48px target minimums. | 8.5 | 7.0 | 6.0 | 8.0 | **29.5** | Pending |
 
 ---
 
-## 🚀 Selected Task Details: TJ-17 — Mobile-Native Web Share API Integration
+## 🚀 Selected Task Details: TJ-21 — Mobile Layout and Responsiveness Overhaul
 
 ### 1. Objective
-Transform TrendJacker's share and export loop on mobile devices to behave like a native mobile app. Currently, clicking "Download Card" or "Download Debate Meme" triggers a browser file download of a `1200x630` PNG image. On mobile viewports (iOS Safari, Android Chrome), file downloads are clunky, hidden in system directories, or blocked by default popup blockers. 
-
-By integrating the HTML5 **Web Share API**, the app will convert canvas elements directly into `File` objects and invoke the native device sharing drawer. This allows users to share the actual visual cards directly into X/Twitter, WhatsApp, Messages, or copy them to their native system clipboard in a single tap.
+Identify and fix the critical mobile-view layout issues reported by the user:
+1. **Debate Bubble Layout Collapse**: The debate messages shrink-wrap to `min-content` width on narrow mobile viewports, displaying arguments as a single vertical column of individual words.
+2. **Horizontal Viewport Overflow**: The trend header's metadata row (`.trend-meta-row`) contains multiple elements (traffic-pill, velocity-gauge-container with sparkline, and share buttons) that do not wrap on mobile. This pushes the page width beyond 100vw, causing massive horizontal overflow and cutting off text on the left/right.
 
 ### 2. Why (Business Value & Rationale)
-*   **Virality (10/10)**: TrendJacker is a viral news-jacking tool. Sharing an image directly to social networks is a 10x lower friction path than forcing a file download and manual upload.
-*   **UX & Native Feel (9.5/10)**: Invoking the native OS share sheet makes the web application feel like a premium, native mobile app, boosting user trust and retention.
-*   **SEO & Citations (6.0/10)**: Direct image-backed shares to social networks increase backlinks and search indexing signals for dynamically generated routes (`/t/:slug`).
+*   **UX & Retention (9.5/10)**: Readable debates and a perfectly bounded page are non-negotiable for mobile user retention. Users leaving due to a broken layout is a high-risk drop-off path.
+*   **SEO & Mobile Friendliness (7.5/10)**: Google penalizes pages that overflow horizontally or have text elements overlapping or too close to each other.
+*   **Feasibility (9.5/10)**: This task requires pure CSS layout corrections (e.g., using `width: fit-content;` and `flex-wrap: wrap;`) without introducing extra frameworks or libraries.
 
 ### 3. Execution Plan
 
-#### Step 1: Feature Detection & Web Share API Support Check
-*   Implement feature detection in `public/app.js` to check if `navigator.share` and `navigator.canShare` are available and support file sharing.
-*   Update the sharing button text and icon on mobile viewports if native sharing is supported (e.g., changing "Download Card" label to "Share Card").
+#### Step 1: Fix Debate and Chat Bubble Collapse
+*   Identify CSS selectors `.debate-bubble-wrap` and `.chat-bubble`.
+*   Change their width properties to `width: fit-content;` combined with `max-width: 90%;` (or `85%` for desktop/mobile consistency) to ensure they shrink-wrap short messages but stretch correctly up to their bounds for longer paragraphs instead of collapsing to single-word column widths.
 
-#### Step 2: Canvas-to-Blob Conversion & File API Wrapping
-*   Update `generateTrendCardImage` and `generateDebateMemeCard` in `public/app.js` to convert the generated `<canvas>` to a PNG Blob via `canvas.toBlob()`.
-*   Wrap the resulting Blob in a standard `File` object:
-    ```javascript
-    const file = new File([blob], `trend-card-${slug}.png`, { type: 'image/png' });
-    ```
+#### Step 2: Fix Horizontal Overflow on Metadata Row
+*   Target `.trend-meta-row` inside the `@media (max-width: 768px)` media query in `public/styles.css`.
+*   Set `.trend-meta-row` to `flex-wrap: wrap;` and configure appropriate spacing and gap rules so that the velocity speedometer, sparkline, traffic pill, and sharing buttons stack beautifully on narrow viewports rather than overflowing the page.
+*   Apply general cleanups (e.g. `box-sizing: border-box`, `max-width: 100%`) on components inside `.main-panel` to guarantee viewport safety.
 
-#### Step 3: Trigger Native Share Sheet
-*   Invoke `navigator.share` with the constructed `File` object, a title, and the trend page URL (`/t/:slug` or current absolute URL):
-    ```javascript
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        files: [file],
-        title: `TrendJacker Explainer: ${trendTitle}`,
-        text: `Check out why ${trendTitle} is viral right now!`,
-        url: window.location.href
-      });
-    }
-    ```
-*   Fall back gracefully to the standard link-based browser download for desktop devices or unsupported browsers.
-
-#### Step 4: Verification & Automated E2E Testing
-*   Write Playwright test assertions in `tests/e2e.spec.js` to verify fallback behavior on non-supporting desktop browsers.
-*   Simulate Web Share API supports on simulated mobile viewports if possible, or verify fallback download triggers.
+#### Step 3: End-to-End Visual Verification
+*   Add E2E tests in Playwright (e.g., in `tests/responsive.spec.js` or `tests/e2e.spec.js`) to verify mobile viewport widths (e.g. `360px`, `375px`).
+*   Assert that there is no horizontal page overflow (i.e. `window.innerWidth` matches the scrollable content width).
+*   Verify that debate text wraps normally and is fully readable on mobile.
