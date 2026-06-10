@@ -211,6 +211,30 @@
 
 ---
 
-## ⏭️ Next Active Task: TJ-10 (One-Click Share-to-X & Native Web Share API Integration)
-- **Objective**: Implement native Web Share API pings and custom prefilled Share-to-X URL templates to let users share explainers and debate outcomes.
-- **Why**: Enhances viral loops and organic user acquisition.
+## 🏁 Completed Task: TJ-10 (One-Click Share-to-X & Native Web Share API Integration)
+
+- **Status**: Completed
+- **Date**: 2026-06-10
+- **Author**: Antigravity (Advanced Agentic Coding Agent)
+
+### 🛠️ Implementation Details
+1. **Created Sharing Buttons (`public/index.html`, `public/styles.css`, `public/app.js`)**:
+   - Added Post to X buttons to:
+     - The trend hero card header.
+     - The Sentiment Poll results layout card.
+     - The Debate Arena results panel.
+   - Designed a responsive CSS class structure (`.share-x-btn`, `.share-poll-x-btn`, `.share-debate-x-btn`) with styled X icons and hover actions.
+2. **Integrated Share Templates (`public/app.js`)**:
+   - Wired up click event handlers mapping text pre-populators with dynamic route links `/t/:slug`.
+   - Captured user choices (`userPollVote`, `userDebateVote`) in local state and mapped them to customized post strings.
+3. **Fixed CSS Priority Bug (`public/styles.css`)**:
+   - Fixed a specificity issue where the `.debate-results` display override was making the hidden elements visible prematurely, by appending `!important` to the `.hidden` utility class.
+4. **E2E Testing & Deploy**:
+   - Added E2E tests to `tests/e2e.spec.js` asserting that sharing buttons load, are hidden initially, and show up correctly when results are loaded or choices submitted.
+   - Pushed commits and deployed successfully via the CI/CD pipeline.
+
+---
+
+## ⏭️ Next Active Task: TJ-11 (Multi-Source Ingestion: Early Reddit Popular RSS Feed Parser)
+- **Objective**: Parse and merge early interest spikes from Reddit hot/popular RSS feeds into our cached trends list, deduplicating items, and rendering source indicators.
+- **Why**: Captures cultural trends hours before they spike in Google Search volume.

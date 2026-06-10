@@ -28,15 +28,18 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-07** | **AI-Driven Sentiment Debate Arena** (Optimist vs Pessimist bot agents debating the trend). | 9 | 6 | 9 | 8 | **32** | `[x]` Completed |
 | **TJ-08** | **Automatic Search Engine Indexing Pinger** (pinging IndexNow / Google Indexing API on trend discovery). | 4 | 10 | 5 | 9 | **28** | `[x]` Completed |
 | **TJ-09** | **Mobile-First Responsiveness & Premium Touch Interactions** (optimized typography, flex column stack, >=48px touch targets, zero overflow scroll). | 9 | 7 | 5 | 10 | **31** | `[x]` Completed |
-| **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | **[/] Active** |
+| **TJ-10** | **One-Click Share-to-X & Native Web Share API Integration** (allowing users to share trend analysis and debate outcomes). | 8 | 5 | 10 | 9 | **32** | `[x]` Completed |
+| **TJ-11** | **Multi-Source Ingestion: Early Reddit Popular RSS Feed Parser** (merging early interest spikes from Reddit into trends feed). | 7 | 6 | 9 | 8 | **30** | **[/] Active** |
+| **TJ-12** | **Visual Meme Card Generator** (HTML canvas rendering custom visual shareable meme assets). | 9 | 5 | 10 | 7 | **31** | `[ ]` Proposed |
 
 ---
 
-## 🛠️ Active Task Details: TJ-10
-- **Objective**: Implement a prominent share button for each trend and debate outcome. Integrate the native Web Share API (so users on mobile get their native share sheet) and a custom Share-to-X (Twitter) button on desktop/fallback that generates pre-populated post text with the trend's title, custom summary, and dynamic link `/t/:slug`.
-- **Why**: Promotes virality, loops, and organic traffic growth, encouraging users to share debate outcomes and JIT explainer details directly to social platforms.
+## 🛠️ Active Task Details: TJ-11
+- **Objective**: Expand trend discovery beyond Google Trends by adding support for parsed Reddit hot/popular RSS feeds (e.g. `/r/popular` or `/r/all` RSS summaries). Merge these raw, early-stage velocity signals into the main cached trends list, deduplicate by topic title, and tag them as "Reddit Spike" vs "Google Search Spike" in the sidebar list.
+- **Why**: Allows TrendJacker to capture hot topics and cultural conversations hours before they register as massive search volume spikes, positioning us as the absolute first JIT explainer for viral spikes.
 - **Execution Plan**:
-  1. Add a Share button to the header of the Explainer Card and the results section of the Sentiment Poll / Debate Arena.
-  2. Implement native `navigator.share` fallback to a popup window for Share-to-X with custom query string parameters.
-  3. Prefill post template: "Just read a debate on [Trend]! I voted [Verdict]. What do you think? [Link]"
-  4. Write E2E Playwright tests to verify the share button click and share parameters trigger correctly.
+  1. Add Reddit popular feed parser helper in `server.js` (fetching `https://www.reddit.com/r/popular.rss` or JSON representation `https://www.reddit.com/r/popular.json` with a customized User-Agent to avoid rate limiting).
+  2. Parse the titles, extract keywords, deduplicate with Google Trends items, and build a unified feeds array.
+  3. Include a `source` tag (`google` vs `reddit`) in each trend item object.
+  4. Modify the sidebar rendering in `public/app.js` and `public/index.html` to render a source indicator badge next to each trend (e.g. Google icon/color vs Reddit icon/color).
+  5. Add E2E tests validating the blended RSS feed parsing and render indicators.
