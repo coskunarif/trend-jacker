@@ -451,10 +451,21 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(sharePollXBtn).toBeVisible();
 
     const shareDebateXBtn = page.locator('#btn-share-debate-x');
+    const downloadDebateCardBtn = page.locator('#btn-download-debate-card');
+    
     await expect(shareDebateXBtn).not.toBeVisible();
+    await expect(downloadDebateCardBtn).not.toBeVisible();
 
     await page.locator('#btn-verdict-optimist').click();
+    
     await expect(shareDebateXBtn).toBeVisible();
+    await expect(downloadDebateCardBtn).toBeVisible();
+
+    // Verify download triggers successfully
+    const downloadPromise = page.waitForEvent('download');
+    await downloadDebateCardBtn.click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('debate-meme-');
   });
 
   test('should render source badges on trend list items', async ({ page }) => {

@@ -1600,9 +1600,9 @@ body {
   font-weight: 600;
 }
 
-.share-debate-x-btn {
-  width: 100%;
-  max-width: 480px;
+.share-debate-x-btn, .download-debate-card-btn {
+  flex: 1;
+  min-width: 180px;
   min-height: 40px;
   padding: var(--space-2) var(--space-4);
   font-size: 0.85rem;
@@ -1610,9 +1610,43 @@ body {
   align-self: center;
 }
 
+.download-debate-card-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: var(--accent-gradient);
+  border: none;
+  color: var(--text-heading);
+  border-radius: var(--space-2);
+  font-family: var(--font-display);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  box-shadow: 0 4px 15px rgba(99, 102, 241, 0.15);
+}
+
+.download-debate-card-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3);
+  filter: brightness(1.1);
+}
+
+.download-debate-card-btn:active {
+  transform: translateY(1px);
+}
+
+.download-debate-card-btn .btn-icon {
+  transition: transform var(--transition-fast);
+}
+
+.download-debate-card-btn:hover .btn-icon {
+  transform: translateY(1px);
+}
+
 /* Mobile Media Query overrides for share buttons */
 @media (max-width: 768px) {
-  .share-x-btn, .share-poll-x-btn, .share-debate-x-btn {
+  .share-x-btn, .share-poll-x-btn, .share-debate-x-btn, .download-debate-card-btn {
     min-height: 48px !important;
   }
 }

@@ -60,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnShareX = document.getElementById('btn-share-x');
   const btnSharePollX = document.getElementById('btn-share-poll-x');
   const btnShareDebateX = document.getElementById('btn-share-debate-x');
+  const btnDownloadDebateCard = document.getElementById('btn-download-debate-card');
 
   // Slug generator helper
   function titleToSlug(title) {
@@ -489,6 +490,9 @@ document.addEventListener('DOMContentLoaded', () => {
   btnGenius.addEventListener('click', () => submitVote('genius'));
   btnOverrated.addEventListener('click', () => submitVote('overrated'));
   btnDownloadCard.addEventListener('click', generateTrendCardImage);
+  if (btnDownloadDebateCard) {
+    btnDownloadDebateCard.addEventListener('click', generateDebateMemeCard);
+  }
 
   async function generateTrendCardImage() {
     if (!currentTrend) return;
@@ -630,6 +634,156 @@ document.addEventListener('DOMContentLoaded', () => {
       link.click();
     } catch (err) {
       console.error("Failed to generate and download card PNG:", err);
+      alert("Could not download image. Please try again.");
+    }
+  }
+
+  async function generateDebateMemeCard() {
+    if (!currentTrend) return;
+
+    // Ensure custom fonts are loaded before drawing
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 1200;
+    canvas.height = 630;
+    const ctx = canvas.getContext('2d');
+
+    // 1. Background Gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, '#0f1225');
+    bgGrad.addColorStop(1, '#05070f');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    // 2. Glowing Neon Border Accent (Emerald to Indigo to Rose)
+    const borderGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    borderGrad.addColorStop(0, '#10b981'); // Emerald
+    borderGrad.addColorStop(0.5, '#6366f1'); // Indigo
+    borderGrad.addColorStop(1, '#f43f5e'); // Rose
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, 1192, 622);
+
+    // 3. Logo/Brand
+    ctx.font = "bold 26px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("Trend", 60, 65);
+    const trendTextWidth = ctx.measureText("Trend").width;
+
+    const logoGrad = ctx.createLinearGradient(60 + trendTextWidth, 0, 60 + trendTextWidth + 100, 0);
+    logoGrad.addColorStop(0, '#06b6d4');
+    logoGrad.addColorStop(1, '#6366f1');
+    ctx.fillStyle = logoGrad;
+    ctx.fillText("Jacker", 60 + trendTextWidth, 65);
+
+    // Arena Badge
+    ctx.fillStyle = "rgba(99, 102, 241, 0.1)";
+    ctx.fillRect(1000, 41, 140, 32);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(99, 102, 241, 0.3)";
+    ctx.strokeRect(1000, 41, 140, 32);
+
+    ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#6366f1";
+    ctx.textAlign = "center";
+    ctx.fillText("AI DEBATE ARENA", 1070, 61);
+    ctx.textAlign = "left"; // Reset
+
+    // 4. Trend Header (centered)
+    ctx.font = "bold 44px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    let headerText = currentTrend.title;
+    if (ctx.measureText(headerText).width > 1080) {
+      ctx.font = "bold 32px 'Space Grotesk', sans-serif";
+      if (ctx.measureText(headerText).width > 1080) {
+        headerText = headerText.substring(0, 50) + "...";
+      }
+    }
+    ctx.fillText(headerText, 600, 115);
+    ctx.textAlign = "left"; // Reset
+
+    // 5. Left Panel: Optimist (Emerald)
+    ctx.fillStyle = "rgba(16, 185, 129, 0.04)";
+    ctx.beginPath();
+    ctx.roundRect(60, 150, 510, 390, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = "bold 24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#10b981";
+    ctx.fillText("⚡ Optimist Bot", 90, 195);
+
+    const optPct = pctOptimist.textContent || '50%';
+    ctx.font = "bold 40px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#10b981";
+    ctx.textAlign = "right";
+    ctx.fillText(optPct, 540, 195);
+    ctx.textAlign = "left"; // Reset
+
+    ctx.strokeStyle = "rgba(16, 185, 129, 0.1)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(90, 215);
+    ctx.lineTo(540, 215);
+    ctx.stroke();
+
+    ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "#cbd5e1";
+    const optBubble = document.querySelector('.debate-bubble-wrap.optimist .debate-bubble');
+    const optText = optBubble ? optBubble.textContent.replace('Optimist Bot', '').trim() : "This trend is highly promising and opens up incredible future opportunities.";
+    wrapText(ctx, `"${optText}"`, 90, 255, 450, 28);
+
+    // 6. Right Panel: Skeptic (Rose)
+    ctx.fillStyle = "rgba(244, 63, 94, 0.04)";
+    ctx.beginPath();
+    ctx.roundRect(630, 150, 510, 390, 16);
+    ctx.fill();
+    ctx.strokeStyle = "rgba(244, 63, 94, 0.2)";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.font = "bold 24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#f43f5e";
+    ctx.fillText("🥱 Skeptic Bot", 660, 195);
+
+    const skPct = pctSkeptic.textContent || '50%';
+    ctx.font = "bold 40px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#f43f5e";
+    ctx.textAlign = "right";
+    ctx.fillText(skPct, 1110, 195);
+    ctx.textAlign = "left"; // Reset
+
+    ctx.strokeStyle = "rgba(244, 63, 94, 0.1)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(660, 215);
+    ctx.lineTo(1110, 215);
+    ctx.stroke();
+
+    ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "#cbd5e1";
+    const skBubble = document.querySelector('.debate-bubble-wrap.skeptic .debate-bubble');
+    const skText = skBubble ? skBubble.textContent.replace('Skeptic Bot', '').trim() : "This trend is likely overrated, short-lived, or lacks deep foundational utility.";
+    wrapText(ctx, `"${skText}"`, 660, 255, 450, 28);
+
+    // 7. Footer Call To Action
+    ctx.font = "500 15px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+    ctx.fillText("Who won? Vote in the live Debate Arena at viraljacker.com", 60, 580);
+
+    // Trigger image download
+    try {
+      const dataUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.download = `debate-meme-${titleToSlug(currentTrend.title)}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Failed to generate and download debate meme card PNG:", err);
       alert("Could not download image. Please try again.");
     }
   }
