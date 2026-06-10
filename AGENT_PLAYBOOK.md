@@ -23,15 +23,15 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-02** | **Dynamic Trend Card Generator** (HTML canvas / preview layout) for social media sharing. | 8 | 5 | 9 | 7 | **29** | `[x]` Completed |
 | **TJ-03** | **Interactive "Viral Velocity" Gauge & Sparkline** on the dashboard. | 9 | 4 | 7 | 8 | **28** | `[x]` Completed |
 | **TJ-05** | **Cloud Firestore Persistence** (keyless production auth + local mock fallback). | 6 | 5 | 5 | 9 | **25** | `[x]` Completed |
-| **TJ-06** | **Playwright E2E testing in CI/CD pipeline** (verifying stability before deploys). | 5 | 5 | 4 | 9 | **23** | `[ ]` |
-| **TJ-04** | **Real-Time Global Sentiment Live Feed** (simulating active votes across regions). | 8 | 4 | 8 | 7 | **27** | **[/] Active** |
+| **TJ-06** | **Playwright E2E testing in CI/CD pipeline** (verifying stability before deploys). | 5 | 5 | 4 | 9 | **23** | **[/] Active** |
+| **TJ-04** | **Real-Time Global Sentiment Live Feed** (simulating active votes across regions). | 8 | 4 | 8 | 7 | **27** | `[x]` Completed |
 
 ---
 
-## 🛠️ Active Task Details: TJ-04
-- **Objective**: Create a simulated global real-time sentiment stream/feed that displays incoming simulated votes from different cities/countries (e.g. "Paris voted Genius on AI Agent", "Tokyo voted Overrated on VR Glasses") to make the site feel extremely dynamic, alive, and interactive.
-- **Why**: Encourages user engagement by creating a sense of an active, breathing global community, boosting user session duration and virality.
+## 🛠️ Active Task Details: TJ-06
+- **Objective**: Integrate Playwright E2E testing in the CI/CD pipeline to verify application stability, API endpoints, dynamic routes, and frontend functionality automatically before deploying to production.
+- **Why**: Ensures code reliability and prevents regressions during deployment cycles, allowing future agents to deploy verified changes autonomously with confidence.
 - **Execution Plan**:
-  1. Add a WebSocket-like simulation or server-sent event route (or a periodic client poll/simulated stream) that updates in real-time.
-  2. Implement an animated live ticker or feed UI on the frontend dashboard using CSS micro-animations to slide new votes into view.
-  3. Hook simulated activity directly into the trending topics and their existing vote states.
+  1. Add `@playwright/test` to devDependencies.
+  2. Write automated E2E tests for verification (e.g. validating sidebar trend selection, dynamic explainer card rendering, community sentiment polling, follow-up Q&A chat, and live sentiment stream).
+  3. Configure GitHub Actions workflow to run E2E test suites prior to the deployment stage.
