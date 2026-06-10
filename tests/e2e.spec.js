@@ -336,4 +336,41 @@ test.describe('TrendJacker E2E tests', () => {
     const text = await response.text();
     expect(text.trim()).toBe('trendjackerkey2026');
   });
+
+  test('should support responsive layout, mobile sidebar toggling, and auto-close on select', async ({ page }) => {
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends),
+      });
+    });
+
+    await page.route('**/api/explain', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExplanation),
+      });
+    });
+
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+
+    const toggleBtn = page.locator('#sidebar-toggle');
+    await expect(toggleBtn).toBeVisible();
+
+    const sidebar = page.locator('.sidebar-panel');
+    await expect(sidebar).not.toHaveClass(/open/);
+
+    await toggleBtn.click();
+    await expect(sidebar).toHaveClass(/open/);
+
+    const firstTrend = page.locator('.trend-item').first();
+    await firstTrend.click();
+    await expect(sidebar).not.toHaveClass(/open/);
+
+    await expect(page.locator('#explainer-view')).toBeVisible();
+    await expect(page.locator('#detail-title')).toHaveText('Google Gemini');
+  });
 });

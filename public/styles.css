@@ -961,24 +961,174 @@ body {
   display: none;
 }
 
-/* Responsive Breakpoints */
+/* Responsive Breakpoints & Drawer Layout */
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  transition: opacity 0.25s ease;
+  opacity: 1;
+}
+
+.sidebar-backdrop.hidden {
+  opacity: 0;
+  pointer-events: none;
+  display: none;
+}
+
 @media (max-width: 768px) {
+  .navbar {
+    top: var(--space-2);
+    left: var(--space-2);
+    right: var(--space-2);
+    height: 56px;
+    padding: 0 var(--space-3);
+    border-radius: var(--space-3);
+  }
+
+  .sidebar-toggle {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    border-radius: var(--space-2);
+    color: var(--text-heading);
+    padding: 0 var(--space-3);
+    height: 40px;
+    font-size: 0.85rem;
+    font-family: var(--font-display);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .sidebar-toggle svg {
+    color: var(--primary);
+  }
+
   .dashboard-grid {
     grid-template-columns: 1fr;
     height: auto;
     overflow-y: visible;
+    margin-top: 80px;
+    padding: var(--space-2);
+    gap: var(--space-3);
   }
   
   .sidebar-panel {
-    height: 300px;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 290px;
+    height: 100vh;
+    transform: translateX(-295px);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 1000;
+    border-radius: 0;
+    box-shadow: none;
+    background-color: var(--surface);
+    border-top: none;
+    border-bottom: none;
+    border-left: none;
+  }
+  
+  .sidebar-panel.open {
+    transform: translateX(0);
+    box-shadow: 20px 0 40px rgba(0, 0, 0, 0.7);
   }
   
   .main-panel {
-    min-height: 500px;
+    min-height: calc(100vh - 100px);
+    border-radius: var(--space-3);
   }
   
   .explainer-grid, .interactive-grid {
     grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  /* Make touch targets mobile-native and thumb-friendly (>=48px) */
+  .poll-btn {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .verdict-btn {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .chat-input-form {
+    height: auto;
+    gap: var(--space-2);
+  }
+
+  #chat-input {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--space-2);
+  }
+
+  #chat-submit-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--space-2);
+    flex-shrink: 0;
+  }
+
+  .download-card-btn {
+    min-height: 48px;
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .share-btn {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+  }
+
+  /* Optimize spacing and font sizes for mobile reading */
+  .trend-hero-card {
+    padding: var(--space-4);
+  }
+
+  .trend-title {
+    font-size: 1.8rem;
+  }
+
+  .hook-box {
+    padding: var(--space-3);
+  }
+
+  .glass-card {
+    padding: var(--space-4);
+  }
+
+  .debate-messages {
+    max-height: 380px;
+    padding: var(--space-2);
+  }
+
+  .debate-bubble-wrap {
+    max-width: 90%;
+  }
+
+  /* Prevent horizontal overflow completely */
+  body, html {
+    overflow-x: hidden;
   }
 }
 

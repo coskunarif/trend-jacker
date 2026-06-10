@@ -42,6 +42,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const pctOptimist = document.getElementById('pct-optimist');
   const pctSkeptic = document.getElementById('pct-skeptic');
 
+  // Mobile drawer elements
+  const btnSidebarToggle = document.getElementById('sidebar-toggle');
+  const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+  const sidebarPanel = document.querySelector('.sidebar-panel');
+
   let currentTrend = null;
   let chatMessages = [];
   let hasVotedCurrent = false;
@@ -165,6 +170,37 @@ document.addEventListener('DOMContentLoaded', () => {
     jsonLdScript.textContent = JSON.stringify(schemaData);
   }
 
+  // Close mobile sidebar drawer if open
+  function closeMobileSidebar() {
+    if (sidebarPanel && sidebarPanel.classList.contains('open')) {
+      sidebarPanel.classList.remove('open');
+      if (btnSidebarToggle) btnSidebarToggle.setAttribute('aria-expanded', 'false');
+    }
+    if (sidebarBackdrop && !sidebarBackdrop.classList.contains('hidden')) {
+      sidebarBackdrop.classList.add('hidden');
+    }
+  }
+
+  // Sidebar mobile drawer toggling
+  if (btnSidebarToggle && sidebarBackdrop && sidebarPanel) {
+    btnSidebarToggle.addEventListener('click', () => {
+      const isOpen = sidebarPanel.classList.contains('open');
+      if (isOpen) {
+        sidebarPanel.classList.remove('open');
+        sidebarBackdrop.classList.add('hidden');
+        btnSidebarToggle.setAttribute('aria-expanded', 'false');
+      } else {
+        sidebarPanel.classList.add('open');
+        sidebarBackdrop.classList.remove('hidden');
+        btnSidebarToggle.setAttribute('aria-expanded', 'true');
+      }
+    });
+
+    sidebarBackdrop.addEventListener('click', () => {
+      closeMobileSidebar();
+    });
+  }
+
   // Initialize: Load Trends
   fetchTrends();
 
@@ -228,6 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         loadTrendDetails(trend);
+        closeMobileSidebar();
       };
 
       a._clickHandler = clickHandler;
@@ -856,6 +893,7 @@ document.addEventListener('DOMContentLoaded', () => {
               });
               const newUrl = window.location.origin + '/t/' + slug;
               window.history.pushState({ path: newUrl }, '', newUrl);
+              closeMobileSidebar();
             }
           });
         }
