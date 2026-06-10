@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrendJacker — Just-in-Time Viral Explainers</title>
+  <meta name="color-scheme" content="dark">
+  <script>
+    // Modern Web Guidance: Prevent Flash of Unstyled Content (FOUC) by forcing dark color-scheme on document element immediately
+    document.documentElement.style.colorScheme = 'dark';
+  </script>
+
+  <meta name="description" content="Instant explainer tool for viral trends and topics. See why things are trending right now on social media and Google.">
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Style Sheet -->
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Floating Top Navbar -->
+  <header class="navbar">
+    <div class="brand">
+      <div class="logo-glow"></div>
+      <span class="logo-text">Trend<span class="gradient-text">Jacker</span></span>
+      <span class="version-tag">PoC</span>
+    </div>
+    <div class="navbar-actions">
+      <span class="status-indicator">
+        <span class="status-dot animate-pulse"></span>
+        <span class="status-label">Live Trends Feed</span>
+      </span>
+    </div>
+  </header>
+
+  <!-- Main Grid Layout -->
+  <main class="dashboard-grid">
+    <!-- Left Sidebar: Trends List -->
+    <aside class="sidebar-panel">
+      <div class="panel-header">
+        <h2 class="section-title">Trending Searches</h2>
+        <p class="section-subtitle">Pinging Google Trends API</p>
+      </div>
+      <div id="trends-list" class="scroll-container">
+        <!-- Skeleton Loaders -->
+        <div class="skeleton-item"></div>
+        <div class="skeleton-item"></div>
+        <div class="skeleton-item"></div>
+        <div class="skeleton-item"></div>
+        <div class="skeleton-item"></div>
+      </div>
+    </aside>
+
+    <!-- Center Panel: Explainer Board -->
+    <section class="main-panel">
+      <!-- Welcome Screen (Default empty state) -->
+      <div id="welcome-view" class="empty-state">
+        <div class="empty-icon-wrap">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-trending-up"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+        </div>
+        <h3>Select a trending topic</h3>
+        <p>Choose any spike-query from the left side panel. Our AI agent will fetch live search context and generate a real-time explainer instantly.</p>
+      </div>
+
+      <!-- Explainer View (Loads dynamically) -->
+      <div id="explainer-view" class="explainer-container hidden">
+        <!-- Trend Header -->
+        <div class="trend-hero-card">
+          <div class="trend-meta-row">
+            <span class="traffic-pill" id="detail-traffic">50K+ searches</span>
+            <div class="velocity-gauge-container" id="detail-velocity" aria-label="Spike Rate indicator">
+              <svg class="speedometer" viewBox="0 0 100 60" width="80" height="48" aria-hidden="true">
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="8" stroke-linecap="round" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="url(#speed-grad)" stroke-width="8" stroke-linecap="round" />
+                <defs>
+                  <linearGradient id="speed-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#10b981" />
+                    <stop offset="50%" stop-color="#06b6d4" />
+                    <stop offset="100%" stop-color="#f43f5e" />
+                  </linearGradient>
+                </defs>
+                <g id="needle-group">
+                  <path id="needle" d="M 50 50 L 50 15" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+                  <circle cx="50" cy="50" r="5" fill="#ffffff" />
+                </g>
+              </svg>
+              <div class="velocity-info">
+                <span id="detail-velocity-text" class="velocity-text">Spike Rate: Breakout</span>
+                <canvas id="trend-sparkline" width="120" height="28" aria-hidden="true"></canvas>
+              </div>
+            </div>
+            <button id="btn-share-trend" class="share-btn" aria-label="Share this trend explainer">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+              Share Explainer
+            </button>
+          </div>
+          <h1 id="detail-title" class="trend-title">Topic Name</h1>
+          
+          <!-- The Hook (JIT summary) -->
+          <div class="hook-box">
+            <div class="hook-badge">THE HOOK</div>
+            <p id="detail-hook">Loading viral hook description...</p>
+          </div>
+        </div>
+
+        <!-- Explainer Cards Grid -->
+        <div class="explainer-grid">
+          <!-- Summary card -->
+          <div class="glass-card">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              What is it?
+            </h3>
+            <p id="detail-what" class="card-text">Loading...</p>
+          </div>
+
+          <!-- Takeaway card -->
+          <div class="glass-card">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="m9 18 6-6-6-6"/></svg>
+              The Takeaway
+            </h3>
+            <p id="detail-takeaway" class="card-text">Loading...</p>
+          </div>
+        </div>
+
+        <!-- Why it is viral -->
+        <div class="glass-card full-width">
+          <h3 class="card-heading">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            Why is it viral?
+          </h3>
+          <div id="detail-viral-tags" class="tag-container">
+            <!-- Programmatic pills -->
+          </div>
+        </div>
+
+        <!-- Interactive Engagement Section -->
+        <div class="interactive-grid">
+          <!-- Sentiment Poll Card -->
+          <div class="glass-card interactive-card">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M12 20a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z"/><path d="M12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="m17 14-5-5-5 5"/></svg>
+              Community Sentiment
+            </h3>
+            <p class="poll-prompt">Is this trend actually genius, or is it totally overrated?</p>
+            <div class="poll-buttons">
+              <button id="btn-vote-genius" class="poll-btn vote-genius">
+                <span class="btn-label">Genius ⚡</span>
+              </button>
+              <button id="btn-vote-overrated" class="poll-btn vote-overrated">
+                <span class="btn-label">Overrated 🥱</span>
+              </button>
+            </div>
+            
+            <!-- Poll Results (hidden until vote) -->
+            <div id="poll-results" class="poll-results hidden" role="status" aria-live="polite">
+              <div class="result-row">
+                <span class="result-label">Genius</span>
+                <div class="progress-bar-wrap">
+                  <div id="bar-genius" class="progress-bar bar-g" style="width: 0%"></div>
+                </div>
+                <span id="pct-genius" class="result-pct">0%</span>
+              </div>
+              <div class="result-row">
+                <span class="result-label">Overrated</span>
+                <div class="progress-bar-wrap">
+                  <div id="bar-overrated" class="progress-bar bar-o" style="width: 0%"></div>
+                </div>
+                <span id="pct-overrated" class="result-pct">0%</span>
+              </div>
+              <button id="btn-download-card" class="download-card-btn" aria-label="Download trend explainer card image">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Trend Card
+              </button>
+            </div>
+          </div>
+
+          <!-- Micro AI Q&A Card -->
+          <div class="glass-card interactive-card flex-col">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              Dig Deeper with AI
+            </h3>
+            <div id="chat-history" class="chat-history-container" role="log" aria-live="polite">
+              <div class="chat-bubble bot">
+                Ask me any follow-up question about this trend (e.g., "how can I check this myself?" or "is there a catch?").
+              </div>
+            </div>
+            <form id="chat-form" class="chat-input-form">
+              <input type="text" id="chat-input" placeholder="Type your question..." required autocomplete="off" aria-label="Ask a follow-up question about the active trend">
+              <button type="submit" id="chat-submit-btn" aria-label="Send follow-up question">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-send-horizontal"><path d="m3 3 3 9-3 9 19-9Z"/><path d="M6 12h16"/></svg>
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- News Context Footer -->
+        <div class="news-footer-card">
+          <div class="news-icon">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-newspaper"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/><path d="M10 6h8v4h-8V6Z"/></svg>
+          </div>
+          <div class="news-content">
+            <h4 class="news-headline" id="detail-news-title">Headline News</h4>
+            <p class="news-snippet" id="detail-news-snippet">News snippet...</p>
+            <a href="#" target="_blank" id="detail-news-link" class="news-link-btn">
+              Read Original Article
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="link-arrow"><path d="M7 7h10v10"/><path d="M7 17 17 7"/></svg>
+            </a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Dynamic CSS Variables Loader -->
+  <script src="app.js"></script>
+</body>
+</html>
