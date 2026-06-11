@@ -36,49 +36,50 @@ Each brainstormed task is scored out of **10 points** across four key areas:
 | **TJ-27** | **Static Social Share Logic Subtraction**<br>Remove the old hardcoded static tweet generation logic from the client-side JavaScript (`app.js`) and clear out the redundant individual share buttons from various sections of the UI, consolidating everything into the new generator. | **7.5** | **6.0** | **5.0** | **10.0** | **28.5** | Pending |
 | **TJ-28** | **AI Post Generator Consistency & Virality Polish**<br>Refactor the post generator prompt and backend routing to consistently embed relevant hashtags and the dynamic app URL (`viraljacker.com/t/<slug>`). Tune the content output to be highly concise, catchy, creative, and human-sounding, matching the reference designs. | **9.5** | **9.0** | **10.0** | **9.5** | **38.0** | `[x]` Completed |
 | **TJ-29** | **Debate Arena Subtraction & Catchy Visual Cards Integration**<br>Remove the text-heavy AI Sentiment Debate Arena module and replace it with a set of catchy, dynamic, visual infographic cards (utilizing dynamic thematic gradients, visual badges, CSS circular charts, and download-to-canvas meme/infographic sharing) to keep the app highly visual and engaging. | **9.5** | **8.5** | **9.5** | **9.0** | **36.5** | `[x]` Completed |
+| **TJ-30** | **Interactive Sentiment Timeline Dashboard**<br>Add an additive dashboard displaying a timeline/time-series of trend sentiment change or voting velocity using interactive HTML5 SVG/Canvas line/bar charts with tooltips and fluid animations. | **9.5** | **8.0** | **8.5** | **8.5** | **34.5** | Pending |
+| **TJ-31** | **View Transitions and Motion-Driven Page Navigation**<br>Implement browser View Transitions API for seamless transitions when selecting trends from the sidebar and switching between mobile tabs. Add micro-animations (subtle scale-up on hover, smooth state updates) to Segmented Controls and Quick Action buttons. | **9.5** | **8.5** | **8.0** | **9.5** | **35.5** | Pending |
+| **TJ-32** | **Redundant Inline CSS Clean up and Consolidation**<br>Audit the codebase to remove redundant CSS rules, delete any remaining inline styles, optimize media queries, and clean up deprecated element styles from previous iterations, reducing page size and improving LCP. | **8.0** | **9.0** | **5.0** | **10.0** | **32.0** | Pending |
 
 ---
 
-## 🚀 Selected Task Details: TJ-29 — Debate Arena Subtraction & Catchy Visual Cards Integration
+## 🚀 Selected Task Details: TJ-31 — View Transitions and Motion-Driven Page Navigation
 
 ### 1. Objective
-Remove the text-heavy Sentiment Debate Arena and replace it with a suite of highly visual, catchy cards that convey trend metrics and community vibe at a single glance:
-1. **Subtract Debate Arena**: Delete all backend routes (`/api/debate`, `/api/debate/vote`), frontend layout elements, timers, CSS styles, and sharing canvas generators associated with the Optimist/Skeptic debate.
-2. ** Catchy Visual Cards Suite**: Design and build three dynamic visual cards:
-   - **"Viral Vibe" Visual Card**: Displays trend categories with dynamic, eye-catching gradients (e.g. Tech, Entertainment, News), large emojis, and status badges.
-   - **"Live Sentiment Chart" Card**: Interactive circular/radial gauge showing the Genius vs Overrated vote split, replacing the text poll results with a sleek visual layout.
-   - **"Snapshot Share" Card**: A clean, graphical canvas/card representation optimized for downloading and sharing on X, LinkedIn, etc.
-3. **Responsive Grid & Design**: Implement responsive layout styling for these cards, ensuring they align beautifully across desktop and mobile screens.
+Enhance the user experience and visual polish of TrendJacker by implementing modern browser View Transitions and micro-interactions:
+1. **View Transitions API**: Implement the native browser View Transitions API for smooth, animated page state changes (e.g. when changing the selected trend or switching tabs on mobile).
+2. **Interactive Micro-animations**: Add refined hover effects, transition states, and micro-animations to interactive elements like segmented controls, sidebar list items, voting buttons, and sharing options.
+3. **Hardware Acceleration & Performance**: Optimize CSS transitions with hardware acceleration, using layout-safe properties (`transform`, `opacity`) to ensure solid performance and avoid Layout Shifts (CLS).
 
 ### 2. Why (Business Value & Rationale)
-*   **UX & Retention (9.5/10)**: Reduces cognitive load and page clutter by removing wall-of-text debates, focusing on vibrant visual components and micro-interactions.
-*   **SEO & GEO Optimization (8.5/10)**: Improved DOM footprint and faster Largest Contentful Paint (LCP) by loading fewer text blocks.
-*   **Viral Potential (9.5/10)**: Visual charts and cards are far more engaging and shareable than plain text debate transcripts, increasing screenshot sharing.
-*   **Feasibility (9.0/10)**: Deleting unused code is highly feasible; constructing visual CSS components and drawing simple canvases has well-supported browser APIs.
+*   **UX & Retention (9.5/10)**: Smooth transitions and tactile micro-interactions make the app feel exceptionally premium and native, improving engagement.
+*   **SEO & GEO Optimization (8.5/10)**: Modern CSS animations and clean JS transition logic avoid DOM churn and align with Core Web Vitals best practices.
+*   **Viral Potential (8.0/10)**: Sleek, high-fidelity animations look stunning on screen recordings, raising product appeal and viral sharing quality.
+*   **Feasibility (9.5/10)**: Leveraging the native browser View Transitions API requires minimal code and carries zero external dependency overhead.
 
 ### 3. Execution Plan
 
-#### Step 1: Remove Debate Arena Feature
-*   In `server.js`, delete `/api/debate` and `/api/debate/vote` route handlers and clean up any database helpers for debate votes.
-*   In `public/index.html`, remove the `<div class="glass-card debate-card full-width">` container.
-*   In `public/app.js`, delete debate event listeners, UI binding logic, and the `generateDebateMemeCard` canvas function.
-*   In `public/styles.css`, clean up all debate-related CSS styles.
+#### Step 1: Implement View Transitions
+*   Wrap trend selection state updates in `document.startViewTransition(() => { ... })` within `public/app.js`.
+*   Wrap mobile tab switching logic in `document.startViewTransition()` to smoothly slide/fade the tabs.
+*   Configure custom view-transition styles in `public/styles.css` using `::view-transition-old` and `::view-transition-new` selectors.
 
-#### Step 2: Implement Catchy Visual Cards
-*   In `public/index.html`, insert the visual cards section where the debate card used to be.
-*   In `public/styles.css`, define layout, responsive grid, animations, and gradients (using HSL color models) for the visual cards.
-*   In `public/app.js`, dynamically populate categories, gradients, and circular progress gauges. Integrate canvas-sharing capabilities for the visual cards.
+#### Step 2: Integrate Micro-animations and Hover Effects
+*   Design and add rich hover states to sidebar items (`.sidebar-item`), tab switchers (`.segmented-control`), and CTA buttons.
+*   Ensure interactive elements scale slightly on click/hover and use smooth transitions (e.g., `transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s;`).
 
 #### Step 3: Run Tests and Verify
-*   Verify app runs correctly on port 3015.
-*   Run Playwright tests, cleaning up any deprecated assertions for the debate elements and verifying the new cards.
+*   Verify the transitions work correctly in Chromium.
+*   Run the Playwright E2E and responsive tests to ensure transitions do not break existing test assertions.
+*   Add a new automated test verifying the active view transitions on trend selection.
 
 ---
 
 ### 🚦 Automated Test Suite Status
 - **Date**: 2026-06-11
-- **Status**: Completed (Steps 1-5 Implementation & Verification).
-  - Deprecated debate tests successfully deleted.
-  - Added new assertions for downloading visual infographic cards and testing the responsiveness of `.visual-cards-grid`.
-  - Verified visual cards layout, circular SVG gauges, and infographic canvas download.
-  - All 38 E2E, responsive, and unit tests have passed successfully.
+- **Status**: Updated with initial failing tests for TJ-31 (View Transitions).
+  - All 38 existing E2E, responsive, and unit tests have passed successfully.
+  - Added new E2E test file [view-transitions.spec.js](file:///home/ubuntuadmin/projects/trend-jacker/tests/view-transitions.spec.js) containing 3 failing tests to guide the implementation of the View Transitions API (TDD).
+  - Failing tests verify:
+    - View Transition is triggered upon trend selection.
+    - View Transition is triggered upon mobile/desktop tab switching.
+    - View-transition-specific styles (e.g. `::view-transition`) are present in the CSS.
