@@ -1,49 +1,11 @@
-task: Fix Test Flakiness (Responsive Grid & Tooltip)     tier: T2   creativity: 0.5
-state: complete                 budget: repairs 0/3
-branch: asf/20260611-test-fix-flakiness    checkpoint: asf/20260611-test-fix-flakiness/green-1
+task: TJ-26 Unified Share and Social Modal UI     tier: T2   creativity: 0.5
+state: architect                 budget: repairs 0/3
+branch: asf/20260611-unified-share-modal          checkpoint: none
 caps: agents,ui,web,human
-
-## Task
-- **Objective**: Fix the failing responsive card grid layout checks and timeline hover tooltip test flakiness to ensure green CI/CD status.
-- **Metric**: Build reliability and layout accuracy.
-- **Why now**: Parallel CPU loads and View Transition timings are causing layout assertions and hover tooltip visibility checks to flake/fail.
-- **Runner-up**: TJ-26 (Unified Share and Social Modal UI)
 
 ## Log
 - 2026-06-11: Conductor initialized Scout phase.
-- 2026-06-11: Scout selected "Fix Test Flakiness (Responsive Grid & Tooltip)" as the next high-ROI task.
-- 2026-06-11: Conductor initialized Architect phase.
-- 2026-06-11: Architect completed SPEC.md. Conductor initialized Tester phase.
-- 2026-06-11: Tester updated tests and verified state. Conductor initialized Builder phase.
-- 2026-06-11: Builder verified tests green on branch and committed changes. Conductor initialized Verifier phase.
-- 2026-06-11: Verifier completed validation of E2E tests, captured screenshots, and verified resolution of test flakiness.
-- 2026-06-11: Conductor initialized Shipper phase.
-
+- 2026-06-11: Scout identified high-ROI task TJ-26 Unified Share and Social Modal UI (combining TJ-26 and TJ-27).
+- 2026-06-11: Conductor created branch asf/20260611-unified-share-modal and initialized Architect phase.
 ## Verdict
-
-### Checks:
-- **Test Suite**: PASS (All 50 E2E tests passed cleanly in 32.2s)
-- **AC-1 (Responsive Grid Layout Checks)**: PASS (Verified that transitions settle, coordinates check out perfectly on desktop [side-by-side] and mobile [stacked])
-- **AC-2 (Timeline Hover Tooltip Checks)**: PASS (Verified explicit network response waiting for history endpoints, and auto-retrying style checks/visibility assertions)
-
-### Evidence:
-- Run logs and test results: `50 passed`
-- Desktop Grid Layout: [desktop-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/desktop-grid.png)
-- Mobile Grid Layout: [mobile-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/mobile-grid.png)
-- Hover Tooltip: [hover-tooltip.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/hover-tooltip.png)
-
 ## Done
-### What Shipped:
-- Replaced hard timeouts and sleeps in E2E tests with robust, retrying assertions (`expect().toPass()`) for viewport resizing and tooltip interactions.
-- Added explicit network response waiting (`page.waitForResponse`) for timeline history data retrieval before starting assertions to eliminate race conditions under high runner loads.
-
-### Acceptance Criteria & Evidence
-| Acceptance Criterion | Verification / Evidence |
-| --- | --- |
-| AC-1 (Responsive Grid Layout) | PASS - Layout verified under desktop (side-by-side) and mobile (stacked) viewports using retrying layout checks. |
-| AC-2 (Timeline Hover Tooltip) | PASS - Tooltip formatting, coordinates/styling, dynamic data display, and hide behavior verified after waiting for api endpoint response. |
-
-### PR & Deploy links:
-- PR: Local merge to `main` (no remote PR opened due to offline/local environment capabilities or access restrictions).
-- Tag: `asf/20260611-test-fix-flakiness/green-1`
-
