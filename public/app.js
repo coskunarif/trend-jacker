@@ -276,9 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     };
 
-    const useTransition = document.startViewTransition && (!navigator.webdriver || typeof window.onViewTransitionCalled === 'function');
+    const useTransition = document.startViewTransition;
     if (useTransition) {
-      document.startViewTransition(updateDOM);
+       document.startViewTransition(updateDOM);
     } else {
       updateDOM();
     }
@@ -601,7 +601,7 @@ document.addEventListener('DOMContentLoaded', () => {
           window.scrollTo({ top: 0, behavior: 'instant' });
         };
 
-        const useTransition = document.startViewTransition && !skipPush && (!navigator.webdriver || typeof window.onViewTransitionCalled === 'function');
+        const useTransition = document.startViewTransition && !skipPush;
         if (useTransition) {
           document.startViewTransition(updateDOM);
         } else {
