@@ -13,4 +13,6 @@ caps: agents,ui,web,human
 - 2026-06-11: Architect completed SPEC.md. Conductor initialized Tester phase.
 - 2026-06-11: Tester wrote 3 tests in tests/og-favicon.spec.js. Observed state: red (3 failed). Conductor initialized Builder phase.
 ## Verdict
+- DISPUTED: `tests/og-favicon.spec.js` line 173 has invalid Playwright syntax calling `expect().toPass(callback)` instead of `expect(callback).toPass()`, throwing "callback is not a function".
 ## Done
+

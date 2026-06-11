@@ -2086,4 +2086,57 @@ body {
   transform: scale(0.97) translateY(0) !important;
 }
 
+/* Image Integration & Favicons Visual Upgrade Styles */
+.trend-thumbnail {
+  width: 60px;
+  height: 45px;
+  object-fit: cover;
+  border-radius: var(--space-2);
+  flex-shrink: 0;
+  aspect-ratio: 16/9;
+  margin-right: 12px;
+}
+
+.trend-thumbnail-placeholder {
+  width: 60px;
+  height: 45px;
+  border-radius: var(--space-2);
+  flex-shrink: 0;
+  aspect-ratio: 16/9;
+  margin-right: 12px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  border: 1px dashed var(--border);
+}
+
+.publisher-favicon {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.detail-hero-container {
+  position: relative;
+  width: 100%;
+  border-radius: var(--space-3);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--border);
+  background: var(--surface-raised);
+  overflow: hidden;
+}
+
+.detail-hero {
+  width: 100%;
+  height: 250px;
+  object-fit: cover;
+  border-radius: var(--space-3);
+  aspect-ratio: 16/9;
+}
+
+.detail-hero-gradient {
+  width: 100%;
+  height: 160px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.3) 0%, rgba(139, 92, 246, 0.3) 100%);
+}
+
 

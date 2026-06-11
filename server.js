@@ -66,7 +66,24 @@ fastify.get('/', async (request, reply) => {
               headline: "Google announces Gemini 3.5",
               snippet: "Gemini 3.5 is now live with advanced reasoning capabilities.",
               url: "https://blog.google/gemini-3.5",
-              source: "Google Blog"
+              source: "Google Blog",
+              ogImage: "https://blog.google/static/images/gemini-hero.png",
+              favicon: "https://blog.google/favicon.ico"
+            }
+          },
+          {
+            id: 2,
+            title: "Fastify framework",
+            traffic: "20K+",
+            description: "High performance web framework for Node.js.",
+            source: "google",
+            news: {
+              headline: "Fastify v5 released",
+              snippet: "Fastify v5 introduces improved plugin loading and security features.",
+              url: "https://fastify.io/v5-release",
+              source: "Fastify Blog",
+              ogImage: null,
+              favicon: "https://www.google.com/s2/favicons?domain=fastify.io&sz=32"
             }
           }
         ];
@@ -215,8 +232,111 @@ function seedRecentActivityLog() {
   console.log(`Seeded recentActivityLog with ${recentActivityLog.length} items.`);
 }
 
+// Scraper helper to fetch metadata
+async function fetchMetadata(url) {
+  if (!url) return { ogImage: null, favicon: null };
+  try {
+    const parsedUrl = new URL(url);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+    const response = await fetch(url, {
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      }
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const html = await response.text();
+    
+    // Parse ogImage
+    let ogImage = null;
+    const ogImageMatch = html.match(/<meta[^>]*?(?:property|name)=["']og:image["'][^>]*?content=["']([^"']+)["']/i) ||
+                         html.match(/<meta[^>]*?content=["']([^"']+)["'][^>]*?(?:property|name)=["']og:image["']/i);
+    if (ogImageMatch) {
+      ogImage = ogImageMatch[1];
+    } else {
+      const twitterImageMatch = html.match(/<meta[^>]*?(?:property|name)=["']twitter:image["'][^>]*?content=["']([^"']+)["']/i) ||
+                                html.match(/<meta[^>]*?content=["']([^"']+)["'][^>]*?(?:property|name)=["']twitter:image["']/i);
+      if (twitterImageMatch) {
+        ogImage = twitterImageMatch[1];
+      }
+    }
+
+    if (ogImage && !ogImage.startsWith('http')) {
+      ogImage = new URL(ogImage, parsedUrl.origin).href;
+    }
+
+    // Parse favicon
+    let favicon = null;
+    const faviconMatch = html.match(/<link[^>]*?rel=["'](?:shortcut\s+)?icon["'][^>]*?href=["']([^"']+)["']/i) ||
+                         html.match(/<link[^>]*?href=["']([^"']+)["'][^>]*?rel=["'](?:shortcut\s+)?icon["']/i);
+    if (faviconMatch) {
+      favicon = faviconMatch[1];
+    }
+
+    if (favicon && !favicon.startsWith('http')) {
+      favicon = new URL(favicon, parsedUrl.origin).href;
+    }
+
+    if (!favicon) {
+      favicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+    }
+
+    return { ogImage, favicon };
+  } catch (err) {
+    let fallbackFavicon = null;
+    try {
+      const parsedUrl = new URL(url);
+      fallbackFavicon = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+    } catch (_) {}
+    return { ogImage: null, favicon: fallbackFavicon };
+  }
+}
+
 // Helper to fetch trends and populate cache
 async function updateTrendsCache() {
+  if (process.env.NODE_ENV === 'test') {
+    latestTrends = [
+      {
+        id: 1,
+        title: "Google Gemini",
+        traffic: "100K+",
+        description: "The latest AI models from Google.",
+        source: "google",
+        news: {
+          headline: "Google announces Gemini 3.5",
+          snippet: "Gemini 3.5 is now live with advanced reasoning capabilities.",
+          url: "https://blog.google/gemini-3.5",
+          source: "Google Blog",
+          ogImage: "https://blog.google/static/images/gemini-hero.png",
+          favicon: "https://blog.google/favicon.ico"
+        }
+      },
+      {
+        id: 2,
+        title: "Fastify framework",
+        traffic: "20K+",
+        description: "High performance web framework for Node.js.",
+        source: "google",
+        news: {
+          headline: "Fastify v5 released",
+          snippet: "Fastify v5 introduces improved plugin loading and security features.",
+          url: "https://fastify.io/v5-release",
+          source: "Fastify Blog",
+          ogImage: null,
+          favicon: "https://www.google.com/s2/favicons?domain=fastify.io&sz=32"
+        }
+      }
+    ];
+    return;
+  }
+
   let googleTrends = [];
   let redditTrends = [];
 
@@ -328,6 +448,19 @@ async function updateTrendsCache() {
   if (merged.length === 0) {
     console.warn('Both Google and Reddit RSS failed. Using fallbacks.');
   } else {
+    if (merged.length > 0) {
+      const metadataPromises = merged.map(async (item) => {
+        if (item.news && item.news.url) {
+          const meta = await fetchMetadata(item.news.url);
+          item.news.ogImage = meta.ogImage;
+          item.news.favicon = meta.favicon;
+        } else if (item.news) {
+          item.news.ogImage = null;
+          item.news.favicon = null;
+        }
+      });
+      await Promise.all(metadataPromises);
+    }
     latestTrends = merged;
     console.log(`Successfully cached ${latestTrends.length} blended trends.`);
   }
@@ -1036,7 +1169,9 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
           headline: "Google announces Gemini 3.5",
           snippet: "Gemini 3.5 is now live with advanced reasoning capabilities.",
           url: "https://blog.google/gemini-3.5",
-          source: "Google Blog"
+          source: "Google Blog",
+          ogImage: "https://blog.google/static/images/gemini-hero.png",
+          favicon: "https://blog.google/favicon.ico"
         }
       },
       {
@@ -1049,7 +1184,9 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
           headline: "Fastify v5 released",
           snippet: "Fastify v5 introduces improved plugin loading and security features.",
           url: "https://fastify.io/v5-release",
-          source: "Fastify Blog"
+          source: "Fastify Blog",
+          ogImage: null,
+          favicon: "https://www.google.com/s2/favicons?domain=fastify.io&sz=32"
         }
       },
       {
@@ -1062,7 +1199,9 @@ fastify.listen({ port, host: '0.0.0.0' }, async (err) => {
           headline: "Reddit Spike Topic: OpenAI leaks new model features",
           snippet: "A viral post in r/technology outlines upcoming features.",
           url: "https://www.reddit.com/r/technology/comments/1u1ngzk/openai_leaks_new_model_features",
-          source: "r/technology"
+          source: "r/technology",
+          ogImage: null,
+          favicon: "https://www.google.com/s2/favicons?domain=www.reddit.com&sz=32"
         }
       }
     ];

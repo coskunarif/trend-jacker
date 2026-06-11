@@ -627,10 +627,33 @@ function initApp() {
       const badgeLabel = source === 'reddit' ? 'Reddit Spike' : 'Google Search Spike';
       const sourceBadge = `<span class="source-badge ${badgeClass}">${badgeLabel}</span>`;
 
+      let thumbnailHtml = '';
+      if (trend.news && trend.news.ogImage) {
+        thumbnailHtml = `<img class="trend-thumbnail" src="${trend.news.ogImage}" alt="${trend.title}" loading="lazy" />`;
+      } else {
+        thumbnailHtml = `<div class="trend-thumbnail-placeholder"></div>`;
+      }
+
+      let faviconUrl = '';
+      if (trend.news) {
+        if (trend.news.favicon) {
+          faviconUrl = trend.news.favicon;
+        } else if (trend.news.url) {
+          try {
+            const parsedUrl = new URL(trend.news.url);
+            faviconUrl = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+          } catch (_) {}
+        }
+      }
+
       a.innerHTML = `
+        ${thumbnailHtml}
         <div class="trend-item-info">
           <span class="trend-item-title">${trend.title}</span>
-          ${sourceBadge}
+          <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
+            ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" />` : ''}
+            ${sourceBadge}
+          </div>
           <span class="trend-item-desc">${trend.description || (trend.news && trend.news.headline) || 'Tap to investigate'}</span>
         </div>
         <span class="trend-item-traffic">${trend.traffic}</span>
@@ -752,6 +775,22 @@ function initApp() {
       }
       
       // Populate Details
+      const heroImg = document.getElementById('detail-hero-image');
+      const heroContainer = document.getElementById('detail-hero-container');
+      const heroGradient = heroContainer ? heroContainer.querySelector('.detail-hero-gradient') : null;
+      if (heroImg) {
+        if (trend.news && trend.news.ogImage) {
+          heroImg.src = trend.news.ogImage;
+          heroImg.style.display = 'block';
+          if (heroGradient) heroGradient.style.display = 'none';
+        } else {
+          heroImg.src = '';
+          heroImg.removeAttribute('src');
+          heroImg.style.display = 'none';
+          if (heroGradient) heroGradient.style.display = 'block';
+        }
+      }
+
       detailTitle.textContent = trend.title;
       detailTraffic.textContent = `${trend.traffic || 'Rising'} searches`;
 
@@ -831,6 +870,29 @@ function initApp() {
         newsTitle.textContent = trend.news.headline;
         newsSnippet.textContent = trend.news.snippet || 'No snippet available.';
         newsLink.href = trend.news.url || '#';
+
+        const footerFaviconImg = document.getElementById('footer-favicon-img');
+        const footerGenericSvg = document.querySelector('.news-icon svg.lucide-newspaper');
+
+        let footerFaviconUrl = '';
+        if (trend.news.favicon) {
+          footerFaviconUrl = trend.news.favicon;
+        } else if (trend.news.url) {
+          try {
+            const parsedUrl = new URL(trend.news.url);
+            footerFaviconUrl = `https://www.google.com/s2/favicons?domain=${parsedUrl.hostname}&sz=32`;
+          } catch (_) {}
+        }
+
+        if (footerFaviconUrl && footerFaviconImg && footerGenericSvg) {
+          footerFaviconImg.src = footerFaviconUrl;
+          footerFaviconImg.style.display = 'block';
+          footerGenericSvg.style.display = 'none';
+        } else if (footerFaviconImg && footerGenericSvg) {
+          footerFaviconImg.style.display = 'none';
+          footerGenericSvg.style.display = 'block';
+        }
+
         document.querySelector('.news-footer-card').classList.remove('hidden');
       } else {
         document.querySelector('.news-footer-card').classList.add('hidden');
