@@ -22,6 +22,7 @@ if (process.env.NODE_ENV === 'production') {
 
 // Local SQLite fallback and in-memory mock
 const inMemoryStorage = new Map();
+const inMemoryEvents = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -34,6 +35,15 @@ if (!firestore) {
         trend TEXT PRIMARY KEY,
         overrated INTEGER DEFAULT 0,
         genius INTEGER DEFAULT 0
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS vote_events (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trend TEXT,
+        vote TEXT,
+        timestamp TEXT,
+        location TEXT
       )
     `);
     console.log('Local SQLite database initialized successfully at', dbPath);
@@ -92,7 +102,7 @@ export async function getPollData(trend) {
  * @param {'overrated'|'genius'} vote 
  * @returns {Promise<{overrated: number, genius: number}>}
  */
-export async function incrementVote(trend, vote) {
+export async function incrementVote(trend, vote, location = null) {
   if (firestore) {
     try {
       const docRef = firestore.collection('polls').doc(trend);
@@ -120,6 +130,9 @@ export async function incrementVote(trend, vote) {
   
   current[vote]++;
 
+  const timestamp = new Date().toISOString();
+  const locStr = location ? JSON.stringify(location) : null;
+
   // SQLite fallback update
   if (sqliteDb) {
     try {
@@ -129,6 +142,7 @@ export async function incrementVote(trend, vote) {
       } else if (vote === 'overrated') {
         sqliteDb.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(trend);
       }
+      sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(trend, vote, timestamp, locStr);
       return current;
     } catch (err) {
       console.error(`Local SQLite write failed for "${trend}":`, err.message);
@@ -137,6 +151,10 @@ export async function incrementVote(trend, vote) {
 
   // In-memory fallback update
   inMemoryStorage.set(trend, current);
+  if (!inMemoryEvents.has(trend)) {
+    inMemoryEvents.set(trend, []);
+  }
+  inMemoryEvents.get(trend).push({ vote, timestamp, location: locStr });
   return current;
 }
 
@@ -152,6 +170,65 @@ async function getLocalSqlitePollData(trend) {
     // ignore
   }
   return { overrated: 0, genius: 0 };
+}
+
+/**
+ * Retrieves all individual vote events for a given trend.
+ * @param {string} trend
+ * @returns {Promise<Array<{vote: string, timestamp: string, location: string}>>}
+ */
+export async function getVoteEvents(trend) {
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT vote, timestamp, location FROM vote_events WHERE trend = ? ORDER BY timestamp ASC');
+      return stmt.all(trend);
+    } catch (err) {
+      console.error(`Local SQLite query for vote_events failed:`, err.message);
+      return [];
+    }
+  }
+  return inMemoryEvents.get(trend) || [];
+}
+
+/**
+ * Seeds multiple historical vote events for a trend.
+ * @param {string} trend
+ * @param {Array<{vote: string, timestamp: string, location: any}>} events
+ */
+export async function seedVoteEvents(trend, events) {
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
+      const stmt = sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
+      let geniusCount = 0;
+      let overratedCount = 0;
+      for (const ev of events) {
+        stmt.run(trend, ev.vote, ev.timestamp, ev.location ? JSON.stringify(ev.location) : null);
+        if (ev.vote === 'genius') geniusCount++;
+        else overratedCount++;
+      }
+      sqliteDb.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
+        .run(geniusCount, overratedCount, trend);
+    } catch (err) {
+      console.error(`Local SQLite seedVoteEvents failed:`, err.message);
+    }
+  } else {
+    if (!inMemoryEvents.has(trend)) {
+      inMemoryEvents.set(trend, []);
+    }
+    const arr = inMemoryEvents.get(trend);
+    let geniusCount = 0;
+    let overratedCount = 0;
+    for (const ev of events) {
+      arr.push({ vote: ev.vote, timestamp: ev.timestamp, location: ev.location ? JSON.stringify(ev.location) : null });
+      if (ev.vote === 'genius') geniusCount++;
+      else overratedCount++;
+    }
+    const current = inMemoryStorage.get(trend) || { overrated: 0, genius: 0 };
+    current.genius += geniusCount;
+    current.overrated += overratedCount;
+    inMemoryStorage.set(trend, current);
+  }
 }
 
 

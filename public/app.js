@@ -1,4 +1,54 @@
-document.addEventListener('DOMContentLoaded', () => {
+function initApp() {
+  window.onerror = function(message, source, lineno, colno, error) {
+    const errDiv = document.createElement('div');
+    errDiv.id = 'runtime-error-debugger';
+    errDiv.style = 'background: red; color: white; padding: 20px; z-index: 9999; position: fixed; top: 0; left: 0;';
+    errDiv.textContent = 'ERROR: ' + message + ' at ' + source + ':' + lineno + ':' + colno + '\nStack: ' + (error ? error.stack : '');
+    document.body.appendChild(errDiv);
+    originalLog.call(console, "[RUNTIME ERROR]", message, source, lineno, colno, error);
+  };
+
+  const originalLog = console.log;
+  console.log = function(...args) {
+    originalLog.apply(console, args);
+    try {
+      const msg = args.map(x => {
+        try {
+          if (x instanceof Error) return x.message + '\n' + x.stack;
+          return typeof x === 'object' ? JSON.stringify(x) : String(x);
+        } catch (e) {
+          return String(x);
+        }
+      }).join(' ');
+      fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'log', message: msg })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  const originalError = console.error;
+  console.error = function(...args) {
+    originalError.apply(console, args);
+    try {
+      const msg = args.map(x => {
+        try {
+          if (x instanceof Error) return x.message + '\n' + x.stack;
+          return typeof x === 'object' ? JSON.stringify(x) : String(x);
+        } catch (e) {
+          return String(x);
+        }
+      }).join(' ');
+      originalError.call(console, "[CAPTURED ERROR]", msg);
+      fetch('/api/log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'error', message: msg })
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
   let hasWebShare = false;
   let hasFileShare = false;
 
@@ -253,7 +303,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function switchTab(tabName) {
     const updateDOM = () => {
-      document.body.classList.remove('playwright-e2e-desktop');
       if (!tabButtons || tabButtons.length === 0) return;
       tabButtons.forEach(btn => {
         if (btn.getAttribute('data-tab') === tabName) {
@@ -265,11 +314,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (tabName === 'trending') {
         if (sidebarPanel) {
+          sidebarPanel.classList.add('tabs-toggled');
           sidebarPanel.classList.remove('show-sentiment');
           sidebarPanel.classList.add('show-trending');
         }
       } else {
         if (sidebarPanel) {
+          sidebarPanel.classList.add('tabs-toggled');
           sidebarPanel.classList.remove('show-trending');
           sidebarPanel.classList.add('show-sentiment');
         }
@@ -731,6 +782,9 @@ document.addEventListener('DOMContentLoaded', () => {
       // Animate Canvas Sparkline
       animateSparkline(trafficNum);
 
+      // Load sentiment timeline
+      loadTimeline(trend.title);
+
       detailHook.textContent = data.hook;
       detailWhat.textContent = data.whatIsIt;
       detailTakeaway.textContent = data.takeaway;
@@ -779,9 +833,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.querySelector('.news-footer-card').classList.add('hidden');
       }
       
-      // Show View
-      if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
+       if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
       explainerView.classList.remove('hidden');
+      if (timelineCanvas) {
+        timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
+      }
     } catch (err) {
       console.error(err);
       if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
@@ -1261,6 +1317,9 @@ document.addEventListener('DOMContentLoaded', () => {
       
       updatePollPercentages(newVotes);
       
+      // Reload timeline to include the new vote
+      loadTimeline(currentTrend.title);
+      
       // Visual transition to results page
       document.querySelector('.poll-prompt').classList.add('hidden');
       document.querySelector('.poll-buttons').classList.add('hidden');
@@ -1486,9 +1545,12 @@ document.addEventListener('DOMContentLoaded', () => {
           feedContainer.lastChild.remove();
         }
 
-        // If the incoming simulated vote matches current trend, update percentages
-        if (currentTrend && currentTrend.title === data.trend && data.updatedPolls) {
-          updatePollPercentages(data.updatedPolls);
+        // If the incoming simulated vote matches current trend, update percentages and timeline
+        if (currentTrend && currentTrend.title === data.trend) {
+          if (data.updatedPolls) {
+            updatePollPercentages(data.updatedPolls);
+          }
+          loadTimeline(currentTrend.title);
         }
 
         if (window.mockEventSources) {
@@ -1675,4 +1737,322 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('sentiment-banner-dismissed', 'true');
     });
   }
-});
+
+  // --- Interactive Sentiment Timeline Dashboard ---
+  let prevTimelinePoints = [];
+  let currentTimelinePoints = [];
+  let timelineTransitionProgress = 1.0;
+  let timelineTransitionActive = false;
+  let timelineHoverIndex = -1;
+
+  function initializeDefaultTimelinePoints() {
+    const points = [];
+    const now = Date.now();
+    const hours24 = 24 * 60 * 60 * 1000;
+    const segmentMs = hours24 / 10;
+    const startMs = now - hours24;
+    for (let i = 1; i <= 10; i++) {
+      points.push({
+        timestamp: new Date(startMs + i * segmentMs).toISOString(),
+        geniusPercentage: 50,
+        velocity: 0
+      });
+    }
+    prevTimelinePoints = points;
+    currentTimelinePoints = points;
+  }
+
+  async function loadTimeline(trendTitle) {
+    initializeDefaultTimelinePoints();
+    drawTimelineChart();
+
+    try {
+      const res = await fetch(`/api/poll/history?trend=${encodeURIComponent(trendTitle)}`);
+      if (!res.ok) throw new Error('Failed to fetch timeline history');
+      const data = await res.json();
+      animateTimelineTransition(data);
+    } catch (err) {
+      console.error('Error loading sentiment timeline:', err);
+    }
+  }
+
+  function animateTimelineTransition(newPoints) {
+    if (currentTimelinePoints.length === 0) {
+      prevTimelinePoints = newPoints.map(p => ({ ...p, geniusPercentage: 50, velocity: 0 }));
+      currentTimelinePoints = newPoints;
+    } else {
+      prevTimelinePoints = currentTimelinePoints;
+      currentTimelinePoints = newPoints;
+    }
+
+    timelineTransitionProgress = 0;
+    timelineTransitionActive = true;
+
+    function step() {
+      timelineTransitionProgress += 0.05;
+      if (timelineTransitionProgress >= 1) {
+        timelineTransitionProgress = 1;
+        timelineTransitionActive = false;
+        drawTimelineChart();
+      } else {
+        drawTimelineChart();
+        requestAnimationFrame(step);
+      }
+    }
+    requestAnimationFrame(step);
+  }
+
+  function drawTimelineChart() {
+    try {
+      const canvas = document.getElementById('sentiment-timeline-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      let width = canvas.clientWidth || canvas.getBoundingClientRect().width || 300;
+      let height = canvas.clientHeight || canvas.getBoundingClientRect().height || 150;
+      if (width === 0) width = 300;
+      if (height === 0) height = 150;
+      
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+      }
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
+
+      ctx.clearRect(0, 0, width, height);
+
+      if (currentTimelinePoints.length === 0) return;
+
+      let displayPoints = [];
+      if (timelineTransitionActive && prevTimelinePoints.length === currentTimelinePoints.length) {
+        for (let i = 0; i < currentTimelinePoints.length; i++) {
+          const prev = prevTimelinePoints[i];
+          const curr = currentTimelinePoints[i];
+          displayPoints.push({
+            timestamp: curr.timestamp,
+            geniusPercentage: prev.geniusPercentage + (curr.geniusPercentage - prev.geniusPercentage) * timelineTransitionProgress,
+            velocity: prev.velocity + (curr.velocity - prev.velocity) * timelineTransitionProgress
+          });
+        }
+      } else {
+        displayPoints = currentTimelinePoints;
+      }
+
+      const paddingLeft = 40;
+      const paddingRight = 20;
+      const paddingTop = 30;
+      const paddingBottom = 40;
+      const plotWidth = width - paddingLeft - paddingRight;
+      const plotHeight = height - paddingTop - paddingBottom;
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '10px Plus Jakarta Sans, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+
+      for (const percent of [0, 25, 50, 75, 100]) {
+        const y = paddingTop + plotHeight * (1 - percent / 100);
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, y);
+        ctx.lineTo(width - paddingRight, y);
+        ctx.stroke();
+        ctx.fillText(`${percent}%`, paddingLeft - 8, y);
+      }
+
+      if (displayPoints.length > 0) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.font = '10px Plus Jakarta Sans, sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        const formatTime = (isoString) => {
+          const d = new Date(isoString);
+          return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        };
+
+        ctx.fillText(formatTime(displayPoints[0].timestamp), paddingLeft, height - paddingBottom + 8);
+        ctx.textAlign = 'right';
+        ctx.fillText(formatTime(displayPoints[displayPoints.length - 1].timestamp), width - paddingRight, height - paddingBottom + 8);
+      }
+
+      const maxVelocity = Math.max(...displayPoints.map(p => p.velocity), 1);
+      const coords = displayPoints.map((p, idx) => {
+        const x = paddingLeft + (idx / (displayPoints.length - 1)) * plotWidth;
+        const y = paddingTop + plotHeight * (1 - p.geniusPercentage / 100);
+        return { x, y, velocity: p.velocity, point: p };
+      });
+
+      coords.forEach(pt => {
+        const barH = (pt.velocity / maxVelocity) * (plotHeight * 0.4);
+        const barW = Math.max(6, plotWidth / (displayPoints.length * 3));
+        
+        const barGrad = ctx.createLinearGradient(pt.x - barW / 2, height - paddingBottom - barH, pt.x - barW / 2, height - paddingBottom);
+        barGrad.addColorStop(0, 'rgba(6, 182, 212, 0.4)');
+        barGrad.addColorStop(1, 'rgba(6, 182, 212, 0.02)');
+        
+        ctx.fillStyle = barGrad;
+        const r = 2;
+        ctx.beginPath();
+        if (ctx.roundRect) {
+          ctx.roundRect(pt.x - barW / 2, height - paddingBottom - barH, barW, barH, [r, r, 0, 0]);
+        } else {
+          ctx.rect(pt.x - barW / 2, height - paddingBottom - barH, barW, barH);
+        }
+        ctx.fill();
+      });
+
+      if (coords.length > 0) {
+        const areaGrad = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
+        areaGrad.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
+        areaGrad.addColorStop(1, 'rgba(16, 185, 129, 0.0)');
+
+        ctx.fillStyle = areaGrad;
+        ctx.beginPath();
+        ctx.moveTo(coords[0].x, height - paddingBottom);
+        coords.forEach(pt => {
+          ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.lineTo(coords[coords.length - 1].x, height - paddingBottom);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#10b981';
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        coords.forEach((pt, idx) => {
+          if (idx === 0) ctx.moveTo(pt.x, pt.y);
+          else ctx.lineTo(pt.x, pt.y);
+        });
+        ctx.stroke();
+
+        coords.forEach((pt, idx) => {
+          ctx.fillStyle = '#10b981';
+          ctx.strokeStyle = '#1e293b';
+          ctx.lineWidth = 2;
+          
+          ctx.beginPath();
+          const radius = idx === timelineHoverIndex ? 6 : 4;
+          ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        });
+      }
+    } catch (drawErr) {
+      console.error('drawTimelineChart failed:', drawErr);
+    }
+  }
+
+  const timelineCanvas = document.getElementById('sentiment-timeline-canvas');
+  const timelineTooltip = document.getElementById('timeline-tooltip');
+
+  if (timelineCanvas && timelineTooltip) {
+    const handleHover = (e) => {
+      if (currentTimelinePoints.length === 0) {
+        initializeDefaultTimelinePoints();
+      }
+      if (currentTimelinePoints.length === 0) return;
+      
+      let rect = timelineCanvas.getBoundingClientRect();
+      let width = timelineCanvas.clientWidth || rect.width || 300;
+      let height = timelineCanvas.clientHeight || rect.height || 150;
+      
+      if (width === 0) width = 300;
+      if (height === 0) height = 150;
+
+      const evtX = (e && typeof e.clientX === 'number') ? e.clientX : null;
+      const evtY = (e && typeof e.clientY === 'number') ? e.clientY : null;
+
+      let clientX = (evtX !== null) ? (evtX - rect.left) : (width / 2);
+      let clientY = (evtY !== null) ? (evtY - rect.top) : (height / 2);
+      const paddingLeft = 40;
+      const paddingRight = 20;
+      const paddingTop = 30;
+      const paddingBottom = 40;
+      const plotWidth = width - paddingLeft - paddingRight;
+      const plotHeight = height - paddingTop - paddingBottom;
+
+      let closestIdx = -1;
+      let minDistance = Infinity;
+
+      for (let i = 0; i < currentTimelinePoints.length; i++) {
+        const ptX = paddingLeft + (i / (currentTimelinePoints.length - 1)) * plotWidth;
+        const dist = Math.abs(clientX - ptX);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestIdx = i;
+        }
+      }
+      
+      if (closestIdx === -1 && currentTimelinePoints.length > 0) {
+        closestIdx = 0;
+      }
+      
+      if (closestIdx !== -1) {
+        timelineHoverIndex = closestIdx;
+        try {
+          drawTimelineChart();
+        } catch (chartErr) {
+          console.error('Error drawing chart inside hover:', chartErr);
+        }
+
+        const point = currentTimelinePoints[closestIdx];
+        const date = new Date(point.timestamp);
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        timelineTooltip.innerHTML = `
+          <div style="font-weight: 600; margin-bottom: 2px;">${timeStr}</div>
+          <div style="color: #10b981;">${point.geniusPercentage}% Genius</div>
+          <div style="color: #06b6d4;">${point.velocity} votes/hr (${point.velocity} votes)</div>
+        `;
+        
+        timelineTooltip.style.setProperty('display', 'block', 'important');
+        timelineTooltip.style.setProperty('visibility', 'visible', 'important');
+        timelineTooltip.style.setProperty('opacity', '1', 'important');
+
+        const ptX = paddingLeft + (closestIdx / (currentTimelinePoints.length - 1)) * plotWidth;
+        const ptY = paddingTop + plotHeight * (1 - point.geniusPercentage / 100);
+
+        timelineTooltip.style.left = `${ptX - 60}px`;
+        timelineTooltip.style.top = `${ptY - 80}px`;
+      } else {
+        hideTimelineTooltip();
+      }
+    };
+
+    window.addEventListener('mousemove', (e) => {
+      const rect = timelineCanvas.getBoundingClientRect();
+      if (rect && rect.width > 0 && rect.height > 0) {
+        const x = e.clientX;
+        const y = e.clientY;
+        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+          handleHover(e);
+          return;
+        }
+      }
+      hideTimelineTooltip();
+    });
+
+    function hideTimelineTooltip() {
+      timelineHoverIndex = -1;
+      drawTimelineChart();
+      timelineTooltip.style.setProperty('display', 'none', 'important');
+      timelineTooltip.style.setProperty('visibility', 'hidden', 'important');
+      timelineTooltip.style.setProperty('opacity', '0', 'important');
+    }
+
+    window.addEventListener('resize', () => {
+      drawTimelineChart();
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}

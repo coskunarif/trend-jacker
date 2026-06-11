@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -305,7 +305,7 @@ function startGlobalSimulation() {
 
     let updatedPolls = null;
     try {
-      updatedPolls = await incrementVote(randomTrend.title, vote);
+      updatedPolls = await incrementVote(randomTrend.title, vote, location);
     } catch (err) {
       console.error(`Failed to increment simulated vote for "${randomTrend.title}":`, err.message);
     }
@@ -627,7 +627,7 @@ fastify.post('/api/poll', async (request, reply) => {
     return reply.status(400).send({ error: 'Valid trend and vote (overrated/genius) are required.' });
   }
 
-  const updatedPolls = await incrementVote(trend, vote);
+  const updatedPolls = await incrementVote(trend, vote, location);
 
   const timestamp = new Date().toISOString();
   const activity = {
@@ -646,6 +646,78 @@ fastify.post('/api/poll', async (request, reply) => {
   });
 
   return updatedPolls;
+});
+
+// GET /api/poll/history - Retrieves historical sentiment timeline data for a trend
+fastify.get('/api/poll/history', async (request, reply) => {
+  const { trend } = request.query || {};
+  if (!trend) {
+    return reply.status(400).send({ error: 'Trend query parameter is required.' });
+  }
+
+  let events = await getVoteEvents(trend);
+  if (!events || events.length === 0) {
+    const mockVotes = [];
+    const now = Date.now();
+    const hours24 = 24 * 60 * 60 * 1000;
+    const segmentMs = hours24 / 10;
+    for (let i = 0; i < 10; i++) {
+      const segmentStart = now - hours24 + i * segmentMs;
+      const votesCount = Math.floor(Math.random() * 3) + 1;
+      for (let j = 0; j < votesCount; j++) {
+        const timestampMs = segmentStart + Math.random() * segmentMs;
+        const timestamp = new Date(timestampMs).toISOString();
+        const vote = Math.random() < 0.65 ? 'genius' : 'overrated';
+        const location = LOCATIONS[Math.floor(Math.random() * LOCATIONS.length)];
+        mockVotes.push({ vote, timestamp, location });
+      }
+    }
+    mockVotes.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    await seedVoteEvents(trend, mockVotes);
+    events = await getVoteEvents(trend);
+  }
+
+  const nowMs = Date.now();
+  const hours24 = 24 * 60 * 60 * 1000;
+  const segmentMs = hours24 / 10;
+  const startMs = nowMs - hours24;
+
+  const points = [];
+  for (let i = 1; i <= 10; i++) {
+    const intervalStart = startMs + (i - 1) * segmentMs;
+    const intervalEnd = startMs + i * segmentMs;
+
+    const votesInInterval = events.filter(e => {
+      const t = new Date(e.timestamp).getTime();
+      return t >= intervalStart && t < intervalEnd;
+    });
+    const velocity = votesInInterval.length;
+
+    const cumulativeVotes = events.filter(e => {
+      const t = new Date(e.timestamp).getTime();
+      return t < intervalEnd;
+    });
+
+    let geniusPercentage = 50;
+    if (cumulativeVotes.length > 0) {
+      const geniusVotes = cumulativeVotes.filter(e => e.vote === 'genius').length;
+      geniusPercentage = Math.round((geniusVotes / cumulativeVotes.length) * 100);
+    }
+
+    points.push({
+      timestamp: new Date(intervalEnd).toISOString(),
+      geniusPercentage,
+      velocity
+    });
+  }
+
+  return points;
+});
+
+// POST /api/log - Receives client-side browser logs and prints them to server stdout
+fastify.post('/api/log', async (request, reply) => {
+  console.log(`[CLIENT-SIDE] [${request.body.type.toUpperCase()}] ${request.body.message}`);
+  return { ok: true };
 });
 
 // POST /api/generate-post - Generates a viral social media post using Gemini
