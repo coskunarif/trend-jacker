@@ -1978,4 +1978,109 @@ body.playwright-e2e-desktop .sidebar-panel:not(.show-sentiment) .live-feed-secti
   }
 }
 
+/* --- View Transitions API styles --- */
+#explainer-view {
+  view-transition-name: explainer-container;
+}
+
+.sidebar-tabs {
+  view-transition-name: sidebar-panel-tabs;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slide-from-right {
+  from { transform: translateX(30px); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slide-to-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-30px); }
+}
+
+/* Customize Explainer Transition */
+::view-transition-old(explainer-container) {
+  animation: 90ms cubic-bezier(0.4, 0, 1, 1) both fade-out;
+}
+
+::view-transition-new(explainer-container) {
+  animation: 210ms cubic-bezier(0, 0, 0.2, 1) 90ms both fade-in,
+             300ms cubic-bezier(0, 0, 0.2, 1) 90ms both slide-from-right;
+}
+
+/* Customize Tabs Transition */
+::view-transition-old(sidebar-panel-tabs) {
+  animation: 90ms ease-out both fade-out;
+}
+
+::view-transition-new(sidebar-panel-tabs) {
+  animation: 210ms ease-in both fade-in;
+}
+
+/* --- Interactive Micro-animations --- */
+.tab-btn {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.tab-btn:hover {
+  transform: translateY(-1px);
+}
+
+.tab-btn:active {
+  transform: scale(0.97) translateY(0) !important;
+}
+
+.trend-item {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease !important;
+}
+
+.trend-item:hover {
+  transform: translateY(-2px) !important;
+}
+
+.trend-item:active {
+  transform: scale(0.98) !important;
+}
+
+/* CTA/Quick Action Buttons */
+.poll-btn,
+.share-btn,
+.share-poll-btn,
+.download-card-btn,
+.download-infographic-btn,
+#chat-submit-btn,
+.modal-btn {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, background-color 0.2s ease, filter 0.2s ease !important;
+}
+
+.poll-btn:hover,
+.share-btn:hover,
+.share-poll-btn:hover,
+.download-card-btn:hover,
+.download-infographic-btn:hover,
+#chat-submit-btn:hover,
+.modal-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.2);
+}
+
+.poll-btn:active,
+.share-btn:active,
+.share-poll-btn:active,
+.download-card-btn:active,
+.download-infographic-btn:active,
+#chat-submit-btn:active,
+.modal-btn:active {
+  transform: scale(0.97) translateY(0) !important;
+}
+
 

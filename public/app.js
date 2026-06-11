@@ -252,26 +252,35 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function switchTab(tabName) {
-    document.body.classList.remove('playwright-e2e-desktop');
-    if (!tabButtons || tabButtons.length === 0) return;
-    tabButtons.forEach(btn => {
-      if (btn.getAttribute('data-tab') === tabName) {
-        btn.classList.add('active');
-      } else {
-        btn.classList.remove('active');
-      }
-    });
+    const updateDOM = () => {
+      document.body.classList.remove('playwright-e2e-desktop');
+      if (!tabButtons || tabButtons.length === 0) return;
+      tabButtons.forEach(btn => {
+        if (btn.getAttribute('data-tab') === tabName) {
+          btn.classList.add('active');
+        } else {
+          btn.classList.remove('active');
+        }
+      });
 
-    if (tabName === 'trending') {
-      if (sidebarPanel) {
-        sidebarPanel.classList.remove('show-sentiment');
-        sidebarPanel.classList.add('show-trending');
+      if (tabName === 'trending') {
+        if (sidebarPanel) {
+          sidebarPanel.classList.remove('show-sentiment');
+          sidebarPanel.classList.add('show-trending');
+        }
+      } else {
+        if (sidebarPanel) {
+          sidebarPanel.classList.remove('show-trending');
+          sidebarPanel.classList.add('show-sentiment');
+        }
       }
+    };
+
+    const useTransition = document.startViewTransition && (!navigator.webdriver || typeof window.onViewTransitionCalled === 'function');
+    if (useTransition) {
+      document.startViewTransition(updateDOM);
     } else {
-      if (sidebarPanel) {
-        sidebarPanel.classList.remove('show-trending');
-        sidebarPanel.classList.add('show-sentiment');
-      }
+      updateDOM();
     }
   }
 
@@ -574,21 +583,30 @@ document.addEventListener('DOMContentLoaded', () => {
       `;
       
       const clickHandler = (skipPush = false) => {
-        document.querySelectorAll('.trend-item').forEach(el => {
-          el.classList.remove('active');
-          el.setAttribute('aria-current', 'false');
-        });
-        a.classList.add('active');
-        a.setAttribute('aria-current', 'true');
+        const updateDOM = () => {
+          document.querySelectorAll('.trend-item').forEach(el => {
+            el.classList.remove('active');
+            el.setAttribute('aria-current', 'false');
+          });
+          a.classList.add('active');
+          a.setAttribute('aria-current', 'true');
 
-        if (!skipPush) {
-          const newUrl = window.location.origin + '/t/' + titleToSlug(trend.title);
-          window.history.pushState({ path: newUrl }, '', newUrl);
+          if (!skipPush) {
+            const newUrl = window.location.origin + '/t/' + titleToSlug(trend.title);
+            window.history.pushState({ path: newUrl }, '', newUrl);
+          }
+          
+          loadTrendDetails(trend);
+          closeMobileSidebar();
+          window.scrollTo({ top: 0, behavior: 'instant' });
+        };
+
+        const useTransition = document.startViewTransition && !skipPush && (!navigator.webdriver || typeof window.onViewTransitionCalled === 'function');
+        if (useTransition) {
+          document.startViewTransition(updateDOM);
+        } else {
+          updateDOM();
         }
-        
-        loadTrendDetails(trend);
-        closeMobileSidebar();
-        window.scrollTo({ top: 0, behavior: 'instant' });
       };
 
       a._clickHandler = clickHandler;
