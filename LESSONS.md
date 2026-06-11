@@ -1,1 +1,1 @@
-- **E2E Testing / View Transitions**: Avoid disabling the View Transitions API conditionally on `navigator.webdriver` in client-side code, as it prevents automated test runners (like Playwright) from verifying transition behaviors directly.
+- **View Transitions & E2E Testing**: Never disable the View Transitions API conditionally on `navigator.webdriver` as it prevents Playwright/automated test runners from verifying transition behaviors directly; instead, ensure tests are robust enough to run with active transitions.
