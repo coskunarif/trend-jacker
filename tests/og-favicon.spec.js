@@ -170,11 +170,11 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     const heroGradientFallback = page.locator('.detail-hero-gradient, .hero-placeholder');
     
     // We use a robust assertion that either the hero image is hidden/removed or the gradient is visible
-    await expect().toPass(async () => {
+    await expect(async () => {
       const isHeroImageVisible = await heroImageSecond.isVisible();
       const isGradientVisible = await heroGradientFallback.isVisible();
       expect(!isHeroImageVisible || isGradientVisible).toBe(true);
-    });
+    }).toPass();
 
     // Check footer card favicon for Trend 2 (which uses fallback)
     const footerFaviconSecond = footerIconContainer.locator('img');
