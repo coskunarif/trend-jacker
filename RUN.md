@@ -3,7 +3,7 @@ moves: Click-through rate, social sharing conversions, and user retention.
 why: Directly addresses the user request to catch people by replacing excessive AI-generated text and placeholders with real, loved images.
 runner-up: Refine the Snapshot Share placeholder with a dynamic Canvas-rendered infographic card preview.
 tier: T2   creativity: 0.5
-state: VERIFY                 budget: repairs 0/3
+state: SHIP                   budget: repairs 0/3
 branch: asf/20260611-real-images          checkpoint: none
 caps: agents,ui,web,human
 
@@ -14,7 +14,22 @@ caps: agents,ui,web,human
 - 2026-06-11: Tester wrote 3 tests in tests/og-favicon.spec.js. Observed state: red (3 failed). Conductor initialized Builder phase.
 - 2026-06-11: Builder disputed test syntax. Conductor ruled test wrong; recalled Tester to amend.
 - 2026-06-11: Tester amended the disputed test. Observed state: green. Builder implementation complete. Conductor initialized Verifier phase.
+- 2026-06-11: Verifier reported PASS. Conductor initialized Shipper phase.
 ## Verdict
-- DISPUTED: `tests/og-favicon.spec.js` line 173 has invalid Playwright syntax calling `expect().toPass(callback)` instead of `expect(callback).toPass()`, throwing "callback is not a function".
-## Done
+- All checks PASSED.
+- Test Suite: Pass (59/59 tests passed, including new `tests/og-favicon.spec.js`).
+- Lint/Types: Pass (Standard JavaScript, no linter errors).
+- Behavioral/Visual Verification: Pass. Start port 3055 server and verified via custom Playwright capture at mobile (375x667) and desktop (1280x800) resolutions.
+  - [AC-1] Fetcher & Caching: Pass. Verified backend handles metadata caching under `trend.news.ogImage` and `trend.news.favicon`.
+  - [AC-2] Fallbacks: Pass. Domain-based favicon fallback verified when favicon is missing. Bypasses external HTTP requests in test environment.
+  - [AC-3] List Items Visuals: Pass. Verified thumbnails (16/9 crop) and badge favicons in trend items list.
+  - [AC-4] Hero & Footer: Pass. Verified hero image in explainer view and actual favicon in news footer card (generic SVG successfully replaced).
+  - [AC-5] Playwright E2E: Pass. Checked via test runner.
+- Screenshots captured and saved:
+  - Desktop home list: [desktop_home.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_home.png)
+  - Desktop details hero: [desktop_detail_hero.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_detail_hero.png)
+  - Desktop details footer: [desktop_detail_footer.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_detail_footer.png)
+  - Mobile details: [mobile_detail.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/mobile_detail.png)
+  - Mobile list: [mobile_home.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/mobile_home.png)
 
+## Done
