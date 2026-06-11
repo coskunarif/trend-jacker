@@ -95,13 +95,56 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
     await expect(firstItem.locator('.feed-item-trend')).toHaveText('Google Gemini');
   });
 
-  test('2. Verify Desktop Tab Toggle & Scroll Heights', async ({ page }) => {
-    // Set viewport to desktop
+  test('2. Verify Desktop Split-Screen Layout & Mobile Tab Switcher', async ({ page }) => {
+    // --- DESKTOP VIEWPORT TEST ---
+    // [AC-1]: Hide Mobile Tab Switcher on Desktop
+    // [AC-2]: Display Both Panels in Split-Screen Layout on Desktop
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
-    // Verify tabs switcher is visible on desktop
     const sidebarTabs = page.locator('.sidebar-tabs');
+    // Mobile tab switcher must be hidden on desktop
+    await expect(sidebarTabs).not.toBeVisible();
+
+    const trendsList = page.locator('#trends-list');
+    const liveFeedSection = page.locator('.live-feed-section');
+    
+    // Both panels must be visible simultaneously on desktop
+    await expect(trendsList).toBeVisible();
+    await expect(liveFeedSection).toBeVisible();
+
+    // Adding interactive classes must NOT hide either panel on desktop
+    await page.evaluate(() => {
+      const sidebar = document.querySelector('.sidebar-panel');
+      sidebar.classList.add('tabs-toggled', 'show-sentiment');
+    });
+    await expect(trendsList).toBeVisible();
+    await expect(liveFeedSection).toBeVisible();
+
+    await page.evaluate(() => {
+      const sidebar = document.querySelector('.sidebar-panel');
+      sidebar.classList.remove('show-sentiment');
+      sidebar.classList.add('show-trending');
+    });
+    await expect(trendsList).toBeVisible();
+    await expect(liveFeedSection).toBeVisible();
+
+    // Reset classes for sanity
+    await page.evaluate(() => {
+      const sidebar = document.querySelector('.sidebar-panel');
+      sidebar.classList.remove('tabs-toggled', 'show-sentiment', 'show-trending');
+    });
+
+    // --- MOBILE VIEWPORT TEST ---
+    // [AC-3]: Retain Mobile Tab Switcher Functionality on Mobile
+    await page.setViewportSize({ width: 375, height: 667 });
+    await page.goto('/');
+
+    // Open sidebar on mobile
+    const toggleBtn = page.locator('#sidebar-toggle');
+    await toggleBtn.click();
+
+    // Tab switcher must be visible on mobile
     await expect(sidebarTabs).toBeVisible();
 
     // Click Sentiment Feed tab
@@ -109,20 +152,20 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
     await sentimentTab.click();
 
     // Verify trends-list is hidden and live-feed-section is visible
-    const trendsList = page.locator('#trends-list');
-    const liveFeedSection = page.locator('.live-feed-section');
     await expect(trendsList).not.toBeVisible();
     await expect(liveFeedSection).toBeVisible();
-
-    // Verify scroll heights (active panels take 100% of height with overflow-y: auto)
-    await expect(liveFeedSection).toHaveCSS('overflow-y', 'auto');
 
     // Click Trending Searches tab
     const trendingTab = page.locator('.tab-btn[data-tab="trending"]');
     await trendingTab.click();
     await expect(trendsList).toBeVisible();
     await expect(liveFeedSection).not.toBeVisible();
-    await expect(trendsList).toHaveCSS('overflow-y', 'auto');
+
+    // --- WEBDRIVER VIEW TRANSITIONS TEST ---
+    // [AC-4]: Enable View Transitions in All Environments
+    // Verify navigator.webdriver does not cause playwright-e2e-desktop to be added to body
+    const body = page.locator('body');
+    await expect(body).not.toHaveClass(/playwright-e2e-desktop/);
   });
 
   test('3. Verify Timezone Location & User Vote Attribution', async ({ page }) => {
@@ -195,7 +238,13 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
   });
 
   test('4. Verify Dismissible Static Banner', async ({ page }) => {
+    // Set to mobile viewport to use the tab switcher
+    await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
+
+    // Open sidebar on mobile
+    const toggleBtn = page.locator('#sidebar-toggle');
+    await toggleBtn.click();
 
     // Activate Sentiment Feed tab to see the banner
     const sentimentTab = page.locator('.tab-btn[data-tab="sentiment"]');
@@ -215,6 +264,8 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
 
     // Reload page and verify it remains hidden (persistence via localStorage)
     await page.reload();
+    // Re-open sidebar and switch to sentiment tab
+    await toggleBtn.click();
     await sentimentTab.click();
     await expect(banner).not.toBeVisible();
   });
