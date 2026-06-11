@@ -273,6 +273,7 @@ function initApp() {
   let chatMessages = [];
   let hasVotedCurrent = false;
   let userPollVote = null;
+  let initialTimelineLoaded = false;
 
 
   const btnShareTrend = document.getElementById('btn-share-trend');
@@ -351,6 +352,10 @@ function initApp() {
     } catch (err) {
       console.error('Error parsing preloaded data:', err);
     }
+  }
+
+  if (preloadedData) {
+    loadTimeline(preloadedData.trend);
   }
 
   // Parse path slug
@@ -833,6 +838,9 @@ function initApp() {
       
        if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
       explainerView.classList.remove('hidden');
+      if (timelineCanvas) {
+        timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
+      }
     } catch (err) {
       console.error(err);
       if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
