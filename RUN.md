@@ -3,7 +3,7 @@ moves: Click-through rate, social sharing conversions, and user retention.
 why: Directly addresses the user request to catch people by replacing excessive AI-generated text and placeholders with real, loved images.
 runner-up: Refine the Snapshot Share placeholder with a dynamic Canvas-rendered infographic card preview.
 tier: T2   creativity: 0.5
-state: SHIP                   budget: repairs 0/3
+state: complete               budget: repairs 0/3
 branch: asf/20260611-real-images          checkpoint: none
 caps: agents,ui,web,human
 
@@ -33,3 +33,26 @@ caps: agents,ui,web,human
   - Mobile list: [mobile_home.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/mobile_home.png)
 
 ## Done
+
+### Shipped Changes
+We successfully integrated real Open Graph (OG) images and publisher favicons from trending news URLs into the trend details and list items, replacing text-only explainers and generic SVGs with high-interest photographic content.
+
+### Acceptance Criteria Evidence
+
+| Acceptance Criteria | Evidence |
+| --- | --- |
+| AC-1: Fetcher & Caching | Pass. Backend scrapes and caches `trend.news.ogImage` and `trend.news.favicon` successfully. |
+| AC-2: Fallbacks | Pass. Domain-based favicon fallback verified when favicon is missing, bypassing external HTTP requests in tests. |
+| AC-3: List Items Visuals | Pass. Thumbnails with a 16:9 crop aspect ratio and favicon badges verified in the trend list. |
+| AC-4: Hero & Footer | Pass. Hero image rendering in detail view explainer and favicon badge in footer news card (SVG placeholder removed). |
+| AC-5: Playwright E2E | Pass. All E2E tests in `tests/og-favicon.spec.js` pass successfully. |
+
+### Integration Details
+- **Integration Method**: Local git merge (no remote exists).
+- **Verified tag**: `asf/20260611-real-images/green-1` at commit `c23576b2c7e19be0f809f0caf0e512512e397791`.
+
+### UI Visuals
+![Desktop Home](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_home.png)
+![Desktop Detail Hero](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_detail_hero.png)
+![Desktop Detail Footer](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-real-images/screenshots/desktop_detail_footer.png)
+

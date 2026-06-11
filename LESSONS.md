@@ -2,3 +2,4 @@
 - **E2E Async Testing**: When testing async actions triggered automatically on page load, always wait for the request/response via `page.waitForResponse` before verifying network call counts to prevent race condition failures under parallel runner CPU loads.
 - **E2E Layout Assertions**: Avoid arbitrary timeouts when viewports resize or UI transitions occur; instead, use retrying assertions like Playwright's `expect().toPass()` to poll for bounding box/visibility changes under heavy runner load.
 - **LLM Content Delivery**: Expose LLM-friendly endpoints like `/llms.txt` using `Content-Type: text/plain` for direct ingestion by scrapers, and inject alternate link headers in HTML pages for auto-discovery.
+- **Playwright Retrying Assertions**: The correct syntax for polling assertions in Playwright is `expect(async () => { ... }).toPass()`; attempting to pass the assertion block as an argument to `expect().toPass(...)` is invalid and causes runtime execution failures.
