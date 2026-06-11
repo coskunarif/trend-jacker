@@ -1,49 +1,40 @@
-task: Fix Test Flakiness (Responsive Grid & Tooltip)     tier: T2   creativity: 0.5
-state: complete                 budget: repairs 0/3
-branch: asf/20260611-test-fix-flakiness    checkpoint: asf/20260611-test-fix-flakiness/green-1
+task: Implement dynamic /llms.txt, /llms-full.txt, and /robots.txt endpoints to optimize for AI engine citations (GEO) and crawl search indexability. Runner-up: Enhance NewsArticle JSON-LD schema with Breadcrumbs and dynamic FAQs. tier: T2   creativity: 0.5
+state: complete                budget: repairs 0/3
+branch: asf/20260611-seo-visibility          checkpoint: asf/20260611-seo-visibility/green-1
 caps: agents,ui,web,human
 
-## Task
-- **Objective**: Fix the failing responsive card grid layout checks and timeline hover tooltip test flakiness to ensure green CI/CD status.
-- **Metric**: Build reliability and layout accuracy.
-- **Why now**: Parallel CPU loads and View Transition timings are causing layout assertions and hover tooltip visibility checks to flake/fail.
-- **Runner-up**: TJ-26 (Unified Share and Social Modal UI)
-
 ## Log
-- 2026-06-11: Conductor initialized Scout phase.
-- 2026-06-11: Scout selected "Fix Test Flakiness (Responsive Grid & Tooltip)" as the next high-ROI task.
-- 2026-06-11: Conductor initialized Architect phase.
+- 2026-06-11: Conductor initialized fresh run. Scout phase started.
+- 2026-06-11: Scout reported selected task. Branch asf/20260611-seo-visibility created. Conductor initialized Architect phase.
 - 2026-06-11: Architect completed SPEC.md. Conductor initialized Tester phase.
-- 2026-06-11: Tester updated tests and verified state. Conductor initialized Builder phase.
-- 2026-06-11: Builder verified tests green on branch and committed changes. Conductor initialized Verifier phase.
-- 2026-06-11: Verifier completed validation of E2E tests, captured screenshots, and verified resolution of test flakiness.
-- 2026-06-11: Conductor initialized Shipper phase.
-
+- 2026-06-11: Tester wrote 6 tests in tests/seo-visibility.spec.js. Observed state: red. Conductor initialized Builder phase.
+- 2026-06-11: Builder implemented the routes and tags. All 56 tests passed. Conductor initialized Verifier phase.
+- 2026-06-11: Verifier verified PASS. Tagged verified commit with asf/20260611-seo-visibility/green-1. Conductor initialized Shipper phase.
 ## Verdict
-
-### Checks:
-- **Test Suite**: PASS (All 50 E2E tests passed cleanly in 32.2s)
-- **AC-1 (Responsive Grid Layout Checks)**: PASS (Verified that transitions settle, coordinates check out perfectly on desktop [side-by-side] and mobile [stacked])
-- **AC-2 (Timeline Hover Tooltip Checks)**: PASS (Verified explicit network response waiting for history endpoints, and auto-retrying style checks/visibility assertions)
-
-### Evidence:
-- Run logs and test results: `50 passed`
-- Desktop Grid Layout: [desktop-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/desktop-grid.png)
-- Mobile Grid Layout: [mobile-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/mobile-grid.png)
-- Hover Tooltip: [hover-tooltip.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/hover-tooltip.png)
+- **[AC-1] Dynamic robots.txt**: PASS. Verified HTTP 200, Content-Type: `text/plain`, and the presence of `User-agent: *`, `Allow: /`, and `Sitemap: https://viraljacker.com/sitemap.xml`.
+- **[AC-2] Dynamic llms.txt**: PASS. Verified HTTP 200, Content-Type: `text/plain`, and the correct Markdown format containing the `# TrendJacker` title, brief description blockquote, and list of links under `## Trends`.
+- **[AC-3] Dynamic llms-full.txt**: PASS. Verified HTTP 200, Content-Type: `text/plain`, and the presence of compilation headers, snippets, explanations, and takeaways for cached trends.
+- **[AC-4] Individual Markdown Trend Explainer (/t/:slug.md)**: PASS. Verified HTTP 200, Content-Type: `text/plain`, correct Markdown fields (Title, Hook, Explanation, Why it is viral, Takeaway, Poll Statistics), and returning 404 on invalid slugs.
+- **[AC-5] Auto-Discovery Meta Link Tag**: PASS. Verified that `<link rel="alternate" type="text/markdown" href="/llms.txt">` is injected in the `<head>` of `/` and `/t/:slug`.
+- **[AC-6] E2E Integration Tests**: PASS. Verified that `npm test` runs all 56 tests successfully.
 
 ## Done
-### What Shipped:
-- Replaced hard timeouts and sleeps in E2E tests with robust, retrying assertions (`expect().toPass()`) for viewport resizing and tooltip interactions.
-- Added explicit network response waiting (`page.waitForResponse`) for timeline history data retrieval before starting assertions to eliminate race conditions under high runner loads.
+### Shipped Features
+- Dynamic `/robots.txt` for crawl search indexability.
+- Dynamic `/llms.txt` and `/llms-full.txt` sitemaps for AI scrapers/agents.
+- Dynamic individual trend Markdown explainer endpoints under `/t/:slug.md`.
+- HTML Alternate link tags injection into the document heads of homepage and trend details pages for discovery.
+- Comprehensive Playwright tests validating response content types, status codes, and structural elements.
 
-### Acceptance Criteria & Evidence
-| Acceptance Criterion | Verification / Evidence |
-| --- | --- |
-| AC-1 (Responsive Grid Layout) | PASS - Layout verified under desktop (side-by-side) and mobile (stacked) viewports using retrying layout checks. |
-| AC-2 (Timeline Hover Tooltip) | PASS - Tooltip formatting, coordinates/styling, dynamic data display, and hide behavior verified after waiting for api endpoint response. |
+### Verification Evidence
+| Acceptance Criterion | Verification Method | Result |
+| --- | --- | --- |
+| `[AC-1]` Dynamic robots.txt | HTTP GET Request Content-Type & Content Check | **PASS** |
+| `[AC-2]` Dynamic llms.txt | HTTP GET Request Content-Type & Markdown Structure Check | **PASS** |
+| `[AC-3]` Dynamic llms-full.txt | HTTP GET Request Content-Type & Compiled Markdown Content Check | **PASS** |
+| `[AC-4]` Trend Explainer /t/:slug.md | HTTP GET Request Content-Type & Explainer Markdown Fields Check | **PASS** |
+| `[AC-5] ` Discovery Meta Tag | HTML Parser Verification of `<link rel="alternate">` | **PASS** |
+| `[AC-6]` E2E Integration | Full Playwright Test Run (`npm test`) | **PASS** (56/56 passed) |
 
-### PR & Deploy links:
-- PR: Local merge to `main` (no remote PR opened due to offline/local environment capabilities or access restrictions).
-- Tag: `asf/20260611-test-fix-flakiness/green-1`
-
+### Integration
+- Merged locally into the default branch `main`.

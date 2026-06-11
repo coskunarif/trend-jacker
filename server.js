@@ -121,6 +121,7 @@ fastify.get('/', async (request, reply) => {
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Why is ${trendName} Trending? | TrendJacker">
   <meta name="twitter:description" content="${explanation.hook}">
+  <link rel="alternate" type="text/markdown" href="/llms.txt">
   
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd, null, 2)}
@@ -527,15 +528,21 @@ fastify.post('/api/explain', async (request, reply) => {
 
 // GET /t/:slug - Dynamically renders a trend explainer page with SEO/GEO metadata
 fastify.get('/t/:slug', async (request, reply) => {
-  const { slug } = request.params;
+  let { slug } = request.params;
   if (!slug) {
     return reply.redirect('/');
   }
 
+  const isMarkdown = slug.endsWith('.md');
+  if (isMarkdown) {
+    slug = slug.slice(0, -3);
+  }
+
   // Determine standard name from slug
-  let trendName = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  let trendName = '';
   let headline = '';
   let snippet = '';
+  let isFound = false;
 
   try {
     if (latestTrends.length === 0) {
@@ -547,6 +554,7 @@ fastify.get('/t/:slug', async (request, reply) => {
       const newsItem = match.news || {};
       snippet = newsItem.snippet || '';
       headline = newsItem.headline || '';
+      isFound = true;
     } else {
       // Fallback
       const response = await fetch('https://trends.google.com/trending/rss?geo=US');
@@ -560,11 +568,20 @@ fastify.get('/t/:slug', async (request, reply) => {
           const newsItem = liveMatch['ht:news_item'] ? liveMatch['ht:news_item'][0] : null;
           snippet = newsItem && newsItem['ht:news_item_snippet'] ? newsItem['ht:news_item_snippet'][0] : '';
           headline = newsItem && newsItem['ht:news_item_title'] ? newsItem['ht:news_item_title'][0] : '';
+          isFound = true;
         }
       }
     }
   } catch (err) {
     console.error('Error matching slug against live trends:', err.message);
+  }
+
+  if (isMarkdown && !isFound) {
+    return reply.status(404).send({ error: 'Trend not found' });
+  }
+
+  if (!trendName) {
+    trendName = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   }
 
   let explanation;
@@ -579,6 +596,26 @@ fastify.get('/t/:slug', async (request, reply) => {
       takeaway: `Keep an eye on this trend as it develops.`,
       polls: await getPollData(trendName)
     };
+  }
+
+  if (isMarkdown) {
+    let md = `# ${trendName}\n\n`;
+    md += `Hook: ${explanation.hook || ''}\n\n`;
+    md += `Explanation: ${explanation.whatIsIt || ''}\n\n`;
+    md += `Why it is viral:\n`;
+    if (explanation.whyIsItViral && Array.isArray(explanation.whyIsItViral)) {
+      for (const viralReason of explanation.whyIsItViral) {
+        md += `- ${viralReason}\n`;
+      }
+    }
+    md += `\n`;
+    md += `Takeaway: ${explanation.takeaway || ''}\n\n`;
+    md += `Poll Statistics:\n`;
+    md += `- Genius: ${explanation.polls?.genius || 0}\n`;
+    md += `- Overrated: ${explanation.polls?.overrated || 0}\n`;
+
+    reply.header('Content-Type', 'text/plain');
+    return md;
   }
 
   try {
@@ -608,6 +645,7 @@ fastify.get('/t/:slug', async (request, reply) => {
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Why is ${trendName} Trending? | TrendJacker">
   <meta name="twitter:description" content="${explanation.hook}">
+  <link rel="alternate" type="text/markdown" href="/llms.txt">
   
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd, null, 2)}
@@ -627,6 +665,84 @@ fastify.get('/t/:slug', async (request, reply) => {
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to render trend page.' });
+  }
+});
+
+// GET /robots.txt - Dynamic robots.txt
+fastify.get('/robots.txt', async (request, reply) => {
+  reply.header('Content-Type', 'text/plain');
+  return `User-agent: *\nAllow: /\nSitemap: https://viraljacker.com/sitemap.xml`;
+});
+
+// GET /llms.txt - Dynamic llms.txt sitemap
+fastify.get('/llms.txt', async (request, reply) => {
+  try {
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    let md = `# TrendJacker\n`;
+    md += `> TrendJacker is a dynamic viral trend explainer platform summarizing what is trending and why.\n\n`;
+    md += `## Trends\n`;
+    for (const trend of latestTrends) {
+      const slug = titleToSlug(trend.title);
+      const desc = trend.description || 'No description available.';
+      md += `- [/t/${slug}.md](/t/${slug}.md) - ${desc}\n`;
+    }
+    reply.header('Content-Type', 'text/plain');
+    return md;
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send('Error generating llms.txt');
+  }
+});
+
+// GET /llms-full.txt - compiles the full content of all trending topics
+fastify.get('/llms-full.txt', async (request, reply) => {
+  try {
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    
+    let md = `# TrendJacker - Full Content\n\n`;
+    
+    const trendsExplanations = await Promise.all(
+      latestTrends.map(async (trend) => {
+        const headline = trend.news?.headline || '';
+        const snippet = trend.news?.snippet || '';
+        let explanation;
+        try {
+          explanation = await getTrendExplanation(trend.title, headline, snippet);
+        } catch (err) {
+          explanation = {
+            hook: `Why is everyone talking about ${trend.title}?`,
+            whatIsIt: `Trending search topic: ${trend.title}.`,
+            whyIsItViral: [`High volume search interest on Google Trends.`],
+            takeaway: `Keep an eye on this trend as it develops.`,
+            polls: { overrated: 0, genius: 0 }
+          };
+        }
+        return { trend, explanation };
+      })
+    );
+    
+    for (const { trend, explanation } of trendsExplanations) {
+      md += `## ${trend.title}\n`;
+      md += `Snippet: ${trend.news?.snippet || ''}\n`;
+      md += `Explanation: ${explanation.whatIsIt || ''}\n`;
+      md += `Why it is viral:\n`;
+      if (explanation.whyIsItViral && Array.isArray(explanation.whyIsItViral)) {
+        for (const viralReason of explanation.whyIsItViral) {
+          md += `- ${viralReason}\n`;
+        }
+      }
+      md += `Takeaway: ${explanation.takeaway || ''}\n\n`;
+    }
+    
+    reply.header('Content-Type', 'text/plain');
+    return md;
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send('Error generating llms-full.txt');
   }
 });
 

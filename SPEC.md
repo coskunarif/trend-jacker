@@ -1,28 +1,69 @@
-# Spec: Fix Test Flakiness (Responsive Grid & Tooltip)
+# SPEC.md - Dynamic SEO/GEO Optimization (`/llms.txt`, `/llms-full.txt`, `/robots.txt`)
+
+This specification outlines the implementation of dynamic `/llms.txt`, `/llms-full.txt`, `/t/:slug.md`, and `/robots.txt` endpoints to optimize TrendJacker for AI engine ingestion, citations (GEO), and crawl visibility.
+
+## Test Strategy (Additive)
+Since this task introduces new routes, we follow a **tests-first** strategy. All test cases verifying correct status codes, Content-Type, and dynamic Markdown rendering structure must be written in the test suite before the server routes are fully implemented.
+
+---
 
 ## Acceptance Criteria
 
-- **[AC-1] Stabilize Responsive Grid E2E Layout Checks**:
-  - Eliminate the flaky `page.waitForTimeout` inside `tests/responsive.spec.js`.
-  - Use Playwright's auto-retrying assertions or `expect().toPass()` blocks to verify the coordinates and alignment of the grid cards (`#card-viral-vibe`, `#card-live-sentiment`, `#card-snapshot-share`) after viewport resizing.
-  - Allow layout adjustments and any active CSS/View transitions to settle before measuring bounding boxes.
+### `[AC-1]` - Dynamic robots.txt
+- **Description**: The `/robots.txt` endpoint must return standard crawl instructions in plaintext format.
+- **Verification**: Sending a GET request to `/robots.txt` returns `HTTP 200` with header `Content-Type: text/plain` (optionally with charset) and contains:
+  ```text
+  User-agent: *
+  Allow: /
+  Sitemap: https://viraljacker.com/sitemap.xml
+  ```
 
-- **[AC-2] Stabilize Timeline Hover Tooltip E2E Checks**:
-  - Prevent race conditions by explicitly waiting for the network response of `/api/poll/history` (using `page.waitForResponse`) before performing the mouse hover action in `tests/sentiment-timeline.spec.js`.
-  - Ensure the tooltip visibility and positioning checks (`left` and `top` style properties) are wrapped in auto-retrying assertions or `expect().toPass()` blocks to tolerate CPU latency and view transition delays.
+### `[AC-2]` - Dynamic llms.txt
+- **Description**: The `/llms.txt` endpoint must return an LLM-friendly Markdown site map of all trending topics.
+- **Verification**: Sending a GET request to `/llms.txt` returns `HTTP 200` with `Content-Type: text/plain` and renders the following Markdown structure dynamically using `latestTrends`:
+  - A main `# TrendJacker` title.
+  - A blockquote brief description of the site.
+  - A list of links under `## Trends` pointing to dynamic Markdown representations `/t/:slug.md` with descriptions.
+
+### `[AC-3]` - Dynamic llms-full.txt
+- **Description**: The `/llms-full.txt` endpoint compiles the full content of all trending topics into a single document for single-request ingestion.
+- **Verification**: Sending a GET request to `/llms-full.txt` returns `HTTP 200` with `Content-Type: text/plain`. The response contains all trend headers, snippets, explanations, and takeaways dynamically rendered in Markdown.
+
+### `[AC-4]` - Individual Markdown Trend Explainer `/t/:slug.md`
+- **Description**: The `/t/:slug.md` endpoint serves the raw Markdown explainer page for a single trend matching the given slug.
+- **Verification**: Sending a GET request to `/t/:slug.md` returns `HTTP 200` with `Content-Type: text/plain` and provides details including the trend title, hook, detailed explanation, why it is viral, and dynamic polling statistics in Markdown.
+
+### `[AC-5]` - Auto-Discovery Meta Link Tag
+- **Description**: The homepage (`/`) and trend pages (`/t/:slug`) must inject a `<link>` alternate tag pointing to `/llms.txt` so AI agents can discover the endpoint.
+- **Verification**: Fetching `/` or `/t/:slug` and parsing the HTML head confirms the presence of `<link rel="alternate" type="text/markdown" href="/llms.txt">`.
+
+### `[AC-6]` - E2E Integration Tests
+- **Description**: Playwright tests cover request validation, content type checks, and dynamic caching behavior for the new routes.
+- **Verification**: Running `npm test` executes the newly added tests, confirming they pass successfully.
+
+---
 
 ## Out of Scope
-- Modifying the styling or HTML structures of the grid and timeline tooltip themselves, unless absolutely necessary to resolve layout bugs.
-- Changing test coverage beyond the flakiness of responsive grid layout and hover tooltips.
+- Implementing the Scout's runner-up task (enhancing NewsArticle JSON-LD schema with Breadcrumbs and dynamic FAQs).
+- Creating CSS stylesheets or visual HTML pages for `/llms.txt` or `/robots.txt`.
+
+---
 
 ## Slices
 
-- **[S-1] Tooltip Hover Test Refinement**:
-  - **Description**: Add `page.waitForResponse` for the `/api/poll/history` endpoint in the hover tooltip tests inside `tests/sentiment-timeline.spec.js` to ensure the chart data has loaded before testing hover functionality. Wrap tooltip verification in auto-retrying assertions.
-  - **Files**: `tests/sentiment-timeline.spec.js`
-  - **Test Strategy**: Refinement. Update existing hover tests to guarantee async data is loaded.
+### `[S-1]` - Test Suite Setup and Route Skeleton
+- **Goal**: Write tests first (tests-first strategy) for all new endpoints. Expose basic Fastify mock route definitions that return placeholder text.
+- **Verification**: Run tests (some might fail or pass depending on placeholder structure).
+- **Files**:
+  - `server.js` (route skeleton)
+  - `tests/seo-visibility.spec.js` (new test suite)
+- **ACs**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-6]`
+- **Status**: Ready for Tester / Builder
 
-- **[S-2] Responsive Grid Test Refinement**:
-  - **Description**: Replace hardcoded `waitForTimeout` with robust, auto-retrying assertions (e.g. `expect().toPass()`) in `tests/responsive.spec.js` to allow layouts to stabilize after resizing viewports.
-  - **Files**: `tests/responsive.spec.js`
-  - **Test Strategy**: Refinement. Verify the grid layout under desktop and mobile viewports cleanly passes under CPU load simulation.
+### `[S-2]` - Dynamic Markdown Logic and Link Injection
+- **Goal**: Build dynamic generators for `/llms.txt`, `/llms-full.txt`, and `/t/:slug.md` extracting data from the existing `latestTrends` cache. Inject the discoverability alternate link tag in the HTML header builder of `server.js`.
+- **Verification**: Run the full Playwright suite; endpoints render exact live/cached trends.
+- **Files**:
+  - `server.js`
+- **ACs**: `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-5]`, `[AC-6]`
+- **Status**: Dependent on `[S-1]`
