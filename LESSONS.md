@@ -1,1 +1,2 @@
 - **View Transitions & E2E Testing**: Never disable the View Transitions API conditionally on `navigator.webdriver` as it prevents Playwright/automated test runners from verifying transition behaviors directly; instead, ensure tests are robust enough to run with active transitions.
+- **E2E Async Testing**: When testing async actions triggered automatically on page load, always wait for the request/response via `page.waitForResponse` before verifying network call counts to prevent race condition failures under parallel runner CPU loads.

@@ -1,6 +1,6 @@
 task: TJ-30: Interactive Sentiment Timeline Dashboard              tier: T2   creativity: 0.5
 state: Shipper              budget: repairs 0/3
-branch: asf/20260611-sentiment-timeline          checkpoint: none
+branch: asf/20260611-sentiment-timeline          checkpoint: asf/20260611-sentiment-timeline/green-1
 caps: agents,ui,web,human
 
 ## Task
@@ -30,3 +30,24 @@ caps: agents,ui,web,human
 **Result**: PASS
 
 ## Done
+### What Shipped
+An interactive sentiment timeline dashboard that displays voting sentiment and voting velocity trends for individual viral topics. The dashboard renders chronologically sorted data points using an HTML5 Canvas, providing fluid transition animations, responsive sizing across device viewports, and custom interactive hover tooltips tracking vote details (percentage genius, vote velocity).
+
+### AC & Verification Evidence
+| Acceptance Criteria | Verified Result / Evidence |
+| --- | --- |
+| **AC-1 (Database Schema & API)** | Verified: chronologically sorted points, 8-10 items, keys `timestamp`, `geniusPercentage`, `velocity`. Stable seeded baseline. |
+| **AC-2 (Timeline Container Layout)** | Verified: `.timeline-card-wrap` and canvas render in DOM. Fallback UI displays when API fails. |
+| **AC-3 (Canvas Rendering & Fluid Animations)**| Verified: Line/bar charts render, animate correctly, adjust viewport responsively, and update after casted votes. |
+| **AC-4 (Interactive Hover Tooltips)** | Verified: Hover triggers tooltip element matching closest point. Tooltip displays formatted time, genius %, velocity. Hides on mouseleave. |
+| **AC-5 (E2E Playwright Tests)** | Verified: All timeline dashboard tests passing locally and on CI (100% pass). |
+
+### PR & Deployment Links
+- **PR #6**: https://github.com/coskunarif/trend-jacker/pull/6 (Initial implementation)
+- **PR #7**: https://github.com/coskunarif/trend-jacker/pull/7 (E2E test race condition fixes)
+- **CI Build**: https://github.com/coskunarif/trend-jacker/actions/runs/27334524781 (Successful build, test, and deploy)
+- **Production URL**: https://trend-jacker-q2wur4uk2q-uc.a.run.app
+
+### UI Screenshots
+![Desktop Sentiment Timeline Initial](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-sentiment-timeline/screenshots/desktop-initial.png)
+![Desktop Sentiment Timeline Hover Tooltip](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-sentiment-timeline/screenshots/desktop-hover.png)
