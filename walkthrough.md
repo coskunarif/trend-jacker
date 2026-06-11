@@ -1,59 +1,62 @@
-# Walkthrough: Debate Arena Subtraction & Catchy Visual Cards Integration (TJ-29)
+# Walkthrough: View Transitions & Motion-Driven Page Navigation (TJ-31)
 
-This walkthrough documents the features, architectural subtraction/addition, user interface, and testing suite implemented for the **Debate Arena Subtraction & Catchy Visual Cards Integration** (TJ-29).
+This walkthrough documents the features, architectural implementation, user interface transitions, and testing suite completed for **View Transitions and Motion-Driven Page Navigation** (TJ-31).
 
 ---
 
 ## 🌟 Visual & UX Design Overhaul
 
-To keep the application highly visual, lightweight, and engaging, we have removed the text-heavy AI Debate Arena and replaced it with a set of catchy, dynamic, visual infographic cards.
+To elevate TrendJacker to a premium, high-fidelity experience, we implemented seamless browser view transitions and tactile micro-animations.
 
-### 1. Unified Visual Cards Suite
-We introduced three dynamic visual cards under a responsive grid layout:
-*   **"Viral Vibe" Visual Card**: Displays trend categories with dynamic, eye-catching gradients (e.g. Tech, Entertainment, News), large emojis, and status badges.
-*   **"Live Sentiment Chart" Card**: Interactive circular/radial progress gauge showing the Genius vs Overrated vote split, replacing the text poll results with a sleek visual layout.
-*   **"Snapshot Share" Card**: A clean, graphical canvas/card representation optimized for downloading and sharing on social media.
+### 1. View Transitions API Integration
+*   **Trend Selection Transition**: Selecting any trend from the sidebar dynamically slides and transitions the detail explainer panel into place without jarring jumps.
+*   **Mobile & Desktop Tab Switching**: Switching between tabs (e.g., Explainer, Social Post, Community Sentiment Feed) initiates a fluid fade-and-slide motion transition.
+*   **Smooth Scroll Resets**: Integrated custom transition animations that coordinate with client-side scroll resets.
 
-### 2. Debate Arena Subtraction
-*   Removed the text-heavy AI Sentiment Debate Arena module.
-*   Cleaned up all debate-related layout elements, timers, CSS styles, and sharing canvas generators associated with the Optimist/Skeptic debate.
+### 2. Interactive Micro-animations
+*   **Segmented Controls**: Added a subtle slide, scale, and active-state animation when tapping tab switchers.
+*   **Interactive Buttons**: Configured subtle scale-up effects on hover (`transform: scale(1.02)`) and press-down effects (`transform: scale(0.98)`) on call-to-actions, voting, and share buttons.
+*   **Sidebar Navigation**: Added elegant border and hover states on `.trend-item` elements.
+
+---
+
+## 📷 Screenshots
+
+Here is the updated TrendJacker interface showcasing the new visual styling:
+
+![Desktop Homepage](/home/ubuntuadmin/.gemini/antigravity-cli/brain/ee9d9ba3-648b-4378-ac84-100737785a88/desktop-home.png)
+
+![Desktop Detail View](/home/ubuntuadmin/.gemini/antigravity-cli/brain/ee9d9ba3-648b-4378-ac84-100737785a88/desktop-detail.png)
 
 ---
 
 ## ⚙️ Architectural & Code Changes
 
-### Backend (`server.js` & `db.js`)
-*   **Route Subtraction**: Removed `/api/debate` and `/api/debate/vote` route handlers.
-*   **DB Subtraction**: Deleted `getDebateData` and `incrementDebateVote` helper functions in `db.js`.
-
 ### Frontend (`public/`)
-*   **Structure (`index.html`)**: Removed the old debate card container. Inserted the new visual cards section (`.visual-cards-grid`) with the circular gauge and infographic sharing controls.
-*   **Styling (`styles.css`)**: Cleaned up debate-related CSS. Added a modern responsive grid, HSL-based thematic gradients, custom SVG path calculations for the circular sentiment gauge, and animations.
-*   **Logic (`app.js`)**:
-    *   Wired up the circular progress indicator to update dynamically on vote events.
-    *   Integrated a new canvas drawing method `generateInfographicCard()` to render a high-fidelity visual card for social sharing or downloading.
-    *   Updated the share modal/download buttons to invoke the new infographic generation.
+*   **Logic (`public/app.js`)**:
+    *   Wrapped tab switching inside `switchTab` inside a `document.startViewTransition` block, falling back to instant updates for unsupported browsers.
+    *   Wrapped trend selection DOM rendering and API updates inside `document.startViewTransition` within the sidebar click handlers.
+*   **Styling (`public/styles.css`)**:
+    *   Configured custom `::view-transition-old` and `::view-transition-new` selectors to handle animations.
+    *   Added transitions utilizing `cubic-bezier(0.4, 0, 0.2, 1)` for hardware-accelerated transforms and opacity.
+
+### Tests (`tests/`)
+*   **Automated Verification (`tests/view-transitions.spec.js`)**:
+    *   Added E2E test verification ensuring `window.document.startViewTransition` is called during tab switching and trend selection.
+    *   Verified presence of transition elements and styles in the DOM.
 
 ---
 
 ## 🚦 How to Run & Verify
 
-### 1. Run the Application
-Start the fastify server:
+### 1. Start the Server Locally
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000).
+Navigate to [http://localhost:3000](http://localhost:3000).
 
-### 2. Verify Functionality Manually
-1. Open TrendJacker, click on a trend.
-2. Observe the new **Visual Cards Grid** displaying the Category Vibe, the Circular Live Sentiment Gauge, and the Download/Share Infographic card.
-3. Vote on a trend poll and watch the circular gauge dynamically redraw to represent the new Genius vs Overrated ratio.
-4. Click **Download Infographic** to download the clean visual image of the card, or **Share Infographic** on supported mobile devices to share it.
-
-### 3. Run Automated Tests
-Verify all integration behaviors via Playwright:
+### 2. Run the Full Test Suite
+Verify that all 41 test cases pass cleanly:
 ```bash
 npm test
 ```
-All tests should pass successfully.
