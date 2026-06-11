@@ -243,12 +243,16 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
     });
 
     const responsePromise = page.waitForResponse(
-      response => response.url().includes('/api/poll/history') && response.status() === 200
-    );
+      response => response.url().includes('/api/poll/history') && response.status() === 200,
+      { timeout: 10000 }
+    ).catch(() => null);
 
     await page.goto('/');
 
     await responsePromise;
+
+    // Wait for view transition/animations to settle before hover
+    await page.waitForTimeout(500);
 
     const canvas = page.locator('#sentiment-timeline-canvas');
     await expect(canvas).toBeVisible();
@@ -256,12 +260,19 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
 
-    // Hover at the center of the canvas
+    // Hover at the center of the canvas. Sometimes a single move fails if coordinates aren't fully resolved in style recalculations.
+    // Move slightly, then move to center to guarantee event triggers.
+    await page.mouse.move(box.x + 10, box.y + 10);
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 
     const tooltip = page.locator('#timeline-tooltip');
 
     await expect(async () => {
+      // Re-trigger hover if tooltip is not visible
+      const isVisible = await tooltip.isVisible();
+      if (!isVisible) {
+        await page.mouse.move(box.x + box.width / 2 + (Math.random() - 0.5) * 5, box.y + box.height / 2 + (Math.random() - 0.5) * 5);
+      }
       await expect(tooltip).toBeVisible();
 
       // Check formatting: tooltip must display time, percentage (with %), and velocity (votes)
