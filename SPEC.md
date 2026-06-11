@@ -1,69 +1,59 @@
-# SPEC.md - Dynamic SEO/GEO Optimization (`/llms.txt`, `/llms-full.txt`, `/robots.txt`)
+# SPEC.md - Real OG Images and Publisher Favicons Integration
 
-This specification outlines the implementation of dynamic `/llms.txt`, `/llms-full.txt`, `/t/:slug.md`, and `/robots.txt` endpoints to optimize TrendJacker for AI engine ingestion, citations (GEO), and crawl visibility.
-
-## Test Strategy (Additive)
-Since this task introduces new routes, we follow a **tests-first** strategy. All test cases verifying correct status codes, Content-Type, and dynamic Markdown rendering structure must be written in the test suite before the server routes are fully implemented.
-
----
+This specification details the design and implementation plan to integrate real Open Graph (OG) images and publisher favicons from trending news URLs into trend details and list items, replacing text-only explainers and generic SVGs.
 
 ## Acceptance Criteria
 
-### `[AC-1]` - Dynamic robots.txt
-- **Description**: The `/robots.txt` endpoint must return standard crawl instructions in plaintext format.
-- **Verification**: Sending a GET request to `/robots.txt` returns `HTTP 200` with header `Content-Type: text/plain` (optionally with charset) and contains:
-  ```text
-  User-agent: *
-  Allow: /
-  Sitemap: https://viraljacker.com/sitemap.xml
-  ```
+- **[AC-1] Server-Side Metadata Fetcher & Caching**
+  - The server (`server.js`) must parse the HTML of the trending `news.url` (if present) during `updateTrendsCache()` to extract:
+    - The Open Graph image URL from `<meta property="og:image" ...>` or fallback `<meta name="twitter:image" ...>`.
+    - The publisher favicon URL from `<link rel="icon" ...>`, `<link rel="shortcut icon" ...>`, or fallback.
+  - The extracted metadata must be cached in memory under the `latestTrends` data structures (`trend.news.ogImage` and `trend.news.favicon`).
+  - To prevent startup delay or request blocking, URL fetches must use a timeout (e.g., maximum 2 seconds) and run concurrently/asynchronously.
 
-### `[AC-2]` - Dynamic llms.txt
-- **Description**: The `/llms.txt` endpoint must return an LLM-friendly Markdown site map of all trending topics.
-- **Verification**: Sending a GET request to `/llms.txt` returns `HTTP 200` with `Content-Type: text/plain` and renders the following Markdown structure dynamically using `latestTrends`:
-  - A main `# TrendJacker` title.
-  - A blockquote brief description of the site.
-  - A list of links under `## Trends` pointing to dynamic Markdown representations `/t/:slug.md` with descriptions.
+- **[AC-2] Robust Fallbacks & Test Safety**
+  - If a metadata fetch fails, times out, or contains no OG image/favicon, the system must:
+    - Fall back to a domain-based favicon provider (e.g., `https://www.google.com/s2/favicons?domain=DOMAIN&sz=32`).
+    - Fall back to `null` or a placeholder indicator for the OG image, enabling clean UI handling.
+  - In test environments (`process.env.NODE_ENV === 'test'`), the server must not execute external HTTP requests. It must return deterministic mock OG image URLs and mock favicon URLs.
 
-### `[AC-3]` - Dynamic llms-full.txt
-- **Description**: The `/llms-full.txt` endpoint compiles the full content of all trending topics into a single document for single-request ingestion.
-- **Verification**: Sending a GET request to `/llms-full.txt` returns `HTTP 200` with `Content-Type: text/plain`. The response contains all trend headers, snippets, explanations, and takeaways dynamically rendered in Markdown.
+- **[AC-3] Trend List Items Visual Upgrade**
+  - The trend list items (`.trend-item` in `public/app.js`) must be updated to include:
+    - A visual thumbnail (rendered from `trend.news.ogImage`) with modern styling (e.g., `aspect-ratio: 16/9`, object-fit cover, small size like `60px` width) next to the info block. If no image is available, a clean gradient placeholder is rendered.
+    - The publisher favicon image (rendered from `trend.news.favicon`) placed next to the publisher/source badge text.
+  - Existing CSS selectors (`.trend-item .source-badge.google-spike`, `.trend-item .source-badge.reddit-spike`) and text contents must be preserved to keep existing tests passing.
 
-### `[AC-4]` - Individual Markdown Trend Explainer `/t/:slug.md`
-- **Description**: The `/t/:slug.md` endpoint serves the raw Markdown explainer page for a single trend matching the given slug.
-- **Verification**: Sending a GET request to `/t/:slug.md` returns `HTTP 200` with `Content-Type: text/plain` and provides details including the trend title, hook, detailed explanation, why it is viral, and dynamic polling statistics in Markdown.
+- **[AC-4] Trend Details & News Footer Enhancement**
+  - The active trend detail view (`#explainer-view` in `public/index.html`) must display:
+    - A prominent hero image banner rendering `trend.news.ogImage` (with a clean aspect ratio like `16/9` or `21/9`, lazy loading, and rounded corners) directly above the trend content (e.g., above or below the title `#detail-title`).
+    - If the trend has no valid OG image, the hero block should hide gracefully or render a high-quality CSS gradient fallback.
+  - In the news context footer (`.news-footer-card`), the generic newspaper SVG icon must be replaced with the actual publisher's favicon image.
 
-### `[AC-5]` - Auto-Discovery Meta Link Tag
-- **Description**: The homepage (`/`) and trend pages (`/t/:slug`) must inject a `<link>` alternate tag pointing to `/llms.txt` so AI agents can discover the endpoint.
-- **Verification**: Fetching `/` or `/t/:slug` and parsing the HTML head confirms the presence of `<link rel="alternate" type="text/markdown" href="/llms.txt">`.
-
-### `[AC-6]` - E2E Integration Tests
-- **Description**: Playwright tests cover request validation, content type checks, and dynamic caching behavior for the new routes.
-- **Verification**: Running `npm test` executes the newly added tests, confirming they pass successfully.
-
----
+- **[AC-5] Playwright E2E Verification**
+  - A test suite `tests/og-favicon.spec.js` must verify:
+    - Each trend list item renders a visible thumbnail image or visual placeholder.
+    - Each trend list item renders a favicon next to the source badge.
+    - The detail view displays a hero image banner (when `ogImage` is present).
+    - The news footer card renders the correct publisher favicon instead of the generic SVG icon.
 
 ## Out of Scope
-- Implementing the Scout's runner-up task (enhancing NewsArticle JSON-LD schema with Breadcrumbs and dynamic FAQs).
-- Creating CSS stylesheets or visual HTML pages for `/llms.txt` or `/robots.txt`.
 
----
+- Setting up external image caching proxies or processing services (e.g., Cloudinary, Imgix).
+- Support for user uploads of custom icons or images.
 
 ## Slices
 
-### `[S-1]` - Test Suite Setup and Route Skeleton
-- **Goal**: Write tests first (tests-first strategy) for all new endpoints. Expose basic Fastify mock route definitions that return placeholder text.
-- **Verification**: Run tests (some might fail or pass depending on placeholder structure).
-- **Files**:
-  - `server.js` (route skeleton)
-  - `tests/seo-visibility.spec.js` (new test suite)
-- **ACs**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-6]`
-- **Status**: Ready for Tester / Builder
+- **[S-1] Additive: Test Suite Setup (Test-First)**
+  - **Files**: `tests/og-favicon.spec.js`
+  - **Details**: Implement mock trend data containing test `ogImage` and `favicon` URLs. Write Playwright tests verifying the presence and layout of these elements in list items and detail views under both successful metadata matches and fallback conditions.
+  - **Status**: Additive test slice.
 
-### `[S-2]` - Dynamic Markdown Logic and Link Injection
-- **Goal**: Build dynamic generators for `/llms.txt`, `/llms-full.txt`, and `/t/:slug.md` extracting data from the existing `latestTrends` cache. Inject the discoverability alternate link tag in the HTML header builder of `server.js`.
-- **Verification**: Run the full Playwright suite; endpoints render exact live/cached trends.
-- **Files**:
-  - `server.js`
-- **ACs**: `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-5]`, `[AC-6]`
-- **Status**: Dependent on `[S-1]`
+- **[S-2] Server-Side Scraper & Fallbacks**
+  - **Files**: `server.js`
+  - **Details**: Implement the metadata extractor helper with regex/parse logic, request timeouts, caching, and fallback favicon generation. Ensure external HTTP requests are completely bypassed in `test` mode.
+  - **Status**: Backend dependency slice.
+
+- **[S-3] Frontend UI Integration & Styling**
+  - **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
+  - **Details**: Update UI code to render the new metadata fields. Apply modern responsive styles to thumbnails, hero banners, and favicon icons. Verify visually with tests.
+  - **Status**: Frontend UI slice.
