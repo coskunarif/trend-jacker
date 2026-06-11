@@ -184,6 +184,7 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
   });
 
   test('AC-3: Canvas resizes responsively when the window is resized', async ({ page }) => {
+    // [AC-2] Stabilize Timeline Hover Tooltip E2E Checks
     await page.route('**/api/poll/history?trend=Google%20Gemini', async (route) => {
       await route.fulfill({
         status: 200,
@@ -203,19 +204,28 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
 
     // Resize viewport to a mobile layout
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.waitForTimeout(500); // Give layout time to shift
 
-    const mobileBoundingBox = await canvas.boundingBox();
-    expect(mobileBoundingBox).not.toBeNull();
-    expect(mobileBoundingBox.width).toBeLessThan(initialBoundingBox.width);
+    let mobileBoundingBox;
+    await expect(async () => {
+      mobileBoundingBox = await canvas.boundingBox();
+      expect(mobileBoundingBox).not.toBeNull();
+      expect(mobileBoundingBox.width).toBeLessThan(initialBoundingBox.width);
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
 
     // Resize viewport to widescreen
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.waitForTimeout(500);
 
-    const desktopBoundingBox = await canvas.boundingBox();
-    expect(desktopBoundingBox).not.toBeNull();
-    expect(desktopBoundingBox.width).toBeGreaterThan(mobileBoundingBox.width);
+    await expect(async () => {
+      const desktopBoundingBox = await canvas.boundingBox();
+      expect(desktopBoundingBox).not.toBeNull();
+      expect(desktopBoundingBox.width).toBeGreaterThan(mobileBoundingBox.width);
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
   });
 
   // ==========================================
@@ -223,6 +233,7 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
   // ==========================================
 
   test('AC-4: Interactive Hover Tooltip shows dynamic data on hover, positions correctly, and hides on leave', async ({ page }) => {
+    // [AC-2] Stabilize Timeline Hover Tooltip E2E Checks
     await page.route('**/api/poll/history?trend=Google%20Gemini', async (route) => {
       await route.fulfill({
         status: 200,
@@ -231,7 +242,13 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
       });
     });
 
+    const responsePromise = page.waitForResponse(
+      response => response.url().includes('/api/poll/history') && response.status() === 200
+    );
+
     await page.goto('/');
+
+    await responsePromise;
 
     const canvas = page.locator('#sentiment-timeline-canvas');
     await expect(canvas).toBeVisible();
@@ -243,25 +260,37 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
 
     const tooltip = page.locator('#timeline-tooltip');
-    await expect(tooltip).toBeVisible();
 
-    // Check formatting: tooltip must display time, percentage (with %), and velocity (votes)
-    await expect(tooltip).toContainText('%');
-    await expect(tooltip).toContainText(/vote/i); // e.g. "votes" or "vote velocity" or similar label
-    
-    // Check coordinates change positioning (style left/top properties should be set)
-    const styleAttr = await tooltip.getAttribute('style');
-    expect(styleAttr).toContain('left');
-    expect(styleAttr).toContain('top');
+    await expect(async () => {
+      await expect(tooltip).toBeVisible();
+
+      // Check formatting: tooltip must display time, percentage (with %), and velocity (votes)
+      await expect(tooltip).toContainText('%');
+      await expect(tooltip).toContainText(/vote/i); // e.g. "votes" or "vote velocity" or similar label
+      
+      // Check coordinates change positioning (style left/top properties should be set)
+      const styleAttr = await tooltip.getAttribute('style');
+      expect(styleAttr).toContain('left');
+      expect(styleAttr).toContain('top');
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
 
     // Move cursor off canvas
     await page.mouse.move(box.x - 50, box.y - 50);
     
     // Tooltip must immediately hide
-    await expect(tooltip).toBeHidden();
+    await expect(async () => {
+      await expect(tooltip).toBeHidden();
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
   });
 
   test('AC-4: Hovering at canvas boundaries or extreme coordinates does not crash', async ({ page }) => {
+    // [AC-2] Stabilize Timeline Hover Tooltip E2E Checks
     await page.route('**/api/poll/history?trend=Google%20Gemini', async (route) => {
       await route.fulfill({
         status: 200,
@@ -270,7 +299,13 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
       });
     });
 
+    const responsePromise = page.waitForResponse(
+      response => response.url().includes('/api/poll/history') && response.status() === 200
+    );
+
     await page.goto('/');
+
+    await responsePromise;
 
     const canvas = page.locator('#sentiment-timeline-canvas');
     const box = await canvas.boundingBox();
