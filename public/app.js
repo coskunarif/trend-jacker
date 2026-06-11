@@ -273,6 +273,7 @@ function initApp() {
   let chatMessages = [];
   let hasVotedCurrent = false;
   let userPollVote = null;
+  let initialTimelineLoaded = false;
 
 
   const btnShareTrend = document.getElementById('btn-share-trend');
@@ -351,6 +352,10 @@ function initApp() {
     } catch (err) {
       console.error('Error parsing preloaded data:', err);
     }
+  }
+
+  if (preloadedData) {
+    loadTimeline(preloadedData.trend);
   }
 
   // Parse path slug
@@ -1764,6 +1769,9 @@ function initApp() {
     initializeDefaultTimelinePoints();
     drawTimelineChart();
 
+    const existingErr = document.getElementById('timeline-error');
+    if (existingErr) existingErr.style.display = 'none';
+
     try {
       const res = await fetch(`/api/poll/history?trend=${encodeURIComponent(trendTitle)}`);
       if (!res.ok) throw new Error('Failed to fetch timeline history');
@@ -1771,6 +1779,20 @@ function initApp() {
       animateTimelineTransition(data);
     } catch (err) {
       console.error('Error loading sentiment timeline:', err);
+      let errDiv = document.getElementById('timeline-error');
+      if (!errDiv) {
+        errDiv = document.createElement('div');
+        errDiv.id = 'timeline-error';
+        errDiv.className = 'timeline-error';
+        errDiv.style.color = '#ef4444';
+        errDiv.style.marginTop = '12px';
+        errDiv.style.fontSize = '0.9rem';
+        errDiv.style.textAlign = 'center';
+        const cardWrap = document.querySelector('.timeline-card-wrap');
+        if (cardWrap) cardWrap.appendChild(errDiv);
+      }
+      errDiv.textContent = 'Failed to load sentiment timeline.';
+      errDiv.style.display = 'block';
     }
   }
 
@@ -2022,16 +2044,11 @@ function initApp() {
       }
     };
 
-    window.addEventListener('mousemove', (e) => {
-      const rect = timelineCanvas.getBoundingClientRect();
-      if (rect && rect.width > 0 && rect.height > 0) {
-        const x = e.clientX;
-        const y = e.clientY;
-        if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
-          handleHover(e);
-          return;
-        }
-      }
+    timelineCanvas.addEventListener('mousemove', (e) => {
+      handleHover(e);
+    });
+
+    timelineCanvas.addEventListener('mouseleave', () => {
       hideTimelineTooltip();
     });
 
