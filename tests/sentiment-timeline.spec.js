@@ -114,7 +114,9 @@ test.describe('Sentiment Timeline Dashboard E2E Tests', () => {
       });
     });
 
+    const responsePromise = page.waitForResponse('**/api/poll/history*');
     await page.goto('/');
+    await responsePromise;
 
     const canvas = page.locator('#sentiment-timeline-canvas');
     await expect(canvas).toBeVisible();

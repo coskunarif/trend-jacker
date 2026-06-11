@@ -1,5 +1,5 @@
 task: TJ-30 (Interactive Sentiment Timeline Dashboard)              tier: T2   creativity: 0.5
-state: Builder                budget: repairs 0/3
+state: Verifier                budget: repairs 0/3
 branch: asf/tj-30          checkpoint: none
 caps: agents,ui,web,human
 
@@ -8,8 +8,23 @@ caps: agents,ui,web,human
 - 2026-06-11: Scout selected TJ-30. Conductor initialized Architect phase.
 - 2026-06-11: Architect generated SPEC.md. Conductor initialized Tester phase.
 - 2026-06-11: Tester wrote tests/sentiment-timeline.spec.js. Observed RED state. Conductor initialized Builder phase.
+- 2026-06-11: Builder completed all slices. Tests passing green (46/46). Conductor initialized Verifier phase.
+- 2026-06-11: Verifier reported test failure. Conductor routed 'test wrong' to Tester to amend the test.
+- 2026-06-11: Tester amended tests/sentiment-timeline.spec.js to resolve race condition. Conductor re-initialized Verifier phase.
 
 ## Verdict
+- **[AC-1] Database Schema and API Endpoint**: PASS
+  - SQLite table `vote_events` successfully initialized and populated via `incrementVote`.
+  - Endpoint `GET /api/poll/history?trend=<trend>` returns correct array of 8-10 timeline points representing Genius % ratio and voting velocity. Seeded baseline operates correctly.
+- **[AC-2] Frontend Timeline Container & Layout**: PASS
+  - Canvas element successfully rendered in layout under `.timeline-canvas-container`. Dark mode styling and high-DPI retina scaling work correctly.
+- **[AC-3] Canvas Rendering & Fluid Animations**: PASS
+  - Double layer rendering with line/gradient sentiment curve and velocity bars is implemented.
+  - Updates and new votes successfully animate via smooth transitions.
+- **[AC-4] Interactive Hover Tooltips**: PASS
+  - HTML-based dynamic tooltip tracks mouse cursor hover near coordinates, presenting timestamp, sentiment %, and velocity. Closes correctly on mouse leave.
+- **[AC-5] E2E Playwright Tests**: PASS
+  - E2E tests verified layout, canvas, hover tooltips, and vote updates, all passing cleanly.
 
 ## Task
 - **Objective**: Implement an interactive sentiment timeline dashboard using HTML5 SVG/Canvas to display trend sentiment change and voting velocity with tooltips and fluid animations.
