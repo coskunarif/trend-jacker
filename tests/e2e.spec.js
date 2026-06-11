@@ -62,6 +62,16 @@ test.describe('TrendJacker E2E tests', () => {
       });
     });
 
+    await page.addInitScript(() => {
+      const originalGetElementById = document.getElementById;
+      document.getElementById = function(id) {
+        if (id === 'preloaded-trend-data') {
+          return null;
+        }
+        return originalGetElementById.apply(this, arguments);
+      };
+    });
+
     await page.goto('/');
 
     // Check header/title
