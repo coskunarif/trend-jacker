@@ -1,6 +1,6 @@
 task: Repair the failing E2E baseline test (should submit a sentiment vote and update poll percentages) by intercepting/mocking the live sentiment SSE stream. Metric: Test Suite Stability. Why now: A red baseline suite preempts all pillars under the SDLC guidelines. Runner-up: Integrate Google Gemini image generation to generate and display catchy images based on trend content when fallback/placeholder images are used.
 tier: T2   creativity: 0.5
-state: ship                     budget: repairs 0/3
+state: complete                 budget: repairs 0/3
 branch: asf/20260611-gemini-images          checkpoint: none
 caps: agents,ui,web,human
 
@@ -15,3 +15,13 @@ caps: agents,ui,web,human
 - **E2E Test Stability Check**: PASS. All 59 tests in the E2E test suite run successfully and reliably under parallel execution. Verified with 3 consecutive full suite runs, achieving 59/59 passing tests on each run. The MockEventSource helper successfully intercepts the live sentiment SSE stream, eliminating background SSE flakiness.
 
 ## Done
+What shipped:
+E2E baseline test fix to mock EventSource sentiment-stream SSE connection, stabilizing E2E poll assertions.
+
+| Acceptance Criteria | Evidence |
+| --- | --- |
+| `[AC-1]` Mock SSE Stream in baseline E2E tests | SSE EventSource intercepted dynamically on target tests via `page.addInitScript` in `tests/e2e.spec.js` |
+| `[AC-2]` Test Suite Stability | All 59 tests in parallel test runner successfully and reliably passed |
+
+PR Link: https://github.com/coskunarif/trend-jacker/pull/11
+Integration Method: Pull Request squash & merge / local merge to default branch `main`.
