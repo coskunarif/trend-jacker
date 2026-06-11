@@ -833,9 +833,6 @@ function initApp() {
       
        if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
       explainerView.classList.remove('hidden');
-      if (timelineCanvas) {
-        timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
-      }
     } catch (err) {
       console.error(err);
       if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
