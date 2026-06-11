@@ -1,5 +1,5 @@
 task: TJ-30: Interactive Sentiment Timeline Dashboard              tier: T2   creativity: 0.5
-state: Shipper              budget: repairs 0/3
+state: complete            budget: repairs 0/3
 branch: asf/20260611-sentiment-timeline          checkpoint: asf/20260611-sentiment-timeline/green-1
 caps: agents,ui,web,human
 
