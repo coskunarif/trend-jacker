@@ -287,61 +287,58 @@
           </div>
         </div>
 
-        <!-- Sentiment Debate Arena (TJ-07) -->
-        <div class="glass-card debate-card full-width">
-          <h3 class="card-heading">
-            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            AI-Driven Sentiment Debate Arena
-          </h3>
-          <p class="debate-intro">Optimist Bot (Genius) vs Skeptic Bot (Overrated) debate this trend. Who makes the more compelling case?</p>
-          <button id="btn-share-debate" class="share-debate-btn" style="margin-top: var(--space-2); margin-bottom: var(--space-2); width: auto;" aria-label="Share debate verdict results">
-            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            Share Debate Verdict
-          </button>
-          
-          <div id="debate-container" class="debate-container">
-            <div id="debate-messages" class="debate-messages">
-              <!-- Debate rounds render here dynamically -->
-              <div class="debate-loading">
-                <span class="spinner animate-spin"></span> Generating debate arguments...
+        <!-- Catchy Visual Cards Grid (TJ-29) -->
+        <div class="visual-cards-grid">
+          <!-- Card 1: Viral Vibe -->
+          <div class="glass-card visual-card vibe-card" id="card-viral-vibe">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+              Viral Vibe
+            </h3>
+            <div class="vibe-content">
+              <span id="vibe-emoji" class="vibe-emoji">🔥</span>
+              <div class="vibe-meta">
+                <span id="vibe-category" class="vibe-category">Trending</span>
+                <span id="vibe-badge" class="vibe-badge">Hot Vibe</span>
               </div>
             </div>
-            
-            <!-- Debate Verdict Panel (hidden until debate completes or user votes) -->
-            <div id="debate-verdict-panel" class="debate-verdict-panel hidden">
-              <h4>Cast Your Verdict: Who won this round?</h4>
-              <div class="verdict-buttons">
-                <button id="btn-verdict-optimist" class="verdict-btn optimist-btn">
-                  Optimist Bot Wins
-                </button>
-                <button id="btn-verdict-skeptic" class="verdict-btn skeptic-btn">
-                  Skeptic Bot Wins
-                </button>
+          </div>
+
+          <!-- Card 2: Live Sentiment Chart -->
+          <div class="glass-card visual-card sentiment-chart-card" id="card-live-sentiment">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M21.21 15.89A10 10 0 1 1 8 2.83M22 12A10 10 0 0 0 12 2v10z"/></svg>
+              Live Sentiment
+            </h3>
+            <div class="radial-gauge-container">
+              <svg viewBox="0 0 100 100" class="radial-gauge">
+                <circle class="gauge-bg" cx="50" cy="50" r="40" fill="none" stroke-width="8"></circle>
+                <circle class="gauge-fill-genius" id="gauge-fill" cx="50" cy="50" r="40" fill="none" stroke-width="8" stroke-dasharray="251.2" stroke-dashoffset="125.6"></circle>
+              </svg>
+              <div class="gauge-text">
+                <span class="gauge-pct" id="gauge-genius-pct">50%</span>
+                <span class="gauge-label">Genius</span>
               </div>
-              
-              <!-- Verdict Results -->
-              <div id="debate-results" class="debate-results hidden">
-                <div class="result-row">
-                  <span class="result-label">Optimist Wins</span>
-                  <div class="progress-bar-wrap">
-                    <div id="bar-optimist" class="progress-bar bar-g" style="width: 0%"></div>
-                  </div>
-                  <span id="pct-optimist" class="result-pct">0%</span>
-                </div>
-                <div class="result-row">
-                  <span class="result-label">Skeptic Wins</span>
-                  <div class="progress-bar-wrap">
-                    <div id="bar-skeptic" class="progress-bar bar-o" style="width: 0%"></div>
-                  </div>
-                  <span id="pct-skeptic" class="result-pct">0%</span>
-                </div>
-                <div class="result-actions" style="display: flex; gap: var(--space-2); margin-top: var(--space-3); flex-wrap: wrap;">
-                  <button id="btn-download-debate-card" class="download-debate-card-btn" aria-label="Download debate meme card">
-                    <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Download Debate Meme
-                  </button>
+            </div>
+          </div>
+
+          <!-- Card 3: Snapshot Share -->
+          <div class="glass-card visual-card share-card" id="card-snapshot-share">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+              Snapshot Share
+            </h3>
+            <div class="share-card-content">
+              <div class="card-preview-placeholder">
+                <div class="mini-card-graphic">
+                  <span class="mini-title">Trend Summary</span>
+                  <div class="mini-bar"></div>
                 </div>
               </div>
+              <button id="btn-download-infographic" class="download-infographic-btn" aria-label="Download infographic share card image">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download Infographic
+              </button>
             </div>
           </div>
         </div>
@@ -380,7 +377,6 @@
           <select id="share-context-select" class="modal-select">
             <option value="general">General Explainer</option>
             <option value="poll">Poll Verdict</option>
-            <option value="debate">Debate Summary</option>
           </select>
         </div>
         <div class="form-group">

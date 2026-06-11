@@ -203,16 +203,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const newsSnippet = document.getElementById('detail-news-snippet');
   const newsLink = document.getElementById('detail-news-link');
 
-  // Debate Arena elements
-  const debateMessages = document.getElementById('debate-messages');
-  const debateVerdictPanel = document.getElementById('debate-verdict-panel');
-  const btnVerdictOptimist = document.getElementById('btn-verdict-optimist');
-  const btnVerdictSkeptic = document.getElementById('btn-verdict-skeptic');
-  const debateResults = document.getElementById('debate-results');
-  const barOptimist = document.getElementById('bar-optimist');
-  const barSkeptic = document.getElementById('bar-skeptic');
-  const pctOptimist = document.getElementById('pct-optimist');
-  const pctSkeptic = document.getElementById('pct-skeptic');
+  // Visual Cards Grid elements
+  const vibeEmoji = document.getElementById('vibe-emoji');
+  const vibeCategory = document.getElementById('vibe-category');
+  const vibeBadge = document.getElementById('vibe-badge');
+  const cardViralVibe = document.getElementById('card-viral-vibe');
+  const gaugeFill = document.getElementById('gauge-fill');
+  const gaugeGeniusPct = document.getElementById('gauge-genius-pct');
+  const btnDownloadInfographic = document.getElementById('btn-download-infographic');
 
   // Mobile drawer elements
   const btnSidebarToggle = document.getElementById('sidebar-toggle');
@@ -227,15 +225,11 @@ document.addEventListener('DOMContentLoaded', () => {
   let chatMessages = [];
   let hasVotedCurrent = false;
   let userPollVote = null;
-  let hasVotedDebateCurrent = false;
-  let userDebateVote = null;
-  let activeDebateTimer1 = null;
-  let activeDebateTimer2 = null;
+
 
   const btnShareTrend = document.getElementById('btn-share-trend');
   const btnSharePoll = document.getElementById('btn-share-poll');
-  const btnShareDebate = document.getElementById('btn-share-debate');
-  const btnDownloadDebateCard = document.getElementById('btn-download-debate-card');
+
 
   const shareModal = document.getElementById('share-modal');
   const btnCloseShareModal = document.getElementById('btn-close-share-modal');
@@ -252,8 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnDownloadCard) {
       updateButtonForSharing(btnDownloadCard, 'Share Card', 'Share Trend Card');
     }
-    if (btnDownloadDebateCard) {
-      updateButtonForSharing(btnDownloadDebateCard, 'Share Debate Meme', 'Share Debate Meme Card');
+    if (btnDownloadInfographic) {
+      updateButtonForSharing(btnDownloadInfographic, 'Share Infographic', 'Share Infographic Card');
     }
   }
 
@@ -371,9 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnSharePoll) {
     btnSharePoll.addEventListener('click', () => openShareModal('poll'));
   }
-  if (btnShareDebate) {
-    btnShareDebate.addEventListener('click', () => openShareModal('debate'));
-  }
+
   if (btnCloseShareModal) {
     btnCloseShareModal.addEventListener('click', closeShareModal);
   }
@@ -750,8 +742,14 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
       `;
 
-      // Fetch and Render Debate Arena (TJ-07)
-      fetchAndRenderDebate(trend.title);
+      // Populate Viral Vibe Card properties based on trend category meta
+      const meta = getTrendCategoryMeta(trend.title);
+      if (vibeEmoji) vibeEmoji.textContent = meta.emoji;
+      if (vibeCategory) vibeCategory.textContent = meta.category;
+      if (vibeBadge) vibeBadge.textContent = meta.badge;
+      if (cardViralVibe) {
+        cardViralVibe.style.background = meta.gradient;
+      }
 
       // News Footer
       if (trend.news && trend.news.headline) {
@@ -778,8 +776,8 @@ document.addEventListener('DOMContentLoaded', () => {
   btnGenius.addEventListener('click', () => submitVote('genius'));
   btnOverrated.addEventListener('click', () => submitVote('overrated'));
   btnDownloadCard.addEventListener('click', generateTrendCardImage);
-  if (btnDownloadDebateCard) {
-    btnDownloadDebateCard.addEventListener('click', generateDebateMemeCard);
+  if (btnDownloadInfographic) {
+    btnDownloadInfographic.addEventListener('click', generateInfographicCard);
   }
 
   async function generateTrendCardImage() {
@@ -922,9 +920,9 @@ document.addEventListener('DOMContentLoaded', () => {
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
-  async function generateDebateMemeCard() {
+  async function generateInfographicCard() {
     if (!currentTrend) return;
-
+    
     // Ensure custom fonts are loaded before drawing
     await document.fonts.ready;
 
@@ -940,11 +938,11 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1200, 630);
 
-    // 2. Glowing Neon Border Accent (Emerald to Indigo to Rose)
+    // 2. Glowing Neon Border Accent
     const borderGrad = ctx.createLinearGradient(0, 0, 1200, 630);
-    borderGrad.addColorStop(0, '#10b981'); // Emerald
-    borderGrad.addColorStop(0.5, '#6366f1'); // Indigo
-    borderGrad.addColorStop(1, '#f43f5e'); // Rose
+    borderGrad.addColorStop(0, '#6366f1'); // Indigo
+    borderGrad.addColorStop(0.5, '#06b6d4'); // Cyan
+    borderGrad.addColorStop(1, '#6366f1');
     ctx.strokeStyle = borderGrad;
     ctx.lineWidth = 8;
     ctx.strokeRect(4, 4, 1192, 622);
@@ -952,117 +950,143 @@ document.addEventListener('DOMContentLoaded', () => {
     // 3. Logo/Brand
     ctx.font = "bold 26px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.fillText("Trend", 60, 65);
+    ctx.fillText("Trend", 80, 80);
     const trendTextWidth = ctx.measureText("Trend").width;
-
-    const logoGrad = ctx.createLinearGradient(60 + trendTextWidth, 0, 60 + trendTextWidth + 100, 0);
+    
+    const logoGrad = ctx.createLinearGradient(80 + trendTextWidth, 0, 80 + trendTextWidth + 100, 0);
     logoGrad.addColorStop(0, '#06b6d4');
     logoGrad.addColorStop(1, '#6366f1');
     ctx.fillStyle = logoGrad;
-    ctx.fillText("Jacker", 60 + trendTextWidth, 65);
+    ctx.fillText("Jacker", 80 + trendTextWidth, 80);
 
-    // Arena Badge
+    // Live Badge
     ctx.fillStyle = "rgba(99, 102, 241, 0.1)";
-    ctx.fillRect(1000, 41, 140, 32);
+    ctx.fillRect(980, 56, 140, 32);
     ctx.lineWidth = 1;
     ctx.strokeStyle = "rgba(99, 102, 241, 0.3)";
-    ctx.strokeRect(1000, 41, 140, 32);
+    ctx.strokeRect(980, 56, 140, 32);
 
     ctx.font = "bold 13px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#6366f1";
     ctx.textAlign = "center";
-    ctx.fillText("AI DEBATE ARENA", 1070, 61);
-    ctx.textAlign = "left"; // Reset
+    ctx.fillText("INFOGRAPHIC CARD", 1050, 76);
+    ctx.textAlign = "left"; // Reset alignment
 
-    // 4. Trend Header (centered)
-    ctx.font = "bold 44px 'Space Grotesk', sans-serif";
+    // 4. Trend Header Title
+    ctx.font = "bold 56px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#ffffff";
-    ctx.textAlign = "center";
-    let headerText = currentTrend.title;
-    if (ctx.measureText(headerText).width > 1080) {
-      ctx.font = "bold 32px 'Space Grotesk', sans-serif";
-      if (ctx.measureText(headerText).width > 1080) {
-        headerText = headerText.substring(0, 50) + "...";
-      }
+    ctx.fillText(currentTrend.title, 80, 165);
+
+    // 5. Category Vibe Badge (Filled with trend category gradient)
+    const meta = getTrendCategoryMeta(currentTrend.title);
+    ctx.font = "bold 16px 'Plus Jakarta Sans', sans-serif";
+    const badgeText = `${meta.emoji}  ${meta.category} • ${meta.badge}`;
+    const badgeWidth = ctx.measureText(badgeText).width + 30;
+    
+    // Draw rounded badge background
+    const gradientParts = meta.gradient.match(/#[0-9a-fA-F]{6}/g);
+    let badgeGrad = meta.gradient;
+    if (gradientParts && gradientParts.length >= 2) {
+      badgeGrad = ctx.createLinearGradient(80, 0, 80 + badgeWidth, 0);
+      badgeGrad.addColorStop(0, gradientParts[0]);
+      badgeGrad.addColorStop(1, gradientParts[1]);
+    } else {
+      badgeGrad = '#6366f1';
     }
-    ctx.fillText(headerText, 600, 115);
-    ctx.textAlign = "left"; // Reset
-
-    // 5. Left Panel: Optimist (Emerald)
-    ctx.fillStyle = "rgba(16, 185, 129, 0.04)";
+    
+    ctx.fillStyle = badgeGrad;
     ctx.beginPath();
-    ctx.roundRect(60, 150, 510, 390, 16);
+    ctx.roundRect(80, 195, badgeWidth, 36, 18);
     ctx.fill();
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.2)";
-    ctx.lineWidth = 2;
-    ctx.stroke();
 
-    ctx.font = "bold 24px 'Space Grotesk', sans-serif";
-    ctx.fillStyle = "#10b981";
-    ctx.fillText("⚡ Optimist Bot", 90, 195);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(badgeText, 95, 219);
 
-    const optPct = pctOptimist.textContent || '50%';
-    ctx.font = "bold 40px 'Space Grotesk', sans-serif";
-    ctx.fillStyle = "#10b981";
-    ctx.textAlign = "right";
-    ctx.fillText(optPct, 540, 195);
-    ctx.textAlign = "left"; // Reset
+    // 6. Hook Section (Left Side)
+    ctx.font = "bold 14px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#6366f1";
+    ctx.fillText("THE AI HOOK", 80, 275);
 
-    ctx.strokeStyle = "rgba(16, 185, 129, 0.1)";
-    ctx.lineWidth = 1;
+    // Hook background box
+    ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
     ctx.beginPath();
-    ctx.moveTo(90, 215);
-    ctx.lineTo(540, 215);
-    ctx.stroke();
-
-    ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
-    ctx.fillStyle = "#cbd5e1";
-    const optBubble = document.querySelector('.debate-bubble-wrap.optimist .debate-bubble');
-    const optText = optBubble ? optBubble.textContent.replace('Optimist Bot', '').trim() : "This trend is highly promising and opens up incredible future opportunities.";
-    wrapText(ctx, `"${optText}"`, 90, 255, 450, 28);
-
-    // 6. Right Panel: Skeptic (Rose)
-    ctx.fillStyle = "rgba(244, 63, 94, 0.04)";
-    ctx.beginPath();
-    ctx.roundRect(630, 150, 510, 390, 16);
+    ctx.roundRect(80, 290, 640, 180, 8);
     ctx.fill();
-    ctx.strokeStyle = "rgba(244, 63, 94, 0.2)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
+    ctx.stroke();
+    
+    // Vertical left accent line
+    ctx.fillStyle = "#6366f1";
+    ctx.fillRect(80, 290, 6, 180);
+
+    // Wrap hook text
+    ctx.font = "500 18px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "#cbd5e1";
+    const hookText = detailHook.textContent || "";
+    wrapText(ctx, hookText, 110, 330, 580, 28);
+
+    // 7. Live Sentiment Gauge (Right Side)
+    const geniusText = pctGenius.textContent || '50%';
+    const overratedText = pctOverrated.textContent || '50%';
+    const geniusVal = parseInt(geniusText) || 50;
+    const overratedVal = parseInt(overratedText) || 50;
+
+    const gaugeX = 930;
+    const gaugeY = 380;
+    const gaugeRadius = 80;
+
+    // Draw Gauge Track
+    ctx.strokeStyle = "#1e293b";
+    ctx.lineWidth = 16;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.arc(gaugeX, gaugeY, gaugeRadius, 0, 2 * Math.PI);
     ctx.stroke();
 
-    ctx.font = "bold 24px 'Space Grotesk', sans-serif";
-    ctx.fillStyle = "#f43f5e";
-    ctx.fillText("🥱 Skeptic Bot", 660, 195);
+    // Draw Genius Arc
+    const startAngle = -Math.PI / 2;
+    const geniusArcLength = (geniusVal / 100) * 2 * Math.PI;
+    ctx.strokeStyle = "#10b981";
+    ctx.beginPath();
+    ctx.arc(gaugeX, gaugeY, gaugeRadius, startAngle, startAngle + geniusArcLength);
+    ctx.stroke();
 
-    const skPct = pctSkeptic.textContent || '50%';
-    ctx.font = "bold 40px 'Space Grotesk', sans-serif";
-    ctx.fillStyle = "#f43f5e";
-    ctx.textAlign = "right";
-    ctx.fillText(skPct, 1110, 195);
+    // Draw Overrated Arc
+    if (overratedVal > 0) {
+      ctx.strokeStyle = "#f43f5e";
+      ctx.beginPath();
+      ctx.arc(gaugeX, gaugeY, gaugeRadius, startAngle + geniusArcLength, startAngle + 2 * Math.PI);
+      ctx.stroke();
+    }
+
+    // Inside Gauge Text
+    ctx.textAlign = "center";
+    ctx.font = "bold 38px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`${geniusVal}%`, gaugeX, gaugeY + 6);
+
+    ctx.font = "bold 11px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#10b981";
+    ctx.fillText("GENIUS", gaugeX, gaugeY + 26);
     ctx.textAlign = "left"; // Reset
 
-    ctx.strokeStyle = "rgba(244, 63, 94, 0.1)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(660, 215);
-    ctx.lineTo(1110, 215);
-    ctx.stroke();
+    // Sentiment Labels under gauge
+    ctx.font = "bold 15px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#10b981";
+    ctx.fillText(`● Genius: ${geniusVal}%`, 810, 505);
 
-    ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
-    ctx.fillStyle = "#cbd5e1";
-    const skBubble = document.querySelector('.debate-bubble-wrap.skeptic .debate-bubble');
-    const skText = skBubble ? skBubble.textContent.replace('Skeptic Bot', '').trim() : "This trend is likely overrated, short-lived, or lacks deep foundational utility.";
-    wrapText(ctx, `"${skText}"`, 660, 255, 450, 28);
+    ctx.fillStyle = "#f43f5e";
+    ctx.fillText(`● Overrated: ${overratedVal}%`, 970, 505);
 
-    // 7. Footer Call To Action
+    // 8. Footer Call To Action
     ctx.font = "500 15px 'Plus Jakarta Sans', sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
-    ctx.fillText("Who won? Vote in the live Debate Arena at viraljacker.com", 60, 580);
+    ctx.fillText("Vote live and track trends at viraljacker.com", 80, 560);
 
     // Trigger image share or download
-    const filename = `debate-meme-${titleToSlug(currentTrend.title)}.png`;
-    const title = `TrendJacker — AI Debate on ${currentTrend.title}`;
-    const text = `AI Debate: Optimist Bot vs Skeptic Bot on "${currentTrend.title}". Who makes the more compelling case?`;
+    const filename = `infographic-${titleToSlug(currentTrend.title)}.png`;
+    const title = `TrendJacker — ${currentTrend.title} Infographic`;
+    const text = `Check out the infographic representation and vote on whether "${currentTrend.title}" is overrated or genius!`;
     const fallbackUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
 
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
@@ -1253,6 +1277,9 @@ document.addEventListener('DOMContentLoaded', () => {
     barOverrated.style.width = `${overratedPct}%`;
     pctGenius.textContent = `${geniusPct}%`;
     pctOverrated.textContent = `${overratedPct}%`;
+
+    // Sync Live Sentiment radial gauge
+    updateSentimentGauge(geniusPct);
 
     if (geniusChanged) {
       pctGenius.classList.add('pulse-text');
@@ -1558,131 +1585,61 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Debate Arena Helper functions (TJ-07)
-  async function fetchAndRenderDebate(trendTitle) {
-    if (activeDebateTimer1) clearTimeout(activeDebateTimer1);
-    if (activeDebateTimer2) clearTimeout(activeDebateTimer2);
-
-    hasVotedDebateCurrent = false;
-    userDebateVote = null;
-    debateVerdictPanel.classList.add('hidden');
-    debateResults.classList.add('hidden');
-    document.querySelector('.verdict-buttons').classList.remove('hidden');
-
-    debateMessages.innerHTML = `
-      <div class="debate-loading">
-        <span class="spinner"></span> Generating debate arguments...
-      </div>
-    `;
-
-    try {
-      const res = await fetch('/api/debate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trend: trendTitle })
-      });
-      if (!res.ok) throw new Error('Debate API failed');
-      const data = await res.json();
-
-      debateMessages.innerHTML = '';
-      
-      const turns = data.turns || [];
-      if (turns.length === 0) {
-        debateMessages.innerHTML = '<p class="empty-msg">No arguments recorded for this trend.</p>';
-        return;
-      }
-
-      // Render Turn 1 immediately
-      renderDebateTurn(turns[0]);
-
-      // Render Turn 2 with a delay
-      activeDebateTimer1 = setTimeout(() => {
-        renderDebateTurn(turns[1]);
-
-        // Render Turn 3 with another delay
-        activeDebateTimer2 = setTimeout(() => {
-          renderDebateTurn(turns[2]);
-
-          // Once complete, show verdict panel
-          updateDebatePercentages(data.votes);
-          debateVerdictPanel.classList.remove('hidden');
-        }, 1500);
-
-      }, 1500);
-
-    } catch (err) {
-      console.error('Error fetching debate:', err);
-      debateMessages.innerHTML = '<p class="error-msg">Failed to load AI debate card. Please retry.</p>';
+  // Live Sentiment Gauge Sync
+  function updateSentimentGauge(geniusPct) {
+    const radius = 40;
+    const circumference = 2 * Math.PI * radius; // 251.2px
+    const offset = circumference - (geniusPct / 100) * circumference;
+    const gaugeFill = document.getElementById('gauge-fill');
+    const gaugeGeniusPct = document.getElementById('gauge-genius-pct');
+    if (gaugeFill) {
+      gaugeFill.style.strokeDashoffset = offset;
+    }
+    if (gaugeGeniusPct) {
+      gaugeGeniusPct.textContent = `${geniusPct}%`;
     }
   }
 
-  function renderDebateTurn(turn) {
-    const wrap = document.createElement('div');
-    const isOptimist = turn.speaker === 'optimist';
-    wrap.className = `debate-bubble-wrap ${isOptimist ? 'optimist' : 'skeptic'}`;
-
-    const avatarChar = isOptimist ? '⚡' : '🥱';
-    const nameStr = isOptimist ? 'Optimist Bot' : 'Skeptic Bot';
-
-    wrap.innerHTML = `
-      <div class="debate-avatar">${avatarChar}</div>
-      <div class="debate-bubble">
-        <span class="debate-bot-name">${nameStr}</span>
-        ${turn.message}
-      </div>
-    `;
-    debateMessages.appendChild(wrap);
-    debateMessages.scrollTop = debateMessages.scrollHeight;
-  }
-
-  function updateDebatePercentages(votes) {
-    const total = (votes.optimistWins || 0) + (votes.skepticWins || 0);
-    let optimistPct = 0;
-    let skepticPct = 0;
-
-    if (total > 0) {
-      optimistPct = Math.round((votes.optimistWins / total) * 100);
-      skepticPct = 100 - optimistPct;
-    } else {
-      optimistPct = 50;
-      skepticPct = 50;
+  // Trend Category Resolver
+  function getTrendCategoryMeta(title) {
+    const lowerTitle = title.toLowerCase();
+    
+    // Tech: violet-to-cyan gradient (#8b5cf6 to #06b6d4), emoji 🤖, badge "Cutting Edge"
+    if (/\b(tech|ai|apple|google|openai|gpt|gemini|claude|nvidia|phone|software|computer|digital|code|developer|web)\b/.test(lowerTitle)) {
+      return {
+        category: 'Tech',
+        emoji: '🤖',
+        badge: 'Cutting Edge',
+        gradient: 'linear-gradient(135deg, #8b5cf6, #06b6d4)'
+      };
     }
-
-    barOptimist.style.width = `${optimistPct}%`;
-    barSkeptic.style.width = `${skepticPct}%`;
-    pctOptimist.textContent = `${optimistPct}%`;
-    pctSkeptic.textContent = `${skepticPct}%`;
-  }
-
-  async function submitDebateVote(winner) {
-    if (hasVotedDebateCurrent || !currentTrend) return;
-
-    try {
-      const res = await fetch('/api/debate/vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          trend: currentTrend.title,
-          winner: winner
-        })
-      });
-
-      if (!res.ok) throw new Error('Failed to record debate vote');
-      const newVotes = await res.json();
-
-      updateDebatePercentages(newVotes);
-
-      document.querySelector('.verdict-buttons').classList.add('hidden');
-      debateResults.classList.remove('hidden');
-      hasVotedDebateCurrent = true;
-      userDebateVote = winner;
-    } catch (err) {
-      console.error(err);
+    // Workplace: orange-to-pink gradient (#f97316 to #ec4899), emoji 💼, badge "Future of Work"
+    if (/\b(work|job|career|office|employee|employer|remote|hybrid|team|business|meeting|manager)\b/.test(lowerTitle)) {
+      return {
+        category: 'Workplace',
+        emoji: '💼',
+        badge: 'Future of Work',
+        gradient: 'linear-gradient(135deg, #f97316, #ec4899)'
+      };
     }
+    // Innovation: emerald-to-cyan gradient (#10b981 to #06b6d4), emoji ⚡, badge "Green Tech"
+    if (/\b(innovation|green|solar|energy|sustainable|electric|climate|future|science|smart|battery)\b/.test(lowerTitle)) {
+      return {
+        category: 'Innovation',
+        emoji: '⚡',
+        badge: 'Green Tech',
+        gradient: 'linear-gradient(135deg, #10b981, #06b6d4)'
+      };
+    }
+    
+    // Default fallback: blue-to-purple gradient (#3b82f6 to #8b5cf6), emoji 🔥, badge "Hot Vibe"
+    return {
+      category: 'Trending',
+      emoji: '🔥',
+      badge: 'Hot Vibe',
+      gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)'
+    };
   }
-
-  btnVerdictOptimist.addEventListener('click', () => submitDebateVote('optimist'));
-  btnVerdictSkeptic.addEventListener('click', () => submitDebateVote('skeptic'));
 
   // Explanation Banner Close / Dismissal & Persistence
   const explanationBanner = document.getElementById('sentiment-explanation-banner');

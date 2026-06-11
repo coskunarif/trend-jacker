@@ -55,20 +55,7 @@ test.describe('Visual Verification & Accessibility Audit', () => {
         body: JSON.stringify({ genius: 10, overrated: 10 }),
       });
     });
-    await page.route('**/api/debate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          turns: [
-            { speaker: 'optimist', message: 'Optimist opening' },
-            { speaker: 'skeptic', message: 'Skeptic counter' },
-            { speaker: 'optimist', message: 'Optimist rebuttal' }
-          ],
-          votes: { optimistWins: 10, skepticWins: 10 }
-        }),
-      });
-    });
+
 
     // Delete Web Share to simulate desktop environment
     await page.addInitScript(() => {
@@ -89,10 +76,10 @@ test.describe('Visual Verification & Accessibility Audit', () => {
     await expect(page.locator('#btn-download-card')).toBeVisible();
     await expect(page.locator('#btn-download-card')).toHaveText(/Download Card/);
 
-    // Vote on debate to reveal debate meme card download button
-    await page.locator('#btn-verdict-optimist').click();
-    await expect(page.locator('#btn-download-debate-card')).toBeVisible();
-    await expect(page.locator('#btn-download-debate-card')).toHaveText(/Download Debate Meme/);
+    // Verify infographic card download button is visible (it does not require voting)
+    const downloadInfographicBtn = page.locator('#btn-download-infographic');
+    await expect(downloadInfographicBtn).toBeVisible();
+    await expect(downloadInfographicBtn).toHaveText(/Download Infographic/);
 
     // Take screenshot of desktop view showing the fallback buttons
     await page.screenshot({
@@ -124,20 +111,7 @@ test.describe('Visual Verification & Accessibility Audit', () => {
         body: JSON.stringify({ genius: 10, overrated: 10 }),
       });
     });
-    await page.route('**/api/debate', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          turns: [
-            { speaker: 'optimist', message: 'Optimist opening' },
-            { speaker: 'skeptic', message: 'Skeptic counter' },
-            { speaker: 'optimist', message: 'Optimist rebuttal' }
-          ],
-          votes: { optimistWins: 10, skepticWins: 10 }
-        }),
-      });
-    });
+
 
     // Mock Web Share support (with files support)
     await page.addInitScript(() => {
@@ -165,13 +139,11 @@ test.describe('Visual Verification & Accessibility Audit', () => {
     await expect(shareCardBtn).toHaveText(/Share Card/);
     await expect(shareCardBtn).toHaveAttribute('aria-label', 'Share Trend Card');
 
-    // Vote on debate to reveal debate meme card share button
-    await page.locator('#btn-verdict-optimist').click();
-    
-    const shareDebateCardBtn = page.locator('#btn-download-debate-card');
-    await expect(shareDebateCardBtn).toBeVisible();
-    await expect(shareDebateCardBtn).toHaveText(/Share Debate Meme/);
-    await expect(shareDebateCardBtn).toHaveAttribute('aria-label', 'Share Debate Meme Card');
+    // Verify infographic card share button is visible (it does not require voting)
+    const shareInfographicBtn = page.locator('#btn-download-infographic');
+    await expect(shareInfographicBtn).toBeVisible();
+    await expect(shareInfographicBtn).toHaveText(/Share Infographic/);
+    await expect(shareInfographicBtn).toHaveAttribute('aria-label', 'Share Infographic Card');
 
     // Take screenshot of mobile view showing the Share buttons
     await page.screenshot({

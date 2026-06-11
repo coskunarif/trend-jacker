@@ -231,6 +231,8 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
     const box1_desk = await card1.boundingBox();
     const box2_desk = await card2.boundingBox();
     const box3_desk = await card3.boundingBox();
+    
+
 
     // On desktop, they should be side-by-side (X coords increasing, Y coords similar)
     expect(box1_desk.x).toBeLessThan(box2_desk.x);
