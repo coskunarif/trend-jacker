@@ -214,43 +214,58 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
   });
 
   test('should render the .visual-cards-grid responsively', async ({ page }) => {
+    // [AC-1] Stabilize Responsive Grid E2E Layout Checks
     await page.goto('/');
     await expect(page.locator('#explainer-view')).toBeVisible();
 
     const grid = page.locator('.visual-cards-grid');
     await expect(grid).toBeVisible();
 
-    // 1. Desktop Viewport
-    await page.setViewportSize({ width: 1200, height: 800 });
-    await page.waitForTimeout(200);
-
     const card1 = page.locator('#card-viral-vibe');
     const card2 = page.locator('#card-live-sentiment');
     const card3 = page.locator('#card-snapshot-share');
 
-    const box1_desk = await card1.boundingBox();
-    const box2_desk = await card2.boundingBox();
-    const box3_desk = await card3.boundingBox();
-    
+    // 1. Desktop Viewport
+    await page.setViewportSize({ width: 1200, height: 800 });
 
+    await expect(async () => {
+      const box1_desk = await card1.boundingBox();
+      const box2_desk = await card2.boundingBox();
+      const box3_desk = await card3.boundingBox();
 
-    // On desktop, they should be side-by-side (X coords increasing, Y coords similar)
-    expect(box1_desk.x).toBeLessThan(box2_desk.x);
-    expect(box2_desk.x).toBeLessThan(box3_desk.x);
-    expect(Math.abs(box1_desk.y - box2_desk.y)).toBeLessThan(20);
+      expect(box1_desk).not.toBeNull();
+      expect(box2_desk).not.toBeNull();
+      expect(box3_desk).not.toBeNull();
+
+      // On desktop, they should be side-by-side (X coords increasing, Y coords similar)
+      expect(box1_desk.x).toBeLessThan(box2_desk.x);
+      expect(box2_desk.x).toBeLessThan(box3_desk.x);
+      expect(Math.abs(box1_desk.y - box2_desk.y)).toBeLessThan(20);
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
 
     // 2. Mobile Viewport
     await page.setViewportSize({ width: 375, height: 667 });
-    await page.waitForTimeout(200);
 
-    const box1_mob = await card1.boundingBox();
-    const box2_mob = await card2.boundingBox();
-    const box3_mob = await card3.boundingBox();
+    await expect(async () => {
+      const box1_mob = await card1.boundingBox();
+      const box2_mob = await card2.boundingBox();
+      const box3_mob = await card3.boundingBox();
 
-    // On mobile, they should stack vertically (Y coords increasing, X coords aligned/similar)
-    expect(box1_mob.y).toBeLessThan(box2_mob.y);
-    expect(box2_mob.y).toBeLessThan(box3_mob.y);
-    expect(Math.abs(box1_mob.x - box2_mob.x)).toBeLessThan(20);
+      expect(box1_mob).not.toBeNull();
+      expect(box2_mob).not.toBeNull();
+      expect(box3_mob).not.toBeNull();
+
+      // On mobile, they should stack vertically (Y coords increasing, X coords aligned/similar)
+      expect(box1_mob.y).toBeLessThan(box2_mob.y);
+      expect(box2_mob.y).toBeLessThan(box3_mob.y);
+      expect(Math.abs(box1_mob.x - box2_mob.x)).toBeLessThan(20);
+    }).toPass({
+      timeout: 5000,
+      intervals: [100, 250, 500]
+    });
   });
 
 });
