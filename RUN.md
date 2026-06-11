@@ -1,6 +1,6 @@
 task: TJ-30 (Interactive Sentiment Timeline Dashboard)              tier: T2   creativity: 0.5
 state: Shipper                budget: repairs 0/3
-branch: asf/tj-30          checkpoint: none
+branch: asf/tj-30          checkpoint: asf/tj-30/green-1
 caps: agents,ui,web,human
 
 ## Log
@@ -34,3 +34,23 @@ caps: agents,ui,web,human
 - **Runner-up**: TJ-26 (Unified Share and Social Modal UI)
 
 ## Done
+Shipped:
+- Interactive Sentiment Timeline Dashboard tracking and displaying real-time voting trends and velocity.
+- SQLite `vote_events` schema and REST API history endpoints.
+- HTML5 Canvas visualization dashboard with responsive hover tooltips and fluid animations.
+
+### Verification Evidence
+
+| Acceptance Criterion | Evidence |
+| --- | --- |
+| **[AC-1] Database Schema and API Endpoint** | `GET /api/poll/history` returns structured JSON dataset containing sentiment percentages and velocity. |
+| **[AC-2] Frontend Timeline Container & Layout** | Layout correctly containers canvas dashboard with retina pixel ratio support. |
+| **[AC-3] Canvas Rendering & Fluid Animations** | Fluid dual-layer rendering (gradient sentiment line + velocity bars) updates smoothly. |
+| **[AC-4] Interactive Hover Tooltips** | Hover handler triggers rich HTML tooltips tracking nearest timeline coordinates. |
+| **[AC-5] E2E Playwright Tests** | E2E test suites fully green locally and in CI/CD pipeline. |
+
+- **Pull Request**: [PR #3](https://github.com/coskunarif/trend-jacker/pull/3)
+- **Deployment URL**: [trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
+
+### Screenshot
+![Sentiment Timeline Dashboard](file:///home/ubuntuadmin/.gemini/antigravity-cli/brain/21be09c9-e360-4f4a-ba04-bdaf4516ebf4/sentiment-timeline.png)
