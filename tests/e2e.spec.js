@@ -1,6 +1,39 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('TrendJacker E2E tests', () => {
+  // Mapped to [AC-1], [AC-2]
+  test.beforeEach(async ({ page }, testInfo) => {
+    // Only mock SSE if this is NOT the live sentiment updates test
+    if (testInfo.title !== 'should display live sentiment updates from SSE feed') {
+      await page.addInitScript(() => {
+        window._OriginalEventSource = window._OriginalEventSource || window.EventSource;
+        class MockEventSource extends EventTarget {
+          constructor(url, options) {
+            super();
+            this.url = url;
+            this.options = options;
+            this.readyState = 0; // CONNECTING
+            if (url && url.includes('/api/sentiment-stream')) {
+              setTimeout(() => {
+                this.readyState = 1; // OPEN
+                const openEvent = new Event('open');
+                this.dispatchEvent(openEvent);
+                if (this.onopen) this.onopen(openEvent);
+              }, 50);
+            } else {
+              const Original = window._OriginalEventSource;
+              return new Original(url, options);
+            }
+          }
+          close() {
+            this.readyState = 2; // CLOSED
+          }
+        }
+        window.EventSource = MockEventSource;
+      });
+    }
+  });
+
   // Mock API data matching the server's test mode defaults
   const mockTrends = [
     {
@@ -159,6 +192,7 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(page.locator('#detail-hook')).toHaveText('Fastify v5 is out with better performance.');
   });
 
+  // Mapped to [AC-1], [AC-2]
   test('should submit a sentiment vote and update poll percentages', async ({ page }) => {
     // Intercept trends and explain API
     await page.route('**/api/trends', async (route) => {
