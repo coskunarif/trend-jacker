@@ -5,3 +5,4 @@ node_modules/
 polls.db
 test-results/
 playwright-report/
+dogfood-output/

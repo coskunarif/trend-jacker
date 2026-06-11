@@ -55,9 +55,7 @@ function initApp() {
   const pageLoadTime = Date.now();
   const localClientId = 'client-' + Math.random().toString(36).substr(2, 9);
 
-  if (navigator.webdriver && !window.mockEventSources && window.innerWidth > 768) {
-    document.body.classList.add('playwright-e2e-desktop');
-  }
+
 
   function resolveLocation(timeZone) {
     const tz = timeZone || '';
