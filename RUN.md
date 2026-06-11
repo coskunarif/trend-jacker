@@ -1,6 +1,6 @@
 task: Fix Test Flakiness (Responsive Grid & Tooltip)     tier: T2   creativity: 0.5
-state: shipper                 budget: repairs 0/3
-branch: asf/20260611-test-fix-flakiness    checkpoint: none
+state: complete                 budget: repairs 0/3
+branch: asf/20260611-test-fix-flakiness    checkpoint: asf/20260611-test-fix-flakiness/green-1
 caps: agents,ui,web,human
 
 ## Task
@@ -31,4 +31,19 @@ caps: agents,ui,web,human
 - Desktop Grid Layout: [desktop-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/desktop-grid.png)
 - Mobile Grid Layout: [mobile-grid.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/mobile-grid.png)
 - Hover Tooltip: [hover-tooltip.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260611-test-fix-flakiness/screenshots/hover-tooltip.png)
+
+## Done
+### What Shipped:
+- Replaced hard timeouts and sleeps in E2E tests with robust, retrying assertions (`expect().toPass()`) for viewport resizing and tooltip interactions.
+- Added explicit network response waiting (`page.waitForResponse`) for timeline history data retrieval before starting assertions to eliminate race conditions under high runner loads.
+
+### Acceptance Criteria & Evidence
+| Acceptance Criterion | Verification / Evidence |
+| --- | --- |
+| AC-1 (Responsive Grid Layout) | PASS - Layout verified under desktop (side-by-side) and mobile (stacked) viewports using retrying layout checks. |
+| AC-2 (Timeline Hover Tooltip) | PASS - Tooltip formatting, coordinates/styling, dynamic data display, and hide behavior verified after waiting for api endpoint response. |
+
+### PR & Deploy links:
+- PR: Local merge to `main` (no remote PR opened due to offline/local environment capabilities or access restrictions).
+- Tag: `asf/20260611-test-fix-flakiness/green-1`
 
