@@ -1,5 +1,5 @@
 task: TJ-30 (Interactive Sentiment Timeline Dashboard)              tier: T2   creativity: 0.5
-state: Verifier                budget: repairs 0/3
+state: Shipper                budget: repairs 0/3
 branch: asf/tj-30          checkpoint: none
 caps: agents,ui,web,human
 
@@ -11,6 +11,7 @@ caps: agents,ui,web,human
 - 2026-06-11: Builder completed all slices. Tests passing green (46/46). Conductor initialized Verifier phase.
 - 2026-06-11: Verifier reported test failure. Conductor routed 'test wrong' to Tester to amend the test.
 - 2026-06-11: Tester amended tests/sentiment-timeline.spec.js to resolve race condition. Conductor re-initialized Verifier phase.
+- 2026-06-11: Verifier successfully verified all ACs passing. Conductor initialized Shipper phase.
 
 ## Verdict
 - **[AC-1] Database Schema and API Endpoint**: PASS
