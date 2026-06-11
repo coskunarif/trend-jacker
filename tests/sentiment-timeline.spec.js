@@ -162,6 +162,9 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
 
     await page.goto('/');
     
+    // Wait for the initial history fetch to resolve to prevent CPU race conditions
+    await page.waitForResponse(response => response.url().includes('/api/poll/history') && response.status() === 200);
+    
     const initialCalls = historyCallCount;
     expect(initialCalls).toBeGreaterThanOrEqual(1);
 
