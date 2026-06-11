@@ -1,5 +1,5 @@
 task: Implement dynamic /llms.txt, /llms-full.txt, and /robots.txt endpoints to optimize for AI engine citations (GEO) and crawl search indexability. Runner-up: Enhance NewsArticle JSON-LD schema with Breadcrumbs and dynamic FAQs. tier: T2   creativity: 0.5
-state: SHIPPER                budget: repairs 0/3
+state: complete                budget: repairs 0/3
 branch: asf/20260611-seo-visibility          checkpoint: asf/20260611-seo-visibility/green-1
 caps: agents,ui,web,human
 
@@ -19,8 +19,22 @@ caps: agents,ui,web,human
 - **[AC-6] E2E Integration Tests**: PASS. Verified that `npm test` runs all 56 tests successfully.
 
 ## Done
+### Shipped Features
+- Dynamic `/robots.txt` for crawl search indexability.
+- Dynamic `/llms.txt` and `/llms-full.txt` sitemaps for AI scrapers/agents.
+- Dynamic individual trend Markdown explainer endpoints under `/t/:slug.md`.
+- HTML Alternate link tags injection into the document heads of homepage and trend details pages for discovery.
+- Comprehensive Playwright tests validating response content types, status codes, and structural elements.
 
+### Verification Evidence
+| Acceptance Criterion | Verification Method | Result |
+| --- | --- | --- |
+| `[AC-1]` Dynamic robots.txt | HTTP GET Request Content-Type & Content Check | **PASS** |
+| `[AC-2]` Dynamic llms.txt | HTTP GET Request Content-Type & Markdown Structure Check | **PASS** |
+| `[AC-3]` Dynamic llms-full.txt | HTTP GET Request Content-Type & Compiled Markdown Content Check | **PASS** |
+| `[AC-4]` Trend Explainer /t/:slug.md | HTTP GET Request Content-Type & Explainer Markdown Fields Check | **PASS** |
+| `[AC-5] ` Discovery Meta Tag | HTML Parser Verification of `<link rel="alternate">` | **PASS** |
+| `[AC-6]` E2E Integration | Full Playwright Test Run (`npm test`) | **PASS** (56/56 passed) |
 
-
-
-
+### Integration
+- Merged locally into the default branch `main`.
