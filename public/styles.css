@@ -231,7 +231,7 @@ body {
 
 /* Sidebar Tab Bar */
 .sidebar-tabs {
-  display: flex;
+  display: none;
   margin-top: var(--space-3);
   gap: var(--space-1);
   background: rgba(18, 22, 33, 0.6);
@@ -1071,14 +1071,7 @@ body {
   display: none;
 }
 
-/* Playwright E2E Desktop Override - removed to allow tab toggling to work on desktop e2e */
-.sidebar-panel.tabs-toggled.show-sentiment .scroll-container,
-.sidebar-panel.tabs-toggled.show-sentiment .panel-header-text {
-  display: none !important;
-}
-.sidebar-panel.tabs-toggled:not(.show-sentiment) .live-feed-section {
-  display: none !important;
-}
+
 
 @media (max-width: 768px) {
   /* Tab switcher visibility logic only on mobile */
@@ -2025,11 +2018,7 @@ body {
   }
 }
 
-body.playwright-e2e-desktop ::view-transition-group(*),
-body.playwright-e2e-desktop ::view-transition-old(*),
-body.playwright-e2e-desktop ::view-transition-new(*) {
-  animation: none !important;
-}
+
 
 /* Customize Tabs Transition */
 ::view-transition-old(sidebar-panel-tabs) {
