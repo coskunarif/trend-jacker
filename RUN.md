@@ -7,6 +7,8 @@ caps: agents,ui,web,human
 - 2026-06-11: Conductor initialized fresh run. Checked out branch asf/20260611-broken-images. Starting Architect phase.
 - 2026-06-11: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-11: Tester wrote tests/og-favicon.spec.js (observed state: red). Conductor starting Builder phase.
+- 2026-06-11: Dispute: "should render visual thumbnails and publisher favicons in trend list items" asserts broken image is visible, contradicting SPEC AC-1.
+- 2026-06-11: Dispute: "should render hero image banner and publisher favicon in detail view and news footer" asserts broken hero image is visible, contradicting SPEC AC-3.
 
 ## Verdict
 
