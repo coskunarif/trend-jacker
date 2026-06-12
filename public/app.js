@@ -629,7 +629,10 @@ function initApp() {
 
       let thumbnailHtml = '';
       if (trend.news && trend.news.ogImage) {
-        thumbnailHtml = `<img class="trend-thumbnail" src="${trend.news.ogImage}" alt="${trend.title}" loading="lazy" />`;
+        thumbnailHtml = `
+          <img class="trend-thumbnail" src="${trend.news.ogImage}" alt="${trend.title}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <div class="trend-thumbnail-placeholder" style="display: none;"></div>
+        `;
       } else {
         thumbnailHtml = `<div class="trend-thumbnail-placeholder"></div>`;
       }
@@ -651,7 +654,7 @@ function initApp() {
         <div class="trend-item-info">
           <span class="trend-item-title">${trend.title}</span>
           <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
-            ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" />` : ''}
+            ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none';" />` : ''}
             ${sourceBadge}
           </div>
           <span class="trend-item-desc">${trend.description || (trend.news && trend.news.headline) || 'Tap to investigate'}</span>
@@ -783,11 +786,16 @@ function initApp() {
           heroImg.src = trend.news.ogImage;
           heroImg.style.display = 'block';
           if (heroGradient) heroGradient.style.display = 'none';
+          heroImg.onerror = () => {
+            heroImg.style.display = 'none';
+            if (heroGradient) heroGradient.style.display = 'block';
+          };
         } else {
           heroImg.src = '';
           heroImg.removeAttribute('src');
           heroImg.style.display = 'none';
           if (heroGradient) heroGradient.style.display = 'block';
+          heroImg.onerror = null;
         }
       }
 
@@ -888,9 +896,16 @@ function initApp() {
           footerFaviconImg.src = footerFaviconUrl;
           footerFaviconImg.style.display = 'block';
           footerGenericSvg.style.display = 'none';
+          footerFaviconImg.onerror = () => {
+            footerFaviconImg.style.display = 'none';
+            if (footerGenericSvg) footerGenericSvg.style.display = 'block';
+          };
         } else if (footerFaviconImg && footerGenericSvg) {
+          footerFaviconImg.src = '';
+          footerFaviconImg.removeAttribute('src');
           footerFaviconImg.style.display = 'none';
           footerGenericSvg.style.display = 'block';
+          footerFaviconImg.onerror = null;
         }
 
         document.querySelector('.news-footer-card').classList.remove('hidden');
