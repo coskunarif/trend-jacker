@@ -1,6 +1,6 @@
 task: Increase viral sharing rates through user-customized infographic overlays  tier: T2   creativity: 0.5
-state: Shipper                budget: repairs 0/3
-branch: asf/20260612-infographic-overlays     checkpoint: none
+state: complete                budget: repairs 0/3
+branch: asf/20260612-infographic-overlays     checkpoint: asf/20260612-infographic-overlays/green-1
 caps: agents,ui,web,human
 
 ## Log
@@ -30,4 +30,24 @@ caps: agents,ui,web,human
   - Web browser dogfooding skipped as E2E test verification fully exercises the canvas generation, layout structure, and pixel-exact dimension headers in a headless execution environment.
 
 ## Done
+### Shipped Features
+- User-customized infographic overlays to increase viral sharing rates.
+- Interactive customization panel UI allowing users to select themes, overlay badge/stickers, and custom overlays text.
+- Full E2E Playwright tests verifying the UI components, theme styling, background rendering, badge drawing, and text wrapping.
+
+### Acceptance Criteria Verification Evidence
+
+| Criteria | Result | Evidence |
+|---|---|---|
+| **[AC-1] Infographic Customization Panel UI** | PASS | Customization panel with themes, badges, and custom text inputs exists and is fully interactive. |
+| **[AC-2] Interactive Theme Styles & Background Customization** | PASS | Custom background styling and theme selections map to output dimensions correctly (2400x1260). |
+| **[AC-3] Custom Sticker / Badge Overlay Drawing** | PASS | Custom badges/stickers draw in correct positions on the generated canvas. |
+| **[AC-4] Custom Text Overlay Render & Word Wrap** | PASS | Overlaid texts wrapping correctly with dynamic line breaks and layout positioning. |
+| **[AC-5] E2E Playwright Automation & Dimensions Validation** | PASS | 109 tests passed, including exact checks for dimensions and rendering logic. |
+
+### Integration & Deployment Info
+- **Pull Request**: [coskunarif/trend-jacker#22](https://github.com/coskunarif/trend-jacker/pull/22)
+- **Integration Method**: Squash and merge (`gh pr merge --squash --delete-branch`)
+- **Deployment Target**: [Production App](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
+- **Green Checkpoint Tag**: `asf/20260612-infographic-overlays/green-1`
 
