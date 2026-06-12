@@ -1,39 +1,46 @@
-task: Further cache and optimize LLM calls to provide quality, catchy, fluff-free content.              tier: T2   creativity: 0.5
-state: complete                 budget: repairs 0/3
-branch: asf/20260611-llm-caching          checkpoint: none
+task: Improve search engine authority and AI search engine citation rates. Metric: Generative search engine citation rate. Why now: Ensures JIT trending explanations are trusted and referenced as primary sources by AI search assistants. Runner-up: Structured data enrichment to maximize search result CTR.              tier: T2   creativity: 0.5
+state: complete               budget: repairs 0/3
+branch: asf/20260612-seo-citation          checkpoint: asf/20260612-seo-citation/green-1
 caps: agents,ui,web,human
 
 ## Log
-- 2026-06-11: Conductor initialized fresh run. Checked out work branch asf/20260611-llm-caching. Starting Architect phase.
-- 2026-06-11: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-11: Tester wrote tests (observed state: red). Conductor starting Builder phase.
-- 2026-06-11: Builder implementation completed. Conductor starting Verifier phase.
-- 2026-06-12: Verifier ran the full test suite (87/87 passed) and verified the caching, prompts, and visual layouts. All checks PASS.
-- 2026-06-12: Verifier completed verification (verdict: PASS). Conductor starting Shipper phase.
-- 2026-06-12: Shipper tagged green-1, opened/merged PR, and closed the run.
-
+- 2026-06-12: Conductor initialized fresh run with Scout trigger. Starting Scout phase.
+- 2026-06-12: Scout phase completed. Selected GEO citation and authority enhancement task.
+- 2026-06-12: Conductor starting Architect phase.
+- 2026-06-12: Conductor starting Tester phase.
+- 2026-06-12: Conductor starting Builder phase.
+- 2026-06-12: Conductor starting Verifier phase.
+- 2026-06-12: Verifier started dev server on port 3001 (task-79).
+- 2026-06-12: Conductor starting Shipper phase.
 ## Verdict
-- **[AC-1] Chat Q&A API Caching**: PASS
-  - Evidence: Tested `/api/chat` caching via DB mutation unit test (replacing cached row text and seeing the API return the customized text on subsequent request) and manual walkthrough.
-- **[AC-2] Social Media Post Generator Caching**: PASS
-  - Evidence: Tested `/api/generate-post` caching via DB verification unit test. Direct DB table inspections confirmed entries exist with structured keys.
-- **[AC-3] LLM Prompt Quality and Style Optimization (Fluff-Free & Catchy)**: PASS
-  - Evidence: Unit test successfully asserted that the four prompt templates (`getTrendExplanation`, `getLocalizedTrendExplanation`, chat API, and social post API) include fluff-free, catchy, and active-voice style instructions along with the banned words blacklist.
-- **Lint, Types, and Build**: SKIPPED
-  - Evidence: No build script, typescript compiler, or eslint configuration files are defined in the workspace.
-- **Visual & E2E Validation**: PASS
-  - Evidence: E2E test suite (87 tests) passed successfully. Captured desktop and mobile screenshots showing correct layout rendering without glitches or overflow.
-
+- **[AC-1] Enriched Schema.org JSON-LD Structured Data**: PASS
+  - Evidence: Verified via Playwright E2E and unit assertions (`tests/seo-visibility.spec.js`). Manual extraction of homepage `/` and `/t/google-gemini` JSON-LD schemas confirmed presence and format of `mainEntityOfPage`, `publisher`, `author`, dynamic ISO 8601 dates, and `citation` block referencing the primary news source.
+- **[AC-2] Plain-Text Citations in Raw Markdown Trend Explainer Endpoints**: PASS
+  - Evidence: Verified via test suite and direct fetch of `/t/google-gemini.md`, which returns `text/plain` and appends `## Sources & Citations` at the bottom pointing to the primary source.
+- **[AC-3] Plain-Text Citations in Sitemap Aggregators (/llms.txt, /llms-full.txt)**: PASS
+  - Evidence: Checked that `/llms.txt` correctly appends inline citation metadata (Source: name/URL) and `/llms-full.txt` lists source details under each trend header.
+- **[AC-4] Semantically Optimized HTML5 Citations in UI**: PASS
+  - Evidence: Verified via E2E testing. Browser screenshots captured desktop and mobile layouts. Confirmed the news context footer wraps the snippet in a `<blockquote>` with `cite` attribute and uses a `<cite>` tag inside the citation footer.
 ## Done
-- **Green checkpoint tag**: `asf/20260611-llm-caching/green-1`
-- **Pull Request**: [coskunarif/trend-jacker#16](https://github.com/coskunarif/trend-jacker/pull/16)
-- **Deployment URL**: [https://trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Integration Method**: GitHub PR merge via `--merge`
+### What Shipped
+Improved search engine authority and generative AI citation coverage by embedding robust semantic and structured attribution across the application:
+1. **JSON-LD Schema Enrichment**: Automatically generates and injects Schema.org compliant structured metadata on the home page and individual trend pages containing source info, authors, publishers, dates, and citation arrays.
+2. **Plain-Text Citations inside Markdown**: Appends a `## Sources & Citations` section with clickable markdown links referencing the news source at `/t/:slug.md`.
+3. **Aggregators Inline & Block Citations**: Adds inline citation source links within sitemap endpoints `/llms.txt` and `/llms-full.txt`.
+4. **Semantic UI Citation Markup**: Wraps news snippets in `blockquote` with correct `cite` attributes and `<cite>` blocks for proper machine readability.
 
-### Evidence Table
-| Acceptance Criteria | Verification / Evidence |
-| --- | --- |
-| `[AC-1] Chat Q&A API Caching` | SQLite/Firestore schema initialized with `chat_cache` table/collection; verified via direct DB mutation test returning the updated cache record immediately. |
-| `[AC-2] Social Media Post Generator Caching` | SQLite/Firestore schema initialized with `generated_posts` table/collection; verified via direct DB mutation test showing instant cached responses. |
-| `[AC-3] LLM Prompt Quality and Style Optimization` | Banned generic filler/AI words (`delve`, `tapestry`, etc.) and mandated active voice and high density across all 4 Gemini templates; verified via content inspection tests. |
+### Acceptance Criteria Verification
+| Acceptance Criteria | Status | Evidence |
+|---|---|---|
+| **[AC-1] JSON-LD Schema** | PASS | Playwright tests verify script presence and structure parsing (publisher, author, citation list, mainEntityOfPage). |
+| **[AC-2] Markdown Citations** | PASS | E2E fetch of `/t/google-gemini.md` includes primary source links and fallback messages for missing data. |
+| **[AC-3] Sitemap Aggregators** | PASS | `/llms.txt` and `/llms-full.txt` verify correct inline and block citations. |
+| **[AC-4] Semantic UI Tags** | PASS | UI rendering contains blockquotes with `cite="..."` and `<cite>` tags. |
 
+### Integration & Deployment Details
+- **PR Link**: [PR #17](https://github.com/coskunarif/trend-jacker/pull/17)
+- **Deployment Mode**: GitHub Actions Workflow (via non-fast-forward merge commit)
+- **Production URL**: [Trend Jacker Prod](https://trend-jacker-250134012801.us-central1.run.app)
+
+### UI Screenshot Evidence
+![UI Citation Block](dogfood-output/20260612-seo-citation/screenshots/desktop_detail.png)
