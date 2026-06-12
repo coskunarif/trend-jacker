@@ -1012,9 +1012,14 @@ function initApp() {
 
       // News Footer
       if (trend.news && trend.news.headline) {
-        newsTitle.textContent = trend.news.headline;
+        newsTitle.textContent = `${trend.news.source ? trend.news.source + ' - ' : ''}${trend.news.headline}`;
         newsSnippet.textContent = trend.news.snippet || 'No snippet available.';
         newsLink.href = trend.news.url || '#';
+
+        const blockquote = document.querySelector('.news-footer-card blockquote');
+        if (blockquote) {
+          blockquote.setAttribute('cite', trend.news.url || '');
+        }
 
         const footerFaviconImg = document.getElementById('footer-favicon-img');
         const footerGenericSvg = document.querySelector('.news-icon svg.lucide-newspaper');
