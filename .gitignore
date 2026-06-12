@@ -3,6 +3,7 @@ node_modules/
 .DS_Store
 *.log
 polls.db
+polls.db-*
 test-results/
 playwright-report/
 dogfood-output/
