@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -587,55 +587,67 @@ fastify.get('/api/sentiment-stream', (request, reply) => {
 
 // Helper to get explanation from Gemini
 async function getTrendExplanation(trend, headline = '', snippet = '') {
+  // Check the cache first
+  const cached = await getCachedExplanation(trend);
+  if (cached) {
+    cached.polls = await getPollData(trend);
+    return cached;
+  }
+
+  let explanation;
   if (process.env.NODE_ENV === 'test') {
-    return {
+    explanation = {
       hook: 'Gemini is capturing developer mindshare with low latency and long context.',
       whatIsIt: 'Google Gemini is a suite of multimodal generative AI models.',
       whyIsItViral: ['Long context window', 'Low latency API', 'Reasoning capability'],
-      takeaway: 'Expect Gemini to power next-gen agentic workflows.',
-      polls: await getPollData(trend)
+      takeaway: 'Expect Gemini to power next-gen agentic workflows.'
     };
-  }
-
-  if (!genAI) {
-    throw new Error('Gemini API not configured.');
-  }
-
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
-    generationConfig: { 
-      thinkingConfig: { thinkingLevel: 'LOW' },
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: "OBJECT",
-        properties: {
-          hook: { type: "STRING" },
-          whatIsIt: { type: "STRING" },
-          whyIsItViral: {
-            type: "ARRAY",
-            items: { type: "STRING" }
-          },
-          takeaway: { type: "STRING" }
-        },
-        required: ["hook", "whatIsIt", "whyIsItViral", "takeaway"]
-      },
-      thinkingConfig: { thinkingLevel: 'LOW' }
+  } else {
+    if (!genAI) {
+      throw new Error('Gemini API not configured.');
     }
-  });
 
-  const prompt = `You are a viral trend analyst. Explain why the topic "${trend}" is trending.
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: { 
+        thinkingConfig: { thinkingLevel: 'LOW' },
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            hook: { type: "STRING" },
+            whatIsIt: { type: "STRING" },
+            whyIsItViral: {
+              type: "ARRAY",
+              items: { type: "STRING" }
+            },
+            takeaway: { type: "STRING" }
+          },
+          required: ["hook", "whatIsIt", "whyIsItViral", "takeaway"]
+        },
+        thinkingConfig: { thinkingLevel: 'LOW' }
+      }
+    });
+
+    const prompt = `You are a viral trend analyst. Explain why the topic "${trend}" is trending.
 Here is the context headline: "${headline || ''}".
 Here is the context snippet: "${snippet || ''}".`;
 
-  const result = await model.generateContent(prompt);
-  const textResponse = result.response.text();
-  
-  let cleanedText = textResponse.trim();
-  if (cleanedText.startsWith('```')) {
-    cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+    const result = await model.generateContent(prompt);
+    const textResponse = result.response.text();
+    
+    let cleanedText = textResponse.trim();
+    if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+    }
+    
+    explanation = JSON.parse(cleanedText);
   }
-  
-  const explanation = JSON.parse(cleanedText);
+
+  // Write explanation to cache
+  await setCachedExplanation(trend, explanation);
+
+  // Retrieve live poll statistics
   explanation.polls = await getPollData(trend);
   return explanation;
 }

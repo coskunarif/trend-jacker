@@ -4,3 +4,4 @@
 - **LLM Content Delivery**: Expose LLM-friendly endpoints like `/llms.txt` using `Content-Type: text/plain` for direct ingestion by scrapers, and inject alternate link headers in HTML pages for auto-discovery.
 - **Playwright Retrying Assertions**: The correct syntax for polling assertions in Playwright is `expect(async () => { ... }).toPass()`; attempting to pass the assertion block as an argument to `expect().toPass(...)` is invalid and causes runtime execution failures.
 - **E2E EventSource Mocking**: Override the global `EventSource` constructor before page load using `page.addInitScript` to prevent live asynchronous SSE stream data from flaking UI/percentage assertions.
+- **SQLite & Playwright Concurrency**: Run Playwright tests with a single worker (`--workers=1`) or enable SQLite WAL mode to prevent transient "database is locked" errors caused by concurrent writes on a shared DB file.
