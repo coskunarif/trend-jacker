@@ -83,6 +83,15 @@ if (!firestore) {
         post_text TEXT
       )
     `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS viral_post_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        trend TEXT,
+        platform TEXT,
+        post_text TEXT,
+        created_at TEXT
+      )
+    `);
     console.log('Local SQLite database initialized successfully at', dbPath);
   } catch (err) {
     console.warn('WARNING: Failed to load node:sqlite, falling back to in-memory mock storage:', err.message);
@@ -659,6 +668,74 @@ export async function setCachedGeneratedPost(trendTitle, platform, contextType, 
   }
 
   inMemoryGeneratedPosts.set(key, postText);
+}
+
+const inMemoryViralPostHistory = [];
+
+export async function insertViralPost(trend, platform, postText, createdAt) {
+  const post = {
+    trend,
+    platform,
+    post_text: postText,
+    created_at: createdAt
+  };
+  
+  if (firestore) {
+    try {
+      await firestore.collection('viral_post_history').add(post);
+      return post;
+    } catch (err) {
+      console.error('Firestore error in insertViralPost:', err.message);
+    }
+  }
+  
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare(`
+        INSERT INTO viral_post_history (trend, platform, post_text, created_at)
+        VALUES (?, ?, ?, ?)
+      `);
+      const info = stmt.run(trend, platform, postText, createdAt);
+      post.id = info.lastInsertRowid;
+      return post;
+    } catch (err) {
+      console.error('Local SQLite insert failed for insertViralPost:', err.message);
+    }
+  }
+  
+  post.id = inMemoryViralPostHistory.length + 1;
+  inMemoryViralPostHistory.push(post);
+  return post;
+}
+
+export async function getViralPostHistory() {
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('viral_post_history')
+        .orderBy('created_at', 'desc')
+        .get();
+      const list = [];
+      snapshot.forEach(doc => {
+        list.push({ id: doc.id, ...doc.data() });
+      });
+      return list;
+    } catch (err) {
+      console.error('Firestore error in getViralPostHistory:', err.message);
+      return [];
+    }
+  }
+  
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT * FROM viral_post_history ORDER BY created_at DESC');
+      return stmt.all();
+    } catch (err) {
+      console.error('Local SQLite SELECT failed for getViralPostHistory:', err.message);
+      return [];
+    }
+  }
+  
+  return [...inMemoryViralPostHistory].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 }
 
 

@@ -67,6 +67,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await expect(page.locator('.platform-pill[data-platform="linkedin"]')).toBeVisible();
     await expect(page.locator('.platform-pill[data-platform="facebook"]')).toBeVisible();
     await expect(page.locator('.platform-pill[data-platform="reddit"]')).toBeVisible();
+    await expect(page.locator('.platform-pill[data-platform="pinterest"]')).toBeVisible();
     await expect(page.locator('#share-preview-text')).toBeVisible();
     await expect(page.locator('#btn-copy-share')).toBeVisible();
     await expect(page.locator('#btn-post-share')).toBeVisible();
@@ -307,6 +308,16 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(redditHashtags.length).toBe(0);
     // Reddit should have a headline hook and structured body
     expect(redditText).toContain('\n');
+
+    // 5. Verify Pinterest formatting & URL [AC-3]
+    const pinterestPill = page.locator('.platform-pill[data-platform="pinterest"]');
+    await pinterestPill.click();
+    await expect(previewTextarea).not.toHaveValue(redditText);
+    await expect(previewTextarea).not.toHaveValue('Generating post...');
+    const pinterestText = await previewTextarea.inputValue();
+    expect(pinterestText).toContain('https://viraljacker.com/t/google-gemini');
+    expect(pinterestText).toContain('Pin Title:');
+    expect(pinterestText).toContain('Pin Description:');
   });
 
   // [AC-3] Automated Validation of High-DPI Card Dimensions

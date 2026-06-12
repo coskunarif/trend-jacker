@@ -612,6 +612,11 @@ function initApp() {
         shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(text)}`;
       } else if (activeSharePlatform === 'reddit') {
         shareUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(currentTrend.title)}&text=${encodeURIComponent(text)}`;
+      } else if (activeSharePlatform === 'pinterest') {
+        const slug = titleToSlug(currentTrend.title);
+        const url = `https://viraljacker.com/t/${slug}`;
+        const media = `https://viraljacker.com/api/og/${slug}`;
+        shareUrl = `https://www.pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}&media=${encodeURIComponent(media)}&description=${encodeURIComponent(text)}`;
       } else {
         shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
       }
@@ -714,6 +719,45 @@ function initApp() {
 
   // Initialize: Load Trends
   fetchTrends();
+  fetchAndRenderViralPosterHistory();
+
+  async function fetchAndRenderViralPosterHistory() {
+    const feed = document.getElementById('viral-poster-feed');
+    if (!feed) return;
+    try {
+      const response = await fetch('/api/viral-poster/history');
+      if (!response.ok) throw new Error('Failed to fetch history');
+      const history = await response.json();
+      feed.innerHTML = '';
+      if (history.length === 0) {
+        feed.innerHTML = '<p style="color: var(--text-muted-color, #a6adc8);">No posts simulated yet.</p>';
+        return;
+      }
+      history.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'viral-post-card glass-card';
+        card.style.padding = '10px';
+        card.style.border = '1px solid rgba(255, 255, 255, 0.1)';
+        card.style.borderRadius = '8px';
+        card.style.display = 'flex';
+        card.style.flexDirection = 'column';
+        card.style.gap = '5px';
+
+        card.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span class="platform-badge" style="font-weight: bold; text-transform: uppercase; font-size: 0.8rem; background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px;">${item.platform}</span>
+            <span class="timestamp" style="font-size: 0.8rem; color: var(--text-muted-color, #a6adc8);">${new Date(item.created_at).toLocaleString()}</span>
+          </div>
+          <div style="font-size: 0.9rem; color: var(--text-muted-color, #a6adc8); font-weight: bold; margin-top: 3px;">Trend: ${item.trend}</div>
+          <div class="post-text" style="white-space: pre-wrap; font-size: 0.9rem; margin-top: 5px;">${item.post_text}</div>
+        `;
+        feed.appendChild(card);
+      });
+    } catch (err) {
+      console.error('Error fetching history:', err);
+      feed.innerHTML = '<p style="color: #f38ba8;">Error loading poster log.</p>';
+    }
+  }
 
   async function fetchTrends() {
     try {
