@@ -1091,9 +1091,10 @@ function initApp() {
     await document.fonts.ready;
 
     const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 630;
+    canvas.width = 2400;
+    canvas.height = 1260;
     const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
 
     // 1. Background Gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
@@ -1231,9 +1232,10 @@ function initApp() {
     await document.fonts.ready;
 
     const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 630;
+    canvas.width = 2400;
+    canvas.height = 1260;
     const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
 
     // 1. Background Gradient
     const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
