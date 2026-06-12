@@ -1,5 +1,5 @@
 task: Improve search engine authority and AI search engine citation rates. Metric: Generative search engine citation rate. Why now: Ensures JIT trending explanations are trusted and referenced as primary sources by AI search assistants. Runner-up: Structured data enrichment to maximize search result CTR.              tier: T2   creativity: 0.5
-state: VERIFIER              budget: repairs 0/3
+state: SHIPPER                budget: repairs 0/3
 branch: asf/20260612-seo-citation          checkpoint: none
 caps: agents,ui,web,human
 
@@ -11,6 +11,7 @@ caps: agents,ui,web,human
 - 2026-06-12: Conductor starting Builder phase.
 - 2026-06-12: Conductor starting Verifier phase.
 - 2026-06-12: Verifier started dev server on port 3001 (task-79).
+- 2026-06-12: Conductor starting Shipper phase.
 ## Verdict
 - **[AC-1] Enriched Schema.org JSON-LD Structured Data**: PASS
   - Evidence: Verified via Playwright E2E and unit assertions (`tests/seo-visibility.spec.js`). Manual extraction of homepage `/` and `/t/google-gemini` JSON-LD schemas confirmed presence and format of `mainEntityOfPage`, `publisher`, `author`, dynamic ISO 8601 dates, and `citation` block referencing the primary news source.
