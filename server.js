@@ -1058,7 +1058,7 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     const slugs = latestTrends.map(item => titleToSlug(item.title));
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
     
     // Add homepage
     xml += `  <url>\n`;
@@ -1067,13 +1067,25 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
     
-    // Add trend pages
+    // Add trend pages for each locale (en, es, fr, ja)
+    const locales = ['en', 'es', 'fr', 'ja'];
     for (const slug of slugs) {
-      xml += `  <url>\n`;
-      xml += `    <loc>https://viraljacker.com/t/${slug}</loc>\n`;
-      xml += `    <changefreq>daily</changefreq>\n`;
-      xml += `    <priority>0.8</priority>\n`;
-      xml += `  </url>\n`;
+      for (const lang of locales) {
+        const loc = lang === 'en'
+          ? `https://viraljacker.com/t/${slug}`
+          : `https://viraljacker.com/t/${slug}/${lang}`;
+        
+        xml += `  <url>\n`;
+        xml += `    <loc>${loc}</loc>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="https://viraljacker.com/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="en" href="https://viraljacker.com/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="es" href="https://viraljacker.com/t/${slug}/es" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="fr" href="https://viraljacker.com/t/${slug}/fr" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="ja" href="https://viraljacker.com/t/${slug}/ja" />\n`;
+        xml += `  </url>\n`;
+      }
     }
     
     xml += `</urlset>`;
