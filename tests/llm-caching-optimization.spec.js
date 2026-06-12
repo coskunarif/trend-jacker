@@ -10,7 +10,6 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('LLM Caching and Content Optimization Tests', () => {
-  let db;
   let getCachedChatResponse;
   let setCachedChatResponse;
   let getCachedGeneratedPost;
@@ -29,27 +28,25 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     } catch (err) {
       console.warn('Could not import caching functions from db.js:', err.message);
     }
-    db = new DatabaseSync(dbPath);
-  });
-
-  test.afterAll(() => {
-    if (db) {
-      db.close();
-    }
   });
 
   // --- AC-1: Chat Q&A API Caching ---
 
   // [AC-1] Schema Verification: SQLite table chat_cache exists
   test('should have the chat_cache table created in SQLite with correct schema', async () => {
-    const stmt = db.prepare(`
-      SELECT sql FROM sqlite_master 
-      WHERE type = 'table' AND name = 'chat_cache'
-    `);
-    const row = stmt.get();
-    expect(row).toBeDefined();
-    expect(row.sql).toContain('key TEXT PRIMARY KEY');
-    expect(row.sql).toContain('reply TEXT');
+    const localDb = new DatabaseSync(dbPath);
+    try {
+      const stmt = localDb.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'chat_cache'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('key TEXT PRIMARY KEY');
+      expect(row.sql).toContain('reply TEXT');
+    } finally {
+      localDb.close();
+    }
   });
 
   // [AC-1] getCachedChatResponse and setCachedChatResponse unit tests
@@ -78,11 +75,13 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const testHistory = [{ role: 'user', content: 'tell me more' }];
 
     // Clean existing database records just in case to ensure starting clean
-    const localDb = new DatabaseSync(dbPath);
+    let localDb = new DatabaseSync(dbPath);
     try {
       localDb.prepare('DELETE FROM chat_cache').run();
     } catch (err) {
       // Ignored if table doesn't exist yet
+    } finally {
+      localDb.close();
     }
 
     // 1. First request: should trigger generation/mock reply and cache it
@@ -93,18 +92,22 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const data1 = await res1.json();
     expect(data1.reply).toBeDefined();
 
-    // Verify it exists in SQLite database chat_cache table
-    const checkStmt = localDb.prepare('SELECT * FROM chat_cache');
-    const rows = checkStmt.all();
-    expect(rows.length).toBe(1);
-    const cachedRow = rows[0];
-    expect(cachedRow.key).toBeDefined();
-
-    // 2. Modify database record directly to set specific custom text
+    // Verify it exists in SQLite database chat_cache table and modify directly
+    localDb = new DatabaseSync(dbPath);
     const customReply = 'This is custom hacked reply text from cache!';
-    const updateStmt = localDb.prepare('UPDATE chat_cache SET reply = ? WHERE key = ?');
-    updateStmt.run(customReply, cachedRow.key);
-    localDb.close();
+    try {
+      const checkStmt = localDb.prepare('SELECT * FROM chat_cache WHERE key LIKE ?');
+      const rows = checkStmt.all(`${testTrend}:%`);
+      expect(rows.length).toBe(1);
+      const cachedRow = rows[0];
+      expect(cachedRow.key).toBeDefined();
+
+      // 2. Modify database record directly to set specific custom text
+      const updateStmt = localDb.prepare('UPDATE chat_cache SET reply = ? WHERE key = ?');
+      updateStmt.run(customReply, cachedRow.key);
+    } finally {
+      localDb.close();
+    }
 
     // 3. Second request: should load from cache, and return our custom modification
     const res2 = await request.post('/api/chat', {
@@ -120,14 +123,19 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] Schema Verification: SQLite table generated_posts exists
   test('should have the generated_posts table created in SQLite with correct schema', async () => {
-    const stmt = db.prepare(`
-      SELECT sql FROM sqlite_master 
-      WHERE type = 'table' AND name = 'generated_posts'
-    `);
-    const row = stmt.get();
-    expect(row).toBeDefined();
-    expect(row.sql).toContain('key TEXT PRIMARY KEY');
-    expect(row.sql).toContain('post_text TEXT');
+    const localDb = new DatabaseSync(dbPath);
+    try {
+      const stmt = localDb.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'generated_posts'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('key TEXT PRIMARY KEY');
+      expect(row.sql).toContain('post_text TEXT');
+    } finally {
+      localDb.close();
+    }
   });
 
   // [AC-2] getCachedGeneratedPost and setCachedGeneratedPost unit tests
@@ -156,11 +164,13 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const testContext = 'funny';
 
     // Clean existing database records to ensure starting clean
-    const localDb = new DatabaseSync(dbPath);
+    let localDb = new DatabaseSync(dbPath);
     try {
       localDb.prepare('DELETE FROM generated_posts').run();
     } catch (err) {
       // Ignored if table doesn't exist yet
+    } finally {
+      localDb.close();
     }
 
     // 1. First request: should trigger generation/mock post and cache it
@@ -171,18 +181,22 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const data1 = await res1.json();
     expect(data1.postText).toBeDefined();
 
-    // Verify it exists in SQLite database generated_posts table
-    const checkStmt = localDb.prepare('SELECT * FROM generated_posts');
-    const rows = checkStmt.all();
-    expect(rows.length).toBe(1);
-    const cachedRow = rows[0];
-    expect(cachedRow.key).toBeDefined();
-
-    // 2. Modify database record directly to set specific custom text
+    // Verify it exists in SQLite database generated_posts table and modify directly
+    localDb = new DatabaseSync(dbPath);
     const customPost = 'This is custom hacked post text from cache!';
-    const updateStmt = localDb.prepare('UPDATE generated_posts SET post_text = ? WHERE key = ?');
-    updateStmt.run(customPost, cachedRow.key);
-    localDb.close();
+    try {
+      const checkStmt = localDb.prepare('SELECT * FROM generated_posts WHERE key LIKE ?');
+      const rows = checkStmt.all(`${testTitle}:%`);
+      expect(rows.length).toBe(1);
+      const cachedRow = rows[0];
+      expect(cachedRow.key).toBeDefined();
+
+      // 2. Modify database record directly to set specific custom text
+      const updateStmt = localDb.prepare('UPDATE generated_posts SET post_text = ? WHERE key = ?');
+      updateStmt.run(customPost, cachedRow.key);
+    } finally {
+      localDb.close();
+    }
 
     // 3. Second request: should load from cache, and return our custom modification
     const res2 = await request.post('/api/generate-post', {

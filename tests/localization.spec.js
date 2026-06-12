@@ -11,7 +11,6 @@ const dbPath = path.resolve(__dirname, '../polls.db');
 test.describe('Gemini AI Multi-Language Localization Engine', () => {
 
   test.describe('[AC-3] Database Caching of Localized Explanations', () => {
-    let db;
     let getLocalizedExplanation;
     let setLocalizedExplanation;
 
@@ -23,30 +22,28 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
       } catch (err) {
         console.warn('Could not import localized caching functions from db.js:', err.message);
       }
-      db = new DatabaseSync(dbPath);
-    });
-
-    test.afterAll(() => {
-      if (db) {
-        db.close();
-      }
     });
 
     // [AC-3] SQLite Schema Verification
     test('should have localized_explanations table created in SQLite with correct schema', async () => {
-      const stmt = db.prepare(`
-        SELECT sql FROM sqlite_master 
-        WHERE type = 'table' AND name = 'localized_explanations'
-      `);
-      const row = stmt.get();
-      expect(row).toBeDefined();
-      expect(row.sql).toContain('trend TEXT');
-      expect(row.sql).toContain('lang TEXT');
-      expect(row.sql).toContain('title TEXT');
-      expect(row.sql).toContain('meta_description TEXT');
-      expect(row.sql).toContain('explanation TEXT');
-      expect(row.sql).toContain('created_at TEXT');
-      expect(row.sql).toContain('PRIMARY KEY (trend, lang)');
+      const db = new DatabaseSync(dbPath);
+      try {
+        const stmt = db.prepare(`
+          SELECT sql FROM sqlite_master 
+          WHERE type = 'table' AND name = 'localized_explanations'
+        `);
+        const row = stmt.get();
+        expect(row).toBeDefined();
+        expect(row.sql).toContain('trend TEXT');
+        expect(row.sql).toContain('lang TEXT');
+        expect(row.sql).toContain('title TEXT');
+        expect(row.sql).toContain('meta_description TEXT');
+        expect(row.sql).toContain('explanation TEXT');
+        expect(row.sql).toContain('created_at TEXT');
+        expect(row.sql).toContain('PRIMARY KEY (trend, lang)');
+      } finally {
+        db.close();
+      }
     });
 
     // [AC-3] getLocalizedExplanation and setLocalizedExplanation unit tests
@@ -74,14 +71,19 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
       });
 
       // Retrieve directly from SQLite table to confirm serialization
-      const checkStmt = db.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
-      const dbRow = checkStmt.get(testTrend, testLang);
-      expect(dbRow).toBeDefined();
-      expect(dbRow.title).toBe(testTitle);
-      expect(dbRow.meta_description).toBe(testMeta);
-      const parsed = JSON.parse(dbRow.explanation);
-      expect(parsed).toEqual(testExpl);
-      expect(dbRow.created_at).toBeDefined();
+      const db = new DatabaseSync(dbPath);
+      try {
+        const checkStmt = db.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
+        const dbRow = checkStmt.get(testTrend, testLang);
+        expect(dbRow).toBeDefined();
+        expect(dbRow.title).toBe(testTitle);
+        expect(dbRow.meta_description).toBe(testMeta);
+        const parsed = JSON.parse(dbRow.explanation);
+        expect(parsed).toEqual(testExpl);
+        expect(dbRow.created_at).toBeDefined();
+      } finally {
+        db.close();
+      }
 
       // Retrieve via getLocalizedExplanation function
       const cached = await getLocalizedExplanation(testTrend, testLang);
