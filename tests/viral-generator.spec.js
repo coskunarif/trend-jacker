@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
 
 test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   const mockTrends = [
@@ -306,6 +307,58 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(redditHashtags.length).toBe(0);
     // Reddit should have a headline hook and structured body
     expect(redditText).toContain('\n');
+  });
+
+  // [AC-3] Automated Validation of High-DPI Card Dimensions
+  test('9. Verify downloaded card and infographic PNG dimensions are 2400x1260', async ({ page }) => {
+    // We already have mockTrends and mockExplanation routes set up in beforeEach.
+    // Let's also intercept api/poll to ensure the vote button reveals the download card button.
+    await page.route('**/api/poll', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ genius: 10, overrated: 10 }),
+      });
+    });
+
+    // Delete Web Share to trigger download
+    await page.addInitScript(() => {
+      try {
+        delete navigator.share;
+        delete navigator.canShare;
+      } catch (e) {
+        Object.defineProperty(navigator, 'share', { value: undefined, configurable: true });
+        Object.defineProperty(navigator, 'canShare', { value: undefined, configurable: true });
+      }
+    });
+
+    await page.goto('/');
+
+    // Vote to reveal Trend Card download button
+    await page.locator('#btn-vote-genius').click();
+    await expect(page.locator('#btn-download-card')).toBeVisible();
+
+    // Download Trend Card and check dimensions
+    const trendDownloadPromise = page.waitForEvent('download');
+    await page.locator('#btn-download-card').click();
+    const trendDownload = await trendDownloadPromise;
+    const trendPath = await trendDownload.path();
+    const trendBuffer = fs.readFileSync(trendPath);
+    const trendWidth = trendBuffer.readUInt32BE(16);
+    const trendHeight = trendBuffer.readUInt32BE(20);
+    expect(trendWidth).toBe(2400);
+    expect(trendHeight).toBe(1260);
+
+    // Download Infographic Card and check dimensions
+    const infoDownloadPromise = page.waitForEvent('download');
+    await page.locator('#btn-download-infographic').click();
+    const infoDownload = await infoDownloadPromise;
+    const infoPath = await infoDownload.path();
+    const infoBuffer = fs.readFileSync(infoPath);
+    const infoWidth = infoBuffer.readUInt32BE(16);
+    const infoHeight = infoBuffer.readUInt32BE(20);
+    expect(infoWidth).toBe(2400);
+    expect(infoHeight).toBe(1260);
   });
 });
 
