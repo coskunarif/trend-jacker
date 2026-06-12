@@ -1473,6 +1473,21 @@ fastify.post('/api/log', async (request, reply) => {
   return { ok: true };
 });
 
+// POST /api/generate-post - Generates a viral social media post using Gemini
+fastify.post('/api/generate-post', async (request, reply) => {
+  const { trendTitle, platform, contextType } = request.body || {};
+  if (!trendTitle) {
+    return reply.status(400).send({ error: 'Trend title is required.' });
+  }
+  try {
+    const postText = await generatePostText(trendTitle, platform, contextType);
+    return { postText };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to generate post.' });
+  }
+});
+
 async function generatePostText(trendTitle, platform, contextType) {
   const targetPlatform = platform || 'x';
   const targetContext = contextType || 'general';
@@ -1566,21 +1581,6 @@ Tone & Style Rules:
     throw err;
   }
 }
-
-// POST /api/generate-post - Generates a viral social media post using Gemini
-fastify.post('/api/generate-post', async (request, reply) => {
-  const { trendTitle, platform, contextType } = request.body || {};
-  if (!trendTitle) {
-    return reply.status(400).send({ error: 'Trend title is required.' });
-  }
-  try {
-    const postText = await generatePostText(trendTitle, platform, contextType);
-    return { postText };
-  } catch (err) {
-    fastify.log.error(err);
-    return reply.status(500).send({ error: 'Failed to generate post.' });
-  }
-});
 
 // POST /api/cron/viral-poster
 fastify.post('/api/cron/viral-poster', async (request, reply) => {
