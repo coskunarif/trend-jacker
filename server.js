@@ -1435,6 +1435,10 @@ fastify.post('/api/generate-post', async (request, reply) => {
       if (postText.length > 280) {
         postText = postText.substring(0, 277) + '...';
       }
+    } else if (targetPlatform === 'pinterest') {
+      const trend = latestTrends.find(t => titleToSlug(t.title) === titleToSlug(trendTitle) || t.title === trendTitle);
+      const snippet = trend ? (trend.description || (trend.news && trend.news.snippet) || '') : '';
+      postText = `Pin Title: ${trendTitle}\n\nPin Description: ${snippet}. Explore live sentiment: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
     } else if (targetPlatform === 'linkedin') {
       postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
     } else if (targetPlatform === 'facebook') {
@@ -1459,6 +1463,11 @@ fastify.post('/api/generate-post', async (request, reply) => {
 - Platform: X (Twitter).
 - Length constraint: The entire post must be strictly under 280 characters, including the target URL.
 - Hashtags: Include 2 to 3 highly relevant, hyper-targeted hashtags (e.g., #CricketTwitter, #AIAgents) based on the trend topic.`;
+    } else if (targetPlatform === 'pinterest') {
+      platformInstructions = `
+- Platform: Pinterest.
+- Style: Frame the post with a catchy title/headline as the first line (e.g. "Pin Title: <Title>"), followed by a double newline and a keyword-rich description under 500 characters highlighting the virality factors.
+- Hashtags: Include exactly 2 to 3 relevant hashtags on the last line.`;
     } else if (targetPlatform === 'linkedin') {
       platformInstructions = `
 - Platform: LinkedIn.
