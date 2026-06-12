@@ -23,6 +23,7 @@ if (process.env.NODE_ENV === 'production') {
 // Local SQLite fallback and in-memory mock
 const inMemoryStorage = new Map();
 const inMemoryEvents = new Map();
+const inMemoryExplanations = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -44,6 +45,13 @@ if (!firestore) {
         vote TEXT,
         timestamp TEXT,
         location TEXT
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS trend_explanations (
+        trend TEXT PRIMARY KEY,
+        explanation TEXT,
+        created_at TEXT
       )
     `);
     console.log('Local SQLite database initialized successfully at', dbPath);
@@ -229,6 +237,101 @@ export async function seedVoteEvents(trend, events) {
     current.overrated += overratedCount;
     inMemoryStorage.set(trend, current);
   }
+}
+
+/**
+ * Retrieves the cached explanation for a trend if it exists.
+ * @param {string} trend 
+ * @returns {Promise<{hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string} | null>}
+ */
+export async function getCachedExplanation(trend) {
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('trend_explanations').doc(trend);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data();
+        return {
+          hook: data.hook,
+          whatIsIt: data.whatIsIt,
+          whyIsItViral: data.whyIsItViral || [],
+          takeaway: data.takeaway
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getCachedExplanation for "${trend}":`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
+      const row = stmt.get(trend);
+      if (row && row.explanation) {
+        return JSON.parse(row.explanation);
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getCachedExplanation "${trend}":`, err.message);
+      return null;
+    }
+  }
+
+  const cached = inMemoryExplanations.get(trend);
+  if (cached) {
+    return cached.explanation;
+  }
+  return null;
+}
+
+/**
+ * Stores the trend explanation in the cache.
+ * @param {string} trend 
+ * @param {{hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string}} explanation 
+ * @returns {Promise<void>}
+ */
+export async function setCachedExplanation(trend, explanation) {
+  const createdAt = new Date().toISOString();
+  const dataToSave = {
+    hook: explanation.hook,
+    whatIsIt: explanation.whatIsIt,
+    whyIsItViral: explanation.whyIsItViral || [],
+    takeaway: explanation.takeaway
+  };
+
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('trend_explanations').doc(trend);
+      await docRef.set({
+        ...dataToSave,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setCachedExplanation for "${trend}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
+        VALUES (?, ?, ?)
+      `).run(trend, JSON.stringify(dataToSave), createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setCachedExplanation "${trend}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryExplanations.set(trend, {
+    explanation: dataToSave,
+    created_at: createdAt
+  });
 }
 
 
