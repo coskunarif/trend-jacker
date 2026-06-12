@@ -1708,6 +1708,7 @@ body {
   border-radius: var(--space-4);
   width: 90%;
   max-width: 500px;
+  max-height: 90vh;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform: translateY(20px) scale(0.95);
   transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -1754,6 +1755,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  overflow-y: auto;
 }
 
 .form-group {
@@ -2154,6 +2156,231 @@ body {
 .lang-select:focus, .lang-select:hover {
   border-color: var(--primary);
   color: var(--text-heading);
+}
+
+/* Unified Preview Card Styles */
+#share-card-preview {
+  margin-top: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--space-3);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Platform-specific Theme overrides */
+/* X (Twitter) */
+#share-card-preview.preview-x {
+  background: #000000;
+  color: #e7e9ea;
+  border-color: #2f3336;
+}
+#share-card-preview.preview-x .preview-avatar {
+  background: #2f3336;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+#share-card-preview.preview-x .preview-profile-name {
+  color: #e7e9ea;
+  font-weight: 700;
+}
+#share-card-preview.preview-x .preview-profile-handle {
+  color: #71767b;
+  font-size: 0.85rem;
+}
+#share-card-preview.preview-x .preview-link-card {
+  border-color: #2f3336;
+}
+
+/* LinkedIn */
+#share-card-preview.preview-linkedin {
+  background: #ffffff;
+  color: #191919;
+  border-color: #e0e0e0;
+}
+#share-card-preview.preview-linkedin .preview-avatar {
+  background: #cbcbcb;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+}
+#share-card-preview.preview-linkedin .preview-profile-name {
+  color: #191919;
+  font-weight: 600;
+}
+#share-card-preview.preview-linkedin .preview-profile-handle {
+  display: none;
+}
+#share-card-preview.preview-linkedin .preview-link-card {
+  border-color: #e0e0e0;
+  background: #f8f9fa;
+}
+#share-card-preview.preview-linkedin .preview-link-title {
+  color: #191919;
+  font-weight: 600;
+}
+#share-card-preview.preview-linkedin .preview-link-domain {
+  color: rgba(0, 0, 0, 0.6);
+}
+
+/* Facebook */
+#share-card-preview.preview-facebook {
+  background: #ffffff;
+  color: #050505;
+  border-color: #ced0d4;
+}
+#share-card-preview.preview-facebook .preview-avatar {
+  background: #e4e6eb;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+}
+#share-card-preview.preview-facebook .preview-profile-name {
+  color: #050505;
+  font-weight: 600;
+}
+#share-card-preview.preview-facebook .preview-profile-handle {
+  color: #65676b;
+  font-size: 0.8rem;
+}
+#share-card-preview.preview-facebook .preview-link-card {
+  border-color: #ced0d4;
+  background: #f0f2f5;
+}
+
+/* Reddit */
+#share-card-preview.preview-reddit {
+  background: #1a1a1b;
+  color: #d7dadc;
+  border-color: #343536;
+}
+#share-card-preview.preview-reddit .preview-avatar {
+  background: #ff4500;
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+}
+#share-card-preview.preview-reddit .preview-profile-name {
+  color: #d7dadc;
+  font-weight: 500;
+}
+#share-card-preview.preview-reddit .preview-profile-handle {
+  color: #818384;
+}
+#share-card-preview.preview-reddit .preview-link-card {
+  border-color: #343536;
+  background: #272729;
+}
+
+/* Pinterest */
+#share-card-preview.preview-pinterest {
+  background: #ffffff;
+  color: #111111;
+  border-color: #e2e2e2;
+  align-items: stretch;
+}
+#share-card-preview.preview-pinterest .preview-header,
+#share-card-preview.preview-pinterest .preview-post-text,
+#share-card-preview.preview-pinterest .preview-link-card {
+  display: none !important;
+}
+
+#share-card-preview.preview-pinterest .preview-pin-image {
+  background: #efefef;
+  height: 200px;
+  border-radius: 16px;
+  display: block;
+}
+#share-card-preview.preview-pinterest .preview-pin-title {
+  color: #111111;
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-top: var(--space-2);
+  display: block;
+}
+#share-card-preview.preview-pinterest .preview-pin-desc {
+  color: #5f5f5f;
+  font-size: 0.9rem;
+  display: block;
+}
+
+/* Hide Pinterest elements for other platforms */
+#share-card-preview:not(.preview-pinterest) .preview-pin-image,
+#share-card-preview:not(.preview-pinterest) .preview-pin-title,
+#share-card-preview:not(.preview-pinterest) .preview-pin-desc {
+  display: none !important;
+}
+
+/* Common inner layout components */
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.preview-avatar {
+  flex-shrink: 0;
+  background: var(--surface-raised);
+}
+.preview-profile-info {
+  display: flex;
+  flex-direction: column;
+}
+.preview-profile-name {
+  font-size: 0.95rem;
+}
+.preview-profile-handle {
+  font-size: 0.8rem;
+}
+.preview-post-text {
+  font-size: 0.95rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.preview-link-card {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-top: var(--space-2);
+}
+.preview-link-image {
+  width: 120px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2), rgba(139, 92, 246, 0.2));
+  flex-shrink: 0;
+}
+.preview-link-content {
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.preview-link-domain {
+  font-size: 0.75rem;
+  text-transform: lowercase;
+  color: var(--text-muted);
+}
+.preview-link-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+/* Character Counter styles */
+.share-char-counter {
+  text-align: right;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+.share-char-counter.error,
+.share-char-counter.warning,
+.share-char-counter.limit-exceeded {
+  color: #f43f5e !important;
+  font-weight: bold;
 }
 
 

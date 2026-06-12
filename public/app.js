@@ -502,10 +502,94 @@ function initApp() {
     document.documentElement.style.setProperty('--glow-y', `${y}%`);
   });
 
+  // Helper to update unified social sharing preview card and check limitations
+  function updatePreviewAndValidation() {
+    const text = sharePreviewText.value || '';
+    
+    // Update live text preview
+    const previewPostTexts = document.querySelectorAll('.preview-post-text');
+    previewPostTexts.forEach(el => {
+      el.textContent = text;
+    });
+    
+    // Set active platform class on the preview card
+    const previewCard = document.getElementById('share-card-preview');
+    if (previewCard) {
+      // Clear previous preview- classes
+      previewCard.className = '';
+      previewCard.classList.add(`preview-${activeSharePlatform}`);
+    }
+
+    // Set link card trend title
+    const previewLinkTitle = document.getElementById('preview-link-title-text');
+    if (previewLinkTitle && currentTrend) {
+      previewLinkTitle.textContent = currentTrend.title;
+    }
+
+    // Pinterest specific handling: parse "Title: ..." and "Description: ..."
+    const pinTitle = document.querySelector('.preview-pin-title');
+    const pinDesc = document.querySelector('.preview-pin-desc');
+    if (activeSharePlatform === 'pinterest') {
+      let title = 'Pin Title';
+      let desc = 'Pin Description';
+      const titleMatch = text.match(/Title:\s*(.*)/i);
+      const descMatch = text.match(/Description:\s*([\s\S]*)/i);
+      if (titleMatch) {
+        title = titleMatch[1].trim().split('\n')[0];
+      }
+      if (descMatch) {
+        desc = descMatch[1].trim();
+      }
+      if (pinTitle) pinTitle.textContent = title;
+      if (pinDesc) pinDesc.textContent = desc;
+    }
+
+    // Character counter
+    const charCounter = document.getElementById('share-char-counter');
+    const warningMsg = document.querySelector('.share-validation-warning');
+    const length = text.length;
+
+    if (charCounter) {
+      if (activeSharePlatform === 'x') {
+        charCounter.textContent = `${length} / 280`;
+        if (length > 280) {
+          charCounter.classList.add('error');
+          charCounter.classList.add('warning');
+          charCounter.classList.add('limit-exceeded');
+          if (warningMsg) warningMsg.classList.remove('hidden');
+          if (btnPostShare) {
+            btnPostShare.disabled = true;
+            btnPostShare.classList.add('disabled');
+          }
+        } else {
+          charCounter.classList.remove('error', 'warning', 'limit-exceeded');
+          if (warningMsg) warningMsg.classList.add('hidden');
+          if (btnPostShare) {
+            btnPostShare.disabled = false;
+            btnPostShare.classList.remove('disabled');
+          }
+        }
+      } else {
+        charCounter.textContent = `${length}`;
+        charCounter.classList.remove('error', 'warning', 'limit-exceeded');
+        if (warningMsg) warningMsg.classList.add('hidden');
+        if (btnPostShare) {
+          btnPostShare.disabled = false;
+          btnPostShare.classList.remove('disabled');
+        }
+      }
+    }
+  }
+
+  if (sharePreviewText) {
+    sharePreviewText.addEventListener('input', updatePreviewAndValidation);
+  }
+
   // Generate social media post using backend API
   async function generatePost() {
     if (!currentTrend) return;
     sharePreviewText.value = 'Generating post...';
+    updatePreviewAndValidation();
     try {
       const response = await fetch('/api/generate-post', {
         method: 'POST',
@@ -523,9 +607,11 @@ function initApp() {
       }
       const data = await response.json();
       sharePreviewText.value = data.postText || '';
+      updatePreviewAndValidation();
     } catch (err) {
       console.error(err);
       sharePreviewText.value = 'Error generating post. Please try again.';
+      updatePreviewAndValidation();
     }
   }
 
