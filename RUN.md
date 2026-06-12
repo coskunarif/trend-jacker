@@ -12,4 +12,23 @@ caps: agents,ui,web,human
 - 2026-06-12: Tester completed test repair. Observed state: green.
 - 2026-06-12: Conductor starting Verifier phase.
 ## Verdict
+- **[AC-1] Prevent SQLite Locks in LLM Caching Tests**: PASS
+- **[AC-2] Complete Parallel Pass Rate**: FAIL
+
+### Failure Details:
+- **AC Broken**: `[AC-2]`
+- **Evidence**:
+  ```
+  1) [chromium] › tests/caching.spec.js:96:3 › Trend Explanation API Caching [AC-1] › should serve explanation from cache on subsequent API calls (verified via DB modification) 
+
+    Error: database is locked
+
+      119 |     };
+      120 |     const updateStmt = db.prepare('UPDATE trend_explanations SET explanation = ? WHERE trend = ?');
+    > 121 |     updateStmt.run(JSON.stringify(customExplanation), testTrend);
+          |                ^
+      122 |     db.close();
+  ```
+- **Suspected Cause**: The test `tests/caching.spec.js` (and potentially other test files) still maintains persistent SQLite connections (e.g., opened in `beforeAll` and only closed in `afterAll`), or performs un-isolated database operations while parallel test workers or the active webServer are running. These overlapping connection lifetimes cause "database is locked" errors during parallel execution (`--workers=4`).
+
 ## Done
