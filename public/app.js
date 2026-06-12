@@ -1367,18 +1367,41 @@ function initApp() {
     const ctx = canvas.getContext('2d');
     ctx.scale(2, 2);
 
-    // 1. Background Gradient
+    // 1. Background Gradient (Theme Customization)
+    const themeSelectEl = document.getElementById('info-theme-select');
+    const selectedTheme = themeSelectEl ? themeSelectEl.value : 'midnight';
+
+    let bgStart = '#0f1225', bgEnd = '#05070f';
+    let borderStart = '#6366f1', borderEnd = '#06b6d4';
+
+    if (selectedTheme === 'cyberpunk') {
+      bgStart = '#1e0b36';
+      bgEnd = '#0b0214';
+      borderStart = '#ec4899';
+      borderEnd = '#eab308';
+    } else if (selectedTheme === 'sunset') {
+      bgStart = '#2a0845';
+      bgEnd = '#6441a5';
+      borderStart = '#ff7e5f';
+      borderEnd = '#feb47b';
+    } else if (selectedTheme === 'forest') {
+      bgStart = '#064e3b';
+      bgEnd = '#022c22';
+      borderStart = '#10b981';
+      borderEnd = '#059669';
+    }
+
     const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
-    bgGrad.addColorStop(0, '#0f1225');
-    bgGrad.addColorStop(1, '#05070f');
+    bgGrad.addColorStop(0, bgStart);
+    bgGrad.addColorStop(1, bgEnd);
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, 1200, 630);
 
     // 2. Glowing Neon Border Accent
     const borderGrad = ctx.createLinearGradient(0, 0, 1200, 630);
-    borderGrad.addColorStop(0, '#6366f1'); // Indigo
-    borderGrad.addColorStop(0.5, '#06b6d4'); // Cyan
-    borderGrad.addColorStop(1, '#6366f1');
+    borderGrad.addColorStop(0, borderStart);
+    borderGrad.addColorStop(0.5, borderEnd);
+    borderGrad.addColorStop(1, borderStart);
     ctx.strokeStyle = borderGrad;
     ctx.lineWidth = 8;
     ctx.strokeRect(4, 4, 1192, 622);
@@ -1395,18 +1418,58 @@ function initApp() {
     ctx.fillStyle = logoGrad;
     ctx.fillText("Jacker", 80 + trendTextWidth, 80);
 
-    // Live Badge
-    ctx.fillStyle = "rgba(99, 102, 241, 0.1)";
-    ctx.fillRect(980, 56, 140, 32);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "rgba(99, 102, 241, 0.3)";
-    ctx.strokeRect(980, 56, 140, 32);
+    // Custom Sticker / Badge Overlay Drawing (AC-3)
+    const badgeSelectEl = document.getElementById('info-overlay-badge-select');
+    const selectedBadge = badgeSelectEl ? badgeSelectEl.value : 'none';
 
-    ctx.font = "bold 13px 'Space Grotesk', sans-serif";
-    ctx.fillStyle = "#6366f1";
-    ctx.textAlign = "center";
-    ctx.fillText("INFOGRAPHIC CARD", 1050, 76);
-    ctx.textAlign = "left"; // Reset alignment
+    if (selectedBadge && selectedBadge !== 'none') {
+      let badgeLabel = '';
+      let badgeBg = '';
+      let badgeBorder = '';
+      let badgeTextCol = '#ffffff';
+
+      if (selectedBadge === 'hot-take') {
+        badgeLabel = 'HOT TAKE';
+        badgeBg = 'rgba(239, 68, 68, 0.2)';
+        badgeBorder = 'rgba(239, 68, 68, 0.5)';
+        badgeTextCol = '#ef4444';
+      } else if (selectedBadge === 'trending') {
+        badgeLabel = 'TRENDING';
+        badgeBg = 'rgba(245, 158, 11, 0.2)';
+        badgeBorder = 'rgba(245, 158, 11, 0.5)';
+        badgeTextCol = '#f59e0b';
+      } else if (selectedBadge === 'viral') {
+        badgeLabel = 'VIRAL';
+        badgeBg = 'rgba(236, 72, 153, 0.2)';
+        badgeBorder = 'rgba(236, 72, 153, 0.5)';
+        badgeTextCol = '#ec4899';
+      }
+
+      ctx.fillStyle = badgeBg;
+      ctx.fillRect(980, 56, 140, 32);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = badgeBorder;
+      ctx.strokeRect(980, 56, 140, 32);
+
+      ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+      ctx.fillStyle = badgeTextCol;
+      ctx.textAlign = "center";
+      ctx.fillText(badgeLabel, 1050, 76);
+      ctx.textAlign = "left"; // Reset alignment
+    } else {
+      // Default Live Badge
+      ctx.fillStyle = "rgba(99, 102, 241, 0.1)";
+      ctx.fillRect(980, 56, 140, 32);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "rgba(99, 102, 241, 0.3)";
+      ctx.strokeRect(980, 56, 140, 32);
+
+      ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+      ctx.fillStyle = "#6366f1";
+      ctx.textAlign = "center";
+      ctx.fillText("INFOGRAPHIC CARD", 1050, 76);
+      ctx.textAlign = "left"; // Reset alignment
+    }
 
     // 4. Trend Header Title
     ctx.font = "bold 56px 'Space Grotesk', sans-serif";
@@ -1438,28 +1501,44 @@ function initApp() {
     ctx.fillStyle = "#ffffff";
     ctx.fillText(badgeText, 95, 219);
 
+    // Custom Subtitle Render & Word Wrap (AC-4)
+    const customTextEl = document.getElementById('info-custom-text-input');
+    const customText = customTextEl ? customTextEl.value.trim() : '';
+    let hookShift = 0;
+
+    if (customText) {
+      ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      
+      // Draw subtitle
+      wrapText(ctx, customText, 80, 255, 640, 24);
+      
+      // Shift hook section down to make room
+      hookShift = 45;
+    }
+
     // 6. Hook Section (Left Side)
     ctx.font = "bold 14px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#6366f1";
-    ctx.fillText("THE AI HOOK", 80, 275);
+    ctx.fillText("THE AI HOOK", 80, 275 + hookShift);
 
     // Hook background box
     ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
     ctx.beginPath();
-    ctx.roundRect(80, 290, 640, 180, 8);
+    ctx.roundRect(80, 290 + hookShift, 640, 180, 8);
     ctx.fill();
     ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
     ctx.stroke();
     
     // Vertical left accent line
     ctx.fillStyle = "#6366f1";
-    ctx.fillRect(80, 290, 6, 180);
+    ctx.fillRect(80, 290 + hookShift, 6, 180);
 
     // Wrap hook text
     ctx.font = "500 18px 'Plus Jakarta Sans', sans-serif";
     ctx.fillStyle = "#cbd5e1";
     const hookText = detailHook.textContent || "";
-    wrapText(ctx, hookText, 110, 330, 580, 28);
+    wrapText(ctx, hookText, 110, 330 + hookShift, 580, 28);
 
     // 7. Live Sentiment Gauge (Right Side)
     const geniusText = pctGenius.textContent || '50%';
