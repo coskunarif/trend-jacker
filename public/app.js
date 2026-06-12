@@ -1012,7 +1012,15 @@ function initApp() {
 
       // News Footer
       if (trend.news && trend.news.headline) {
-        newsTitle.textContent = `${trend.news.source ? trend.news.source + ' - ' : ''}${trend.news.headline}`;
+        const newsPublisher = document.getElementById('detail-news-publisher');
+        const newsSeparator = document.getElementById('detail-news-separator');
+        if (newsPublisher) {
+          newsPublisher.textContent = trend.news.source || '';
+          if (newsSeparator) {
+            newsSeparator.style.display = trend.news.source ? 'inline' : 'none';
+          }
+        }
+        newsTitle.textContent = trend.news.headline;
         newsSnippet.textContent = trend.news.snippet || 'No snippet available.';
         newsLink.href = trend.news.url || '#';
 
