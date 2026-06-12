@@ -183,4 +183,106 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     expect(secondFooterSrc).toContain('google.com/s2/favicons?domain=fastify.io');
   });
 
+  // [AC-1] List Item Thumbnail Fallback
+  // [AC-2] List Item Publisher Favicon Fallback
+  test('should handle loading failures for list item thumbnails and publisher favicons', async ({ page }) => {
+    // Intercept trends API to return mock metadata
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrendsWithMetadata),
+      });
+    });
+
+    // Intercept image/favicon URLs to return 404
+    await page.route(mockTrendsWithMetadata[0].news.ogImage, async (route) => {
+      await route.fulfill({ status: 404 });
+    });
+    await page.route(mockTrendsWithMetadata[0].news.favicon, async (route) => {
+      await route.fulfill({ status: 404 });
+    });
+
+    await page.goto('/');
+
+    const trendItems = page.locator('.trend-item');
+    await expect(trendItems).toHaveCount(2);
+
+    const firstItem = trendItems.nth(0);
+    const thumbnailImg = firstItem.locator('img.trend-thumbnail');
+    const thumbnailPlaceholder = firstItem.locator('.trend-thumbnail-placeholder');
+    const publisherFavicon = firstItem.locator('img.publisher-favicon');
+
+    // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
+    await expect(async () => {
+      // AC-1: thumbnail image is hidden/display none, placeholder is visible
+      const isImgHidden = !(await thumbnailImg.isVisible()) || 
+                          (await thumbnailImg.evaluate(el => window.getComputedStyle(el).display === 'none'));
+      expect(isImgHidden).toBe(true);
+      await expect(thumbnailPlaceholder).toBeVisible();
+
+      // AC-2: publisher favicon image is hidden/removed/display none
+      const faviconCount = await publisherFavicon.count();
+      const isFaviconHidden = faviconCount === 0 || 
+                              !(await publisherFavicon.isVisible()) || 
+                              (await publisherFavicon.evaluate(el => window.getComputedStyle(el).display === 'none'));
+      expect(isFaviconHidden).toBe(true);
+    }).toPass();
+  });
+
+  // [AC-3] Detail View Hero Image Fallback
+  // [AC-4] News Footer Favicon Fallback
+  test('should handle loading failures for detail view hero image and news footer favicon', async ({ page }) => {
+    // Intercept trends API to return mock metadata
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrendsWithMetadata),
+      });
+    });
+
+    // Intercept explainer API
+    await page.route('**/api/explain', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockExplanation),
+      });
+    });
+
+    // Intercept image/favicon URLs to return 404
+    await page.route(mockTrendsWithMetadata[0].news.ogImage, async (route) => {
+      await route.fulfill({ status: 404 });
+    });
+    await page.route(mockTrendsWithMetadata[0].news.favicon, async (route) => {
+      await route.fulfill({ status: 404 });
+    });
+
+    await page.goto('/');
+
+    const firstItem = page.locator('.trend-item').nth(0);
+    await firstItem.click();
+
+    const heroImage = page.locator('#detail-hero-image');
+    const heroGradient = page.locator('.detail-hero-gradient');
+    const footerFavicon = page.locator('#footer-favicon-img');
+    const genericSvg = page.locator('.news-icon svg.lucide-newspaper');
+
+    // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
+    await expect(async () => {
+      // AC-3: detail hero image is hidden/display none, CSS gradient fallback is visible
+      const isHeroHidden = !(await heroImage.isVisible()) || 
+                           (await heroImage.evaluate(el => window.getComputedStyle(el).display === 'none'));
+      expect(isHeroHidden).toBe(true);
+      await expect(heroGradient).toBeVisible();
+
+      // AC-4: news footer favicon image is hidden, newspaper SVG is visible
+      const isFooterFaviconHidden = !(await footerFavicon.isVisible()) || 
+                                    (await footerFavicon.evaluate(el => window.getComputedStyle(el).display === 'none'));
+      expect(isFooterFaviconHidden).toBe(true);
+      await expect(genericSvg).toBeVisible();
+    }).toPass();
+  });
+
 });
