@@ -1607,7 +1607,7 @@ function initApp() {
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
-  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight, dryRun = false) {
     const words = text.split(' ');
     let line = '';
     let currentY = y;
@@ -1617,15 +1617,21 @@ function initApp() {
       const metrics = ctx.measureText(testLine);
       const testWidth = metrics.width;
       if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, currentY);
+        if (!dryRun) {
+          ctx.fillText(line, x, currentY);
+        }
         line = words[n] + ' ';
         currentY += lineHeight;
       } else {
         line = testLine;
       }
     }
-    ctx.fillText(line, x, currentY);
+    if (!dryRun) {
+      ctx.fillText(line, x, currentY);
+    }
+    return currentY;
   }
+  window.wrapText = wrapText;
 
   function animateSparkline(trafficNum) {
     const canvas = document.getElementById('trend-sparkline');
