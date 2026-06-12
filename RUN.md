@@ -1,6 +1,6 @@
 task: Gemini AI Multi-Language Localization Engine              tier: T2   creativity: 0.5
-state: SHIPPER                budget: repairs 0/3
-branch: asf/20260612-gemini-localization          checkpoint: none
+state: complete                budget: repairs 0/3
+branch: asf/20260612-gemini-localization          checkpoint: asf/20260612-gemini-localization/green-1
 caps: agents,ui,web,human
 
 ## Task
@@ -41,3 +41,31 @@ All checks and E2E tests have passed. No issues or regressions were found.
   - 80/80 E2E and integration tests passed successfully.
 
 ## Done
+### What Shipped
+- Gemini AI Multi-Language Localization Engine supporting dynamic route parameters (`/t/:slug/:lang`) and query parameters (`?lang=...`).
+- Raw localized Markdown endpoints (`/t/:slug/:lang.md` and `/t/:slug.md?lang=...`).
+- Structured `localized_explanations` SQLite caching table with `(trend, lang)` primary key.
+- Dynamic SEO SSR updates for `html[lang]`, `title`, meta description, OpenGraph, Twitter card tags, and JSON-LD structured data.
+- Sitemap alternate linkage and `<link rel="alternate" ...>` header tags.
+- Client-side interactive language switcher `#lang-select` translating static UI labels.
+
+### Acceptance Criteria Evidence
+
+| AC | Requirement | Evidence | Status |
+|---|---|---|---|
+| AC-1 | Locale Route & Query Handling | Integration tests verify 200 OK for `/t/google-gemini/es` and `/t/google-gemini?lang=es`, as well as raw markdown content for `/t/google-gemini/es.md` with fallback to `en` on unsupported languages. | PASS |
+| AC-2 | Gemini AI Localized Translation Engine | Under mock test mode, Spanish translates with `(en español)`. Production model uses `gemini-3.5-flash` with JSON Schema constraint. | PASS |
+| AC-3 | Database Caching of Localized Explanations | SQLite `localized_explanations` verified to contain correct primary keys. Unit tests confirm writing and reading caches correctly bypasses LLM. | PASS |
+| AC-4 | Dynamic Localized SEO & Schema.org JSON-LD | Response HTML verifies correctly generated lang tags, OpenGraph URLs, page titles, and JSON-LD schema objects (articleBody, headline, description). | PASS |
+| AC-5 | Alternate Link Tags & Localized Sitemap | Injected alternate link tags in `<head>` and dynamic sitemap.xml verified to map all trends across all locales with XHTML alternate links. | PASS |
+| AC-6 | Client UI Translation & Interactive Switcher | Playwright browser E2E test verifies `#lang-select` language switcher translates static navbar UI, updates URL via `pushState`, and performs fetch. | PASS |
+
+### Integration & Deployment Links
+- **Pull Request**: [GitHub PR #15](https://github.com/coskunarif/trend-jacker/pull/15)
+- **Integration Method**: GitHub PR Squash & Merge (managed via `gh pr merge`)
+- **Direct Deployment target (Cloud Run)**: [https://trend-jacker-250134012801.us-central1.run.app](https://trend-jacker-250134012801.us-central1.run.app)
+- **Production URL**: [https://viraljacker.com](https://viraljacker.com)
+
+### Verification Screenshots
+![Initial Page (English)](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260612-gemini-localization/screenshots/initial.png)
+![Translated Page (Spanish)](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260612-gemini-localization/screenshots/spanish.png)
