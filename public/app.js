@@ -612,6 +612,11 @@ function initApp() {
         shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}&quote=${encodeURIComponent(text)}`;
       } else if (activeSharePlatform === 'reddit') {
         shareUrl = `https://www.reddit.com/submit?title=${encodeURIComponent(currentTrend.title)}&text=${encodeURIComponent(text)}`;
+      } else if (activeSharePlatform === 'pinterest') {
+        const slug = titleToSlug(currentTrend.title);
+        const url = `https://viraljacker.com/t/${slug}`;
+        const media = `https://viraljacker.com/api/og/${slug}`;
+        shareUrl = `https://www.pinterest.com/pin/create/button/?url=${encodeURIComponent(url)}&media=${encodeURIComponent(media)}&description=${encodeURIComponent(text)}`;
       } else {
         shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
       }
