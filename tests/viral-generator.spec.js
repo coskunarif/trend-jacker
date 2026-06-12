@@ -44,7 +44,8 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     });
   });
 
-  test('1. Verify Modal Opening', async ({ page }) => {
+  // [AC-1] Unified Modal Component Structure
+  test('1. Verify Modal Opening and Structure', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
@@ -56,8 +57,21 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     // Assert the share modal is visible
     const shareModal = page.locator('#share-modal');
     await expect(shareModal).toBeVisible();
+
+    // Verify AC-1 components
+    await expect(page.locator('#share-modal-title')).toBeVisible();
+    await expect(page.locator('#btn-close-share-modal')).toBeVisible();
+    await expect(page.locator('#share-context-select')).toBeVisible();
+    await expect(page.locator('.platform-pill[data-platform="x"]')).toBeVisible();
+    await expect(page.locator('.platform-pill[data-platform="linkedin"]')).toBeVisible();
+    await expect(page.locator('.platform-pill[data-platform="facebook"]')).toBeVisible();
+    await expect(page.locator('.platform-pill[data-platform="reddit"]')).toBeVisible();
+    await expect(page.locator('#share-preview-text')).toBeVisible();
+    await expect(page.locator('#btn-copy-share')).toBeVisible();
+    await expect(page.locator('#btn-post-share')).toBeVisible();
   });
 
+  // [AC-2] Pre-selection & Behavior
   test('2. Verify Context Preselection', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
@@ -77,10 +91,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     // Close modal
     await page.locator('#btn-close-share-modal').click();
     await expect(shareModal).not.toBeVisible();
-
-
   });
 
+  // [AC-2] Pre-selection & Behavior
   test('3. Verify Generation & Platform Switching', async ({ page }) => {
     let lastPostPayload = null;
 
@@ -118,7 +131,43 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await expect(previewTextarea).toHaveValue('This is a mock post for linkedin with context general');
   });
 
-  test('4. Verify Copy-to-Clipboard', async ({ page, context }) => {
+  // [AC-2] Pre-selection & Behavior
+  test('4. Verify Context Dropdown Change Behavior', async ({ page }) => {
+    let lastPostPayload = null;
+
+    // Intercept POST /api/generate-post
+    await page.route('**/api/generate-post', async (route) => {
+      lastPostPayload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          postText: `Dynamic response for ${lastPostPayload.platform} with context ${lastPostPayload.contextType}`
+        }),
+      });
+    });
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto('/');
+
+    // Open share modal via share-trend (general context)
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    // Change dropdown selection to 'poll'
+    const contextSelect = page.locator('#share-context-select');
+    await contextSelect.selectOption('poll');
+
+    // Assert backend was called with updated context
+    await expect.poll(() => lastPostPayload?.contextType).toBe('poll');
+
+    // Verify textarea shows updated response text
+    const previewTextarea = page.locator('#share-preview-text');
+    await expect(previewTextarea).toHaveValue('Dynamic response for x with context poll');
+  });
+
+  // [AC-1] Unified Modal Component Structure
+  test('5. Verify Copy-to-Clipboard', async ({ page, context }) => {
     // Intercept POST /api/generate-post
     await page.route('**/api/generate-post', async (route) => {
       await route.fulfill({
@@ -152,7 +201,8 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(clipboardText).toBe('Awesome Gemini post!');
   });
 
-  test('5. Verify Outbound Sharing Intent', async ({ page, context }) => {
+  // [AC-1] Unified Modal Component Structure
+  test('6. Verify Outbound Sharing Intent', async ({ page, context }) => {
     // Intercept POST /api/generate-post
     await page.route('**/api/generate-post', async (route) => {
       await route.fulfill({
@@ -184,7 +234,8 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(newPage.url()).toMatch(/Awesome.*Gemini.*post/);
   });
 
-  test('6. Verify Redundant Button Removal', async ({ page }) => {
+  // [AC-3] Redundant Button Removal
+  test('7. Verify Redundant Button Removal', async ({ page }) => {
     await page.goto('/');
 
     // Assert that legacy share buttons are removed from the DOM
@@ -195,7 +246,8 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await expect(legacySharePollBtn).not.toBeAttached();
   });
 
-  test('7. Verify Platform-Specific Formatting and URL Inclusion', async ({ page }) => {
+  // [AC-4] Social Media Copy Constraints
+  test('8. Verify Platform-Specific Formatting and URL Inclusion', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
@@ -256,4 +308,5 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(redditText).toContain('\n');
   });
 });
+
 
