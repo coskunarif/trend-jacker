@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1473,26 +1473,20 @@ fastify.post('/api/log', async (request, reply) => {
   return { ok: true };
 });
 
-// POST /api/generate-post - Generates a viral social media post using Gemini
-fastify.post('/api/generate-post', async (request, reply) => {
-  const { trendTitle, platform, contextType } = request.body || {};
-  if (!trendTitle) {
-    return reply.status(400).send({ error: 'Trend title is required.' });
-  }
+async function generatePostText(trendTitle, platform, contextType) {
   const targetPlatform = platform || 'x';
   const targetContext = contextType || 'general';
-
   const slug = titleToSlug(trendTitle);
   const targetUrl = `https://viraljacker.com/t/${slug}`;
 
   // Check cache first
   const cachedPost = await getCachedGeneratedPost(trendTitle, targetPlatform, targetContext);
   if (cachedPost !== null) {
-    return { postText: cachedPost };
+    return cachedPost;
   }
 
+  let postText = '';
   if (process.env.NODE_ENV === 'test' || !genAI) {
-    let postText = '';
     if (targetPlatform === 'x' || targetPlatform === 'twitter') {
       postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
       if (postText.length > 280) {
@@ -1512,7 +1506,7 @@ fastify.post('/api/generate-post', async (request, reply) => {
       postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
     }
     await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
-    return { postText };
+    return postText;
   }
 
   try {
@@ -1567,10 +1561,63 @@ Tone & Style Rules:
     const result = await model.generateContent(prompt);
     const postText = result.response.text().trim();
     await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
+    return postText;
+  } catch (err) {
+    throw err;
+  }
+}
+
+// POST /api/generate-post - Generates a viral social media post using Gemini
+fastify.post('/api/generate-post', async (request, reply) => {
+  const { trendTitle, platform, contextType } = request.body || {};
+  if (!trendTitle) {
+    return reply.status(400).send({ error: 'Trend title is required.' });
+  }
+  try {
+    const postText = await generatePostText(trendTitle, platform, contextType);
     return { postText };
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to generate post.' });
+  }
+});
+
+// POST /api/cron/viral-poster
+fastify.post('/api/cron/viral-poster', async (request, reply) => {
+  try {
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    const trendItem = latestTrends.length > 0 ? latestTrends[0] : null;
+    if (!trendItem) {
+      return reply.status(404).send({ error: 'No active trends found.' });
+    }
+    const trendTitle = trendItem.title;
+    const platforms = ['x', 'linkedin', 'facebook', 'pinterest'];
+    const posted = [];
+    const now = new Date().toISOString();
+
+    for (const platform of platforms) {
+      const postText = await generatePostText(trendTitle, platform, 'general');
+      const postRecord = await insertViralPost(trendTitle, platform, postText, now);
+      posted.push(postRecord);
+    }
+
+    return { success: true, posted };
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to run viral poster cron.' });
+  }
+});
+
+// GET /api/viral-poster/history
+fastify.get('/api/viral-poster/history', async (request, reply) => {
+  try {
+    const history = await getViralPostHistory();
+    return history;
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to fetch viral poster history.' });
   }
 });
 
