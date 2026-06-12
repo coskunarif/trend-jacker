@@ -430,6 +430,32 @@
         <div class="form-group">
           <label for="share-preview-text">Post Preview</label>
           <textarea id="share-preview-text" class="modal-textarea" rows="5"></textarea>
+          <div id="share-char-counter" class="share-char-counter">0</div>
+          <div class="share-validation-warning hidden" data-testid="share-validation-warning" style="color: var(--error); font-size: 0.8rem; margin-top: var(--space-1);">X / Twitter post length exceeds 280 character limit!</div>
+        </div>
+        <div class="form-group">
+          <label>Unified Preview</label>
+          <div id="share-card-preview" class="preview-x">
+            <div class="preview-header">
+              <div class="preview-avatar" data-testid="preview-avatar"></div>
+              <div class="preview-profile-info">
+                <span class="preview-profile-name" data-testid="preview-profile-name">You</span>
+                <span class="preview-profile-handle">@you</span>
+              </div>
+            </div>
+            <div class="preview-post-text" data-testid="preview-post-text"></div>
+            <div class="preview-link-card" data-testid="preview-link-card">
+              <div class="preview-link-image"></div>
+              <div class="preview-link-content">
+                <span class="preview-link-domain">viraljacker.com</span>
+                <span class="preview-link-title" id="preview-link-title-text">Trend Title</span>
+              </div>
+            </div>
+            <!-- Pinterest vertical layout elements -->
+            <div class="preview-pin-image" data-testid="preview-pin-image"></div>
+            <div class="preview-pin-title" data-testid="preview-pin-title">Pin Title</div>
+            <div class="preview-pin-desc" data-testid="preview-pin-desc">Pin Description</div>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
