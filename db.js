@@ -2,6 +2,7 @@ import { Firestore, FieldValue } from '@google-cloud/firestore';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,6 +26,8 @@ const inMemoryStorage = new Map();
 const inMemoryEvents = new Map();
 const inMemoryExplanations = new Map();
 const inMemoryLocalizedExplanations = new Map();
+const inMemoryChatCache = new Map();
+const inMemoryGeneratedPosts = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -32,6 +35,8 @@ if (!firestore) {
     const { DatabaseSync } = await import('node:sqlite');
     const dbPath = path.join(__dirname, 'polls.db');
     sqliteDb = new DatabaseSync(dbPath);
+    sqliteDb.exec('PRAGMA journal_mode = WAL;');
+    sqliteDb.exec('PRAGMA busy_timeout = 5000;');
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS votes (
         trend TEXT PRIMARY KEY,
@@ -64,6 +69,18 @@ if (!firestore) {
         explanation TEXT,
         created_at TEXT,
         PRIMARY KEY (trend, lang)
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS chat_cache (
+        key TEXT PRIMARY KEY,
+        reply TEXT
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS generated_posts (
+        key TEXT PRIMARY KEY,
+        post_text TEXT
       )
     `);
     console.log('Local SQLite database initialized successfully at', dbPath);
@@ -446,6 +463,190 @@ export async function setLocalizedExplanation(trend, lang, data) {
     meta_description,
     explanation
   });
+}
+
+function getChatCacheKey(trend, query, history) {
+  const serializedHistory = JSON.stringify(history || []);
+  const hash = crypto.createHash('sha256').update(serializedHistory).digest('hex');
+  return `${trend || ''}:${query || ''}:${hash}`;
+}
+
+function getPostCacheKey(trendTitle, platform, contextType) {
+  return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`;
+}
+
+function getFirestoreDocId(key) {
+  return crypto.createHash('sha256').update(key).digest('hex');
+}
+
+/**
+ * Retrieves the cached chat response if it exists.
+ * @param {string} trend
+ * @param {string} query
+ * @param {Array} history
+ * @returns {Promise<string | null>}
+ */
+export async function getCachedChatResponse(trend, query, history) {
+  const key = getChatCacheKey(trend, query, history);
+
+  if (firestore) {
+    try {
+      const docId = getFirestoreDocId(key);
+      const docRef = firestore.collection('chat_cache').doc(docId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        return doc.data().reply || null;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getCachedChatResponse:`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT reply FROM chat_cache WHERE key = ?');
+      const row = stmt.get(key);
+      if (row && row.reply !== undefined) {
+        return row.reply;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getCachedChatResponse:`, err.message);
+      return null;
+    }
+  }
+
+  return inMemoryChatCache.get(key) || null;
+}
+
+/**
+ * Stores the chat response in the cache.
+ * @param {string} trend
+ * @param {string} query
+ * @param {Array} history
+ * @param {string} reply
+ * @returns {Promise<void>}
+ */
+export async function setCachedChatResponse(trend, query, history, reply) {
+  const key = getChatCacheKey(trend, query, history);
+
+  if (firestore) {
+    try {
+      const docId = getFirestoreDocId(key);
+      const docRef = firestore.collection('chat_cache').doc(docId);
+      await docRef.set({
+        key,
+        reply,
+        created_at: new Date().toISOString()
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setCachedChatResponse:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO chat_cache (key, reply)
+        VALUES (?, ?)
+      `).run(key, reply);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setCachedChatResponse:`, err.message);
+      return;
+    }
+  }
+
+  inMemoryChatCache.set(key, reply);
+}
+
+/**
+ * Retrieves the cached generated post if it exists.
+ * @param {string} trendTitle
+ * @param {string} platform
+ * @param {string} contextType
+ * @returns {Promise<string | null>}
+ */
+export async function getCachedGeneratedPost(trendTitle, platform, contextType) {
+  const key = getPostCacheKey(trendTitle, platform, contextType);
+
+  if (firestore) {
+    try {
+      const docId = getFirestoreDocId(key);
+      const docRef = firestore.collection('generated_posts').doc(docId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        return doc.data().post_text || null;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getCachedGeneratedPost:`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT post_text FROM generated_posts WHERE key = ?');
+      const row = stmt.get(key);
+      if (row && row.post_text !== undefined) {
+        return row.post_text;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getCachedGeneratedPost:`, err.message);
+      return null;
+    }
+  }
+
+  return inMemoryGeneratedPosts.get(key) || null;
+}
+
+/**
+ * Stores the generated post in the cache.
+ * @param {string} trendTitle
+ * @param {string} platform
+ * @param {string} contextType
+ * @param {string} postText
+ * @returns {Promise<void>}
+ */
+export async function setCachedGeneratedPost(trendTitle, platform, contextType, postText) {
+  const key = getPostCacheKey(trendTitle, platform, contextType);
+
+  if (firestore) {
+    try {
+      const docId = getFirestoreDocId(key);
+      const docRef = firestore.collection('generated_posts').doc(docId);
+      await docRef.set({
+        key,
+        post_text: postText,
+        created_at: new Date().toISOString()
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setCachedGeneratedPost:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO generated_posts (key, post_text)
+        VALUES (?, ?)
+      `).run(key, postText);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setCachedGeneratedPost:`, err.message);
+      return;
+    }
+  }
+
+  inMemoryGeneratedPosts.set(key, postText);
 }
 
 

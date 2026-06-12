@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -631,7 +631,11 @@ async function getTrendExplanation(trend, headline = '', snippet = '') {
 
     const prompt = `You are a viral trend analyst. Explain why the topic "${trend}" is trending.
 Here is the context headline: "${headline || ''}".
-Here is the context snippet: "${snippet || ''}".`;
+Here is the context snippet: "${snippet || ''}".
+
+Style guidelines:
+Write in a catchy, active voice, and keep it concise. Avoid fluff.
+Do NOT use any of the following blacklisted/banned words: delve, tapestry, revolutionize, unlock, moreover, testament to, it is important to note, firstly, in conclusion, embark.`;
 
     const result = await model.generateContent(prompt);
     const textResponse = result.response.text();
@@ -734,6 +738,10 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
     });
 
     const prompt = `You are a translator. Translate the following viral trend explanation and SEO metadata for "${trend}" into the language specified by the language code "${normalizedLang}".
+
+Style guidelines:
+Write in a catchy, active voice, and keep it concise. Avoid fluff.
+Do NOT use any of the following blacklisted/banned words: delve, tapestry, revolutionize, unlock, moreover, testament to, it is important to note, firstly, in conclusion, embark.
 
 Original English Explanation:
 ${JSON.stringify(englishExpl, null, 2)}
@@ -1104,8 +1112,16 @@ fastify.post('/api/chat', async (request, reply) => {
     return reply.status(400).send({ error: 'Trend and query are required.' });
   }
 
+  // Check cache first
+  const cachedResponse = await getCachedChatResponse(trend, query, history);
+  if (cachedResponse !== null) {
+    return { reply: cachedResponse };
+  }
+
   if (process.env.NODE_ENV === 'test') {
-    return { reply: 'This is a mock reply for: ' + query };
+    const mockReply = 'This is a mock reply for: ' + query;
+    await setCachedChatResponse(trend, query, history, mockReply);
+    return { reply: mockReply };
   }
 
   if (!genAI) {
@@ -1128,6 +1144,10 @@ fastify.post('/api/chat', async (request, reply) => {
     const prompt = `You are a sharp, conversational AI trend analyst. The user is asking a follow-up question about the trending topic "${trend}".
 Keep your response under 3 sentences, make it engaging, and focus on delivering direct answers.
 
+Style guidelines:
+Write in a catchy, active voice, and keep it concise. Avoid fluff.
+Do NOT use any of the following blacklisted/banned words: delve, tapestry, revolutionize, unlock, moreover, testament to, it is important to note, firstly, in conclusion, embark.
+
 Conversation history:
 ${historyText}
 
@@ -1137,7 +1157,9 @@ Response:`;
 
     const result = await model.generateContent(prompt);
     const replyText = result.response.text();
-    return { reply: replyText.trim() };
+    const finalReply = replyText.trim();
+    await setCachedChatResponse(trend, query, history, finalReply);
+    return { reply: finalReply };
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to generate chat response.' });
@@ -1258,6 +1280,12 @@ fastify.post('/api/generate-post', async (request, reply) => {
   const slug = titleToSlug(trendTitle);
   const targetUrl = `https://viraljacker.com/t/${slug}`;
 
+  // Check cache first
+  const cachedPost = await getCachedGeneratedPost(trendTitle, targetPlatform, targetContext);
+  if (cachedPost !== null) {
+    return { postText: cachedPost };
+  }
+
   if (process.env.NODE_ENV === 'test' || !genAI) {
     let postText = '';
     if (targetPlatform === 'x' || targetPlatform === 'twitter') {
@@ -1274,6 +1302,7 @@ fastify.post('/api/generate-post', async (request, reply) => {
     } else {
       postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
     }
+    await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
     return { postText };
   }
 
@@ -1316,12 +1345,14 @@ ${platformInstructions}
 
 Tone & Style Rules:
 - Output ONLY the final post content. No meta-commentary, no introductory sentences ("Here is your post:"), no wrapping quotes around the entire post.
-- Use a concise, human-sounding, active tone. Start with a compelling hook or curiosity-inducing question.
-- Avoid generic AI transitions/jargon (e.g., "In a surprising turn of events", "Furthermore", "Delve into", "Unlock", "In conclusion", "Embark", "Revolutionize").
+- Use a concise, human-sounding, active voice. Start with a compelling hook or curiosity-inducing question.
+- Avoid fluff.
+- Banned words you must NOT use under any circumstances: delve, tapestry, revolutionize, unlock, moreover, testament to, it is important to note, firstly, in conclusion, embark.
 - Use clean spacing and strategic emojis where appropriate to match high-quality human styling.`;
 
     const result = await model.generateContent(prompt);
     const postText = result.response.text().trim();
+    await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
     return { postText };
   } catch (err) {
     fastify.log.error(err);
