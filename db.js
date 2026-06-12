@@ -24,6 +24,7 @@ if (process.env.NODE_ENV === 'production') {
 const inMemoryStorage = new Map();
 const inMemoryEvents = new Map();
 const inMemoryExplanations = new Map();
+const inMemoryLocalizedExplanations = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -52,6 +53,17 @@ if (!firestore) {
         trend TEXT PRIMARY KEY,
         explanation TEXT,
         created_at TEXT
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS localized_explanations (
+        trend TEXT,
+        lang TEXT,
+        title TEXT,
+        meta_description TEXT,
+        explanation TEXT,
+        created_at TEXT,
+        PRIMARY KEY (trend, lang)
       )
     `);
     console.log('Local SQLite database initialized successfully at', dbPath);
@@ -333,6 +345,109 @@ export async function setCachedExplanation(trend, explanation) {
     created_at: createdAt
   });
 }
+
+/**
+ * Retrieves the cached localized explanation for a trend if it exists.
+ * @param {string} trend 
+ * @param {string} lang 
+ * @returns {Promise<{title: string, meta_description: string, explanation: {hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string}} | null>}
+ */
+export async function getLocalizedExplanation(trend, lang) {
+  if (firestore) {
+    try {
+      const docId = `${trend}_${lang}`;
+      const docRef = firestore.collection('localized_explanations').doc(docId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data();
+        return {
+          title: data.title,
+          meta_description: data.meta_description,
+          explanation: typeof data.explanation === 'string' ? JSON.parse(data.explanation) : data.explanation
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getLocalizedExplanation for "${trend}" "${lang}":`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation FROM localized_explanations WHERE trend = ? AND lang = ?');
+      const row = stmt.get(trend, lang);
+      if (row) {
+        return {
+          title: row.title,
+          meta_description: row.meta_description,
+          explanation: JSON.parse(row.explanation)
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getLocalizedExplanation "${trend}" "${lang}":`, err.message);
+      return null;
+    }
+  }
+
+  const cached = inMemoryLocalizedExplanations.get(`${trend}_${lang}`);
+  if (cached) {
+    return cached;
+  }
+  return null;
+}
+
+/**
+ * Stores the localized trend explanation in the cache.
+ * @param {string} trend 
+ * @param {string} lang 
+ * @param {{title: string, meta_description: string, explanation: {hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string}}} data 
+ * @returns {Promise<void>}
+ */
+export async function setLocalizedExplanation(trend, lang, data) {
+  const createdAt = new Date().toISOString();
+  const { title, meta_description, explanation } = data;
+
+  if (firestore) {
+    try {
+      const docId = `${trend}_${lang}`;
+      const docRef = firestore.collection('localized_explanations').doc(docId);
+      await docRef.set({
+        trend,
+        lang,
+        title,
+        meta_description,
+        explanation,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setLocalizedExplanation for "${trend}" "${lang}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO localized_explanations (trend, lang, title, meta_description, explanation, created_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(trend, lang, title, meta_description, JSON.stringify(explanation), createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setLocalizedExplanation "${trend}" "${lang}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryLocalizedExplanations.set(`${trend}_${lang}`, {
+    title,
+    meta_description,
+    explanation
+  });
+}
+
 
 
 
