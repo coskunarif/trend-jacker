@@ -11,5 +11,4 @@
 - **Outbound Link E2E Testing**: In Playwright E2E tests, verifying outbound share intents triggered via `window.open` is best done by using `context.waitForEvent('page')` to capture the target page and assert its query parameters directly, ensuring complete end-to-end URL construction.
 - **SQLite Test Concurrency**: In parallel Playwright tests sharing a SQLite database, always scope database connection lifecycles (opening, executing, and immediately closing) to individual test assertions and ensure all connections are closed before initiating API requests via Playwright's request client to prevent 'database is locked' race conditions.
 - **Dynamic Canvas Positioning**: When dynamically overlaying custom text on an HTML5 canvas, apply dynamic layout offsets to subsequent canvas sections and implement a font-size/line-height reduction loop to automatically fit text within maximum boundary constraints.
-
-
+- **Dynamic Content Caching**: When extending a localized content cache to support dynamic demographic presentation variations, suffix the primary lookup key with the parameter variant (e.g., `{trend}:{bracket}`) to reuse existing schema and tables without schema migrations.
