@@ -1,5 +1,5 @@
 task: Increase viral sharing rates through user-customized infographic overlays  tier: T2   creativity: 0.5
-state: Builder                budget: repairs 0/3
+state: Verifier               budget: repairs 0/3
 branch: asf/20260612-infographic-overlays     checkpoint: none
 caps: agents,ui,web,human
 
@@ -11,5 +11,7 @@ caps: agents,ui,web,human
 - 2026-06-12: Conductor starting Tester phase.
 - 2026-06-12: Tester completed tests. Observed state: red.
 - 2026-06-12: Conductor starting Builder phase.
+- 2026-06-12: Builder completed all slices. Observed state: green.
+- 2026-06-12: Conductor starting Verifier phase.
 ## Verdict
 ## Done
