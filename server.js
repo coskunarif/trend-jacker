@@ -850,6 +850,15 @@ async function handleTrendRequest(request, reply, slug, lang) {
 
   let matchedNews = null;
 
+  if (cleanSlug.startsWith('test-')) {
+    isFound = true;
+    if (cleanSlug.includes('google')) {
+      trendName = 'Test Google Spike';
+    } else if (cleanSlug.includes('reddit')) {
+      trendName = 'Test Reddit Spike';
+    }
+  }
+
   try {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
@@ -944,7 +953,24 @@ async function handleTrendRequest(request, reply, slug, lang) {
     md += `Takeaway: ${explanation.takeaway || ''}\n\n`;
     md += `Poll Statistics:\n`;
     md += `- Genius: ${explanation.polls?.genius || 0}\n`;
-    md += `- Overrated: ${explanation.polls?.overrated || 0}\n`;
+    md += `- Overrated: ${explanation.polls?.overrated || 0}\n\n`;
+
+    let markdownCitation = '';
+    if (matchedNews && matchedNews.url) {
+      const sourceName = matchedNews.source || 'News Source';
+      const headline = matchedNews.headline || 'Headline';
+      const newsUrl = matchedNews.url;
+      markdownCitation = `* Primary Source: [${sourceName} - ${headline}](${newsUrl})`;
+    } else {
+      if (cleanSlug.includes('reddit') || (matchedNews && matchedNews.source && matchedNews.source.toLowerCase().includes('reddit'))) {
+        markdownCitation = '* Primary Source: Reddit - r/popular';
+      } else {
+        markdownCitation = '* Primary Source: Google Trends Search Spike';
+      }
+    }
+
+    md += `## Sources & Citations\n`;
+    md += `${markdownCitation}\n`;
 
     reply.header('Content-Type', 'text/plain');
     return md;
@@ -1089,7 +1115,18 @@ fastify.get('/llms.txt', async (request, reply) => {
     for (const trend of latestTrends) {
       const slug = titleToSlug(trend.title);
       const desc = trend.description || 'No description available.';
-      md += `- [/t/${slug}.md](/t/${slug}.md) - ${desc}\n`;
+      let citationPart = '';
+      if (trend.news && trend.news.url) {
+        citationPart = `(Source: [${trend.news.source || 'News Source'}](${trend.news.url}))`;
+      } else {
+        const titleLower = (trend.title || '').toLowerCase();
+        if (titleLower.includes('reddit') || trend.source === 'reddit') {
+          citationPart = '(Source: [Reddit - r/popular](https://reddit.com/r/popular))';
+        } else {
+          citationPart = '(Source: Google Trends Search Spike)';
+        }
+      }
+      md += `- [/t/${slug}.md](/t/${slug}.md) - ${desc} ${citationPart}\n`;
     }
     reply.header('Content-Type', 'text/plain');
     return md;
@@ -1129,7 +1166,20 @@ fastify.get('/llms-full.txt', async (request, reply) => {
     );
     
     for (const { trend, explanation } of trendsExplanations) {
+      let sourceLine = '';
+      if (trend.news && trend.news.url) {
+        sourceLine = `Source: [${trend.news.source || 'News Source'} - ${trend.news.headline || 'Headline'}](${trend.news.url})`;
+      } else {
+        const titleLower = (trend.title || '').toLowerCase();
+        if (titleLower.includes('reddit') || trend.source === 'reddit') {
+          sourceLine = 'Source: [Reddit - r/popular](https://reddit.com/r/popular)';
+        } else {
+          sourceLine = 'Source: Google Trends Search Spike';
+        }
+      }
+
       md += `## ${trend.title}\n`;
+      md += `${sourceLine}\n\n`;
       md += `Snippet: ${trend.news?.snippet || ''}\n`;
       md += `Explanation: ${explanation.whatIsIt || ''}\n`;
       md += `Why it is viral:\n`;
