@@ -1,39 +1,11 @@
-task: Further cache and optimize LLM calls to provide quality, catchy, fluff-free content.              tier: T2   creativity: 0.5
-state: complete                 budget: repairs 0/3
-branch: asf/20260611-llm-caching          checkpoint: none
+task: Improve search engine authority and AI search engine citation rates. Metric: Generative search engine citation rate. Why now: Ensures JIT trending explanations are trusted and referenced as primary sources by AI search assistants. Runner-up: Structured data enrichment to maximize search result CTR.              tier: T2   creativity: 0.5
+state: ARCHITECT              budget: repairs 0/3
+branch: asf/20260612-seo-citation          checkpoint: none
 caps: agents,ui,web,human
 
 ## Log
-- 2026-06-11: Conductor initialized fresh run. Checked out work branch asf/20260611-llm-caching. Starting Architect phase.
-- 2026-06-11: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-11: Tester wrote tests (observed state: red). Conductor starting Builder phase.
-- 2026-06-11: Builder implementation completed. Conductor starting Verifier phase.
-- 2026-06-12: Verifier ran the full test suite (87/87 passed) and verified the caching, prompts, and visual layouts. All checks PASS.
-- 2026-06-12: Verifier completed verification (verdict: PASS). Conductor starting Shipper phase.
-- 2026-06-12: Shipper tagged green-1, opened/merged PR, and closed the run.
-
+- 2026-06-12: Conductor initialized fresh run with Scout trigger. Starting Scout phase.
+- 2026-06-12: Scout phase completed. Selected GEO citation and authority enhancement task.
+- 2026-06-12: Conductor starting Architect phase.
 ## Verdict
-- **[AC-1] Chat Q&A API Caching**: PASS
-  - Evidence: Tested `/api/chat` caching via DB mutation unit test (replacing cached row text and seeing the API return the customized text on subsequent request) and manual walkthrough.
-- **[AC-2] Social Media Post Generator Caching**: PASS
-  - Evidence: Tested `/api/generate-post` caching via DB verification unit test. Direct DB table inspections confirmed entries exist with structured keys.
-- **[AC-3] LLM Prompt Quality and Style Optimization (Fluff-Free & Catchy)**: PASS
-  - Evidence: Unit test successfully asserted that the four prompt templates (`getTrendExplanation`, `getLocalizedTrendExplanation`, chat API, and social post API) include fluff-free, catchy, and active-voice style instructions along with the banned words blacklist.
-- **Lint, Types, and Build**: SKIPPED
-  - Evidence: No build script, typescript compiler, or eslint configuration files are defined in the workspace.
-- **Visual & E2E Validation**: PASS
-  - Evidence: E2E test suite (87 tests) passed successfully. Captured desktop and mobile screenshots showing correct layout rendering without glitches or overflow.
-
 ## Done
-- **Green checkpoint tag**: `asf/20260611-llm-caching/green-1`
-- **Pull Request**: [coskunarif/trend-jacker#16](https://github.com/coskunarif/trend-jacker/pull/16)
-- **Deployment URL**: [https://trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Integration Method**: GitHub PR merge via `--merge`
-
-### Evidence Table
-| Acceptance Criteria | Verification / Evidence |
-| --- | --- |
-| `[AC-1] Chat Q&A API Caching` | SQLite/Firestore schema initialized with `chat_cache` table/collection; verified via direct DB mutation test returning the updated cache record immediately. |
-| `[AC-2] Social Media Post Generator Caching` | SQLite/Firestore schema initialized with `generated_posts` table/collection; verified via direct DB mutation test showing instant cached responses. |
-| `[AC-3] LLM Prompt Quality and Style Optimization` | Banned generic filler/AI words (`delve`, `tapestry`, etc.) and mandated active voice and high density across all 4 Gemini templates; verified via content inspection tests. |
-
