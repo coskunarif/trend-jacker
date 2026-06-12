@@ -284,7 +284,8 @@ export async function getCachedExplanation(trend) {
           hook: data.hook,
           whatIsIt: data.whatIsIt,
           whyIsItViral: data.whyIsItViral || [],
-          takeaway: data.takeaway
+          takeaway: data.takeaway,
+          created_at: data.created_at
         };
       }
       return null;
@@ -296,10 +297,12 @@ export async function getCachedExplanation(trend) {
 
   if (sqliteDb) {
     try {
-      const stmt = sqliteDb.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
+      const stmt = sqliteDb.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
       const row = stmt.get(trend);
       if (row && row.explanation) {
-        return JSON.parse(row.explanation);
+        const explanation = JSON.parse(row.explanation);
+        explanation.created_at = row.created_at;
+        return explanation;
       }
       return null;
     } catch (err) {
@@ -310,7 +313,10 @@ export async function getCachedExplanation(trend) {
 
   const cached = inMemoryExplanations.get(trend);
   if (cached) {
-    return cached.explanation;
+    return {
+      ...cached.explanation,
+      created_at: cached.created_at
+    };
   }
   return null;
 }
@@ -380,7 +386,8 @@ export async function getLocalizedExplanation(trend, lang) {
         return {
           title: data.title,
           meta_description: data.meta_description,
-          explanation: typeof data.explanation === 'string' ? JSON.parse(data.explanation) : data.explanation
+          explanation: typeof data.explanation === 'string' ? JSON.parse(data.explanation) : data.explanation,
+          created_at: data.created_at
         };
       }
       return null;
@@ -392,13 +399,14 @@ export async function getLocalizedExplanation(trend, lang) {
 
   if (sqliteDb) {
     try {
-      const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation FROM localized_explanations WHERE trend = ? AND lang = ?');
+      const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
       const row = stmt.get(trend, lang);
       if (row) {
         return {
           title: row.title,
           meta_description: row.meta_description,
-          explanation: JSON.parse(row.explanation)
+          explanation: JSON.parse(row.explanation),
+          created_at: row.created_at
         };
       }
       return null;
@@ -410,7 +418,10 @@ export async function getLocalizedExplanation(trend, lang) {
 
   const cached = inMemoryLocalizedExplanations.get(`${trend}_${lang}`);
   if (cached) {
-    return cached;
+    return {
+      ...cached,
+      created_at: cached.created_at
+    };
   }
   return null;
 }
@@ -461,7 +472,8 @@ export async function setLocalizedExplanation(trend, lang, data) {
   inMemoryLocalizedExplanations.set(`${trend}_${lang}`, {
     title,
     meta_description,
-    explanation
+    explanation,
+    created_at: createdAt
   });
 }
 
