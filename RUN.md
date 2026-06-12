@@ -7,5 +7,6 @@ caps: agents,ui,web,human
 - 2026-06-11: Conductor initialized fresh run. Checked out branch asf/20260611-cache-results. Starting Architect phase.
 - 2026-06-11: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-11: Tester wrote tests/caching.spec.js (observed state: red). Conductor starting Builder phase.
+- 2026-06-12: Builder implemented S-1 (db.js schema + caching helpers) and S-2 (server.js integration). All tests green.
 ## Verdict
 ## Done
