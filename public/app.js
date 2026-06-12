@@ -343,6 +343,70 @@ function initApp() {
       .replace(/-+/g, '-');
   }
 
+  const UI_DICTIONARY = {
+    en: {
+      whatIsIt: "What is it?",
+      takeaway: "The Takeaway",
+      whyViral: "Why is it viral?",
+      sentiment: "Community Sentiment",
+      pollPrompt: "Is this trend actually genius, or is it totally overrated?",
+      digDeeper: "Dig Deeper with AI",
+      chatPlaceholder: "Type your question..."
+    },
+    es: {
+      whatIsIt: "¿Qué es?",
+      takeaway: "La Conclusión",
+      whyViral: "¿Por qué es viral?",
+      sentiment: "Sentimiento de la Comunidad",
+      pollPrompt: "¿Este tema es una genialidad o está sobrevalorado?",
+      digDeeper: "Profundizar con IA",
+      chatPlaceholder: "Escribe tu pregunta..."
+    },
+    fr: {
+      whatIsIt: "Qu'est-ce que c'est ?",
+      takeaway: "L'essentiel",
+      whyViral: "Pourquoi est-ce viral ?",
+      sentiment: "Sentiment de la communauté",
+      pollPrompt: "Cette tendance est-elle géniale ou surfaite ?",
+      digDeeper: "Approfondir avec l'IA",
+      chatPlaceholder: "Posez votre question..."
+    },
+    ja: {
+      whatIsIt: "概要",
+      takeaway: "要点",
+      whyViral: "なぜバズっているのか？",
+      sentiment: "コミュニティの反応",
+      pollPrompt: "このトレンドは天才的ですか、それとも過大評価ですか？",
+      digDeeper: "AIで深掘りする",
+      chatPlaceholder: "質問を入力..."
+    }
+  };
+
+  function translateUI(lang) {
+    const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+    
+    const labelWhat = document.getElementById('label-what');
+    if (labelWhat) labelWhat.textContent = dict.whatIsIt;
+    
+    const labelTakeaway = document.getElementById('label-takeaway');
+    if (labelTakeaway) labelTakeaway.textContent = dict.takeaway;
+    
+    const labelWhyViral = document.getElementById('label-why-viral');
+    if (labelWhyViral) labelWhyViral.textContent = dict.whyViral;
+    
+    const labelSentiment = document.getElementById('label-sentiment');
+    if (labelSentiment) labelSentiment.textContent = dict.sentiment;
+    
+    const pollPrompt = document.querySelector('.poll-prompt');
+    if (pollPrompt) pollPrompt.textContent = dict.pollPrompt;
+    
+    const labelDigDeeper = document.getElementById('label-dig-deeper');
+    if (labelDigDeeper) labelDigDeeper.textContent = dict.digDeeper;
+    
+    const chatInput = document.getElementById('chat-input');
+    if (chatInput) chatInput.setAttribute('placeholder', dict.chatPlaceholder);
+  }
+
   // Hydration data loader
   const preloadedDataEl = document.getElementById('preloaded-trend-data');
   let preloadedData = null;
@@ -358,9 +422,77 @@ function initApp() {
     loadTimeline(preloadedData.trend);
   }
 
-  // Parse path slug
+  // Parse path slug and language
   const pathParts = window.location.pathname.split('/');
   const urlSlug = (pathParts[1] === 't' && pathParts[2]) ? pathParts[2] : null;
+  const urlLang = (pathParts[1] === 't' && pathParts[3]) ? pathParts[3] : null;
+
+  let initialLang = 'en';
+  if (preloadedData && preloadedData.lang) {
+    initialLang = preloadedData.lang;
+  } else if (urlLang) {
+    initialLang = urlLang.replace('.md', '');
+  } else {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('lang')) {
+      initialLang = params.get('lang');
+    }
+  }
+
+  const langSelect = document.getElementById('lang-select');
+  if (langSelect) {
+    langSelect.value = initialLang;
+    langSelect.addEventListener('change', async (e) => {
+      const selectedLang = e.target.value;
+      translateUI(selectedLang);
+      
+      if (currentTrend) {
+        const currentSlug = titleToSlug(currentTrend.title);
+        const newUrl = selectedLang === 'en'
+          ? window.location.origin + '/t/' + currentSlug
+          : window.location.origin + '/t/' + currentSlug + '/' + selectedLang;
+        
+        window.history.pushState({ path: newUrl }, '', newUrl);
+        
+        // Fetch localized explanation using POST /api/explain
+        try {
+          const res = await fetch('/api/explain', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              trend: currentTrend.title,
+              snippet: currentTrend.news ? currentTrend.news.snippet : '',
+              headline: currentTrend.news ? currentTrend.news.headline : '',
+              lang: selectedLang
+            })
+          });
+          
+          if (!res.ok) throw new Error('API failed to explain');
+          const data = await res.json();
+          
+          // Update details in DOM
+          detailHook.textContent = data.hook;
+          detailWhat.textContent = data.whatIsIt;
+          detailTakeaway.textContent = data.takeaway;
+          
+          // Render viral tags
+          detailViralTags.innerHTML = '';
+          (data.whyIsItViral || []).forEach(reason => {
+            const span = document.createElement('span');
+            span.className = 'viral-tag';
+            span.textContent = reason;
+            detailViralTags.appendChild(span);
+          });
+          
+          // Update SEO
+          updateSEO(currentTrend, data);
+        } catch (err) {
+          console.error('Failed to load localized details:', err);
+        }
+      }
+    });
+  }
+  translateUI(initialLang);
 
   // Track mouse movement for interactive ambient glow
   document.addEventListener('mousemove', (e) => {
@@ -672,7 +804,10 @@ function initApp() {
           a.setAttribute('aria-current', 'true');
 
           if (!skipPush) {
-            const newUrl = window.location.origin + '/t/' + titleToSlug(trend.title);
+            const selectedLang = document.getElementById('lang-select')?.value || 'en';
+            const newUrl = selectedLang === 'en'
+              ? window.location.origin + '/t/' + titleToSlug(trend.title)
+              : window.location.origin + '/t/' + titleToSlug(trend.title) + '/' + selectedLang;
             window.history.pushState({ path: newUrl }, '', newUrl);
           }
           
@@ -763,13 +898,15 @@ function initApp() {
         data = preloadedData.explanation;
         preloadedData = null; // Clear to allow future live fetches
       } else {
+        const selectedLang = document.getElementById('lang-select')?.value || 'en';
         const res = await fetch('/api/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             trend: trend.title,
             snippet: trend.news ? trend.news.snippet : '',
-            headline: trend.news ? trend.news.headline : ''
+            headline: trend.news ? trend.news.headline : '',
+            lang: selectedLang
           })
         });
         
@@ -1568,7 +1705,10 @@ function initApp() {
               traffic: 'Rising',
               news: { headline: '', snippet: '', url: '' }
             });
-            const newUrl = window.location.origin + '/t/' + slug;
+            const selectedLang = document.getElementById('lang-select')?.value || 'en';
+            const newUrl = selectedLang === 'en'
+              ? window.location.origin + '/t/' + slug
+              : window.location.origin + '/t/' + slug + '/' + selectedLang;
             window.history.pushState({ path: newUrl }, '', newUrl);
             closeMobileSidebar();
           }

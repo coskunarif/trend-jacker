@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -652,35 +652,135 @@ Here is the context snippet: "${snippet || ''}".`;
   return explanation;
 }
 
-// POST /api/explain - Explains a trend using Gemini
-fastify.post('/api/explain', async (request, reply) => {
-  const { trend, snippet, headline } = request.body || {};
-  if (!trend) {
-    return reply.status(400).send({ error: 'Trend name is required.' });
-  }
+// Helper to get localized trend explanation (production + mock/test mode)
+async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet = '') {
+  const normalizedLang = (lang || 'en').toLowerCase().trim();
+  const supported = ['es', 'fr', 'ja'];
 
-  try {
+  if (!supported.includes(normalizedLang)) {
+    // Fallback/Use English
     const explanation = await getTrendExplanation(trend, headline, snippet);
-    return explanation;
-  } catch (err) {
-    fastify.log.error(err);
-    return reply.status(500).send({ error: 'Failed to generate trend explanation.' });
+    return {
+      title: `Why is ${trend} Trending? | TrendJacker`,
+      meta_description: explanation.hook,
+      explanation,
+      lang: 'en'
+    };
   }
-});
 
+  // Check localized cache first
+  const cached = await getLocalizedExplanation(trend, normalizedLang);
+  if (cached) {
+    cached.explanation.polls = await getPollData(trend);
+    return {
+      title: cached.title,
+      meta_description: cached.meta_description,
+      explanation: cached.explanation,
+      lang: normalizedLang
+    };
+  }
 
+  let result;
+  if (process.env.NODE_ENV === 'test') {
+    const suffix = normalizedLang === 'es' ? '(en español)' : normalizedLang === 'fr' ? '(en français)' : '(日本語訳)';
+    const englishExpl = await getTrendExplanation(trend, headline, snippet);
+    const explanation = {
+      hook: `${englishExpl.hook} ${suffix}`,
+      whatIsIt: `${englishExpl.whatIsIt} ${suffix}`,
+      whyIsItViral: (englishExpl.whyIsItViral || []).map(r => `${r} ${suffix}`),
+      takeaway: `${englishExpl.takeaway} ${suffix}`
+    };
+    const title = `Why is ${trend} Trending? | TrendJacker ${suffix}`;
+    const meta_description = explanation.hook;
 
+    result = {
+      title,
+      meta_description,
+      explanation
+    };
+  } else {
+    if (!genAI) {
+      throw new Error('Gemini API not configured.');
+    }
 
-// GET /t/:slug - Dynamically renders a trend explainer page with SEO/GEO metadata
-fastify.get('/t/:slug', async (request, reply) => {
-  let { slug } = request.params;
+    const englishExpl = await getTrendExplanation(trend, headline, snippet);
+
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-3.5-flash',
+      generationConfig: {
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: "OBJECT",
+          properties: {
+            title: { type: "STRING" },
+            meta_description: { type: "STRING" },
+            explanation: {
+              type: "OBJECT",
+              properties: {
+                hook: { type: "STRING" },
+                whatIsIt: { type: "STRING" },
+                whyIsItViral: {
+                  type: "ARRAY",
+                  items: { type: "STRING" }
+                },
+                takeaway: { type: "STRING" }
+              },
+              required: ["hook", "whatIsIt", "whyIsItViral", "takeaway"]
+            }
+          },
+          required: ["title", "meta_description", "explanation"]
+        }
+      }
+    });
+
+    const prompt = `You are a translator. Translate the following viral trend explanation and SEO metadata for "${trend}" into the language specified by the language code "${normalizedLang}".
+
+Original English Explanation:
+${JSON.stringify(englishExpl, null, 2)}
+
+Please translate:
+1. The page title (e.g. "Why is ${trend} Trending? | TrendJacker")
+2. The meta description (summarizing the trend explanation)
+3. The explanation fields (hook, whatIsIt, whyIsItViral, takeaway)
+
+Ensure all translated fields conform to the response schema and are in the language "${normalizedLang}".`;
+
+    const modelResult = await model.generateContent(prompt);
+    const textResponse = modelResult.response.text();
+    
+    let cleanedText = textResponse.trim();
+    if (cleanedText.startsWith('```')) {
+      cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+    }
+    
+    result = JSON.parse(cleanedText);
+  }
+
+  // Save to cache
+  await setLocalizedExplanation(trend, normalizedLang, result);
+
+  // Attach polls
+  result.explanation.polls = await getPollData(trend);
+  result.lang = normalizedLang;
+  
+  return result;
+}
+
+async function handleTrendRequest(request, reply, slug, lang) {
   if (!slug) {
     return reply.redirect('/');
   }
 
-  const isMarkdown = slug.endsWith('.md');
+  let isMarkdown = slug.endsWith('.md');
+  let cleanSlug = slug;
   if (isMarkdown) {
-    slug = slug.slice(0, -3);
+    cleanSlug = slug.slice(0, -3);
+  }
+
+  let cleanLang = (lang || 'en').toLowerCase().trim();
+  if (cleanLang.endsWith('.md')) {
+    isMarkdown = true;
+    cleanLang = cleanLang.slice(0, -3);
   }
 
   // Determine standard name from slug
@@ -693,7 +793,7 @@ fastify.get('/t/:slug', async (request, reply) => {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
-    const match = latestTrends.find(item => titleToSlug(item.title) === slug);
+    const match = latestTrends.find(item => titleToSlug(item.title) === cleanSlug);
     if (match) {
       trendName = match.title;
       const newsItem = match.news || {};
@@ -707,7 +807,7 @@ fastify.get('/t/:slug', async (request, reply) => {
         const xmlText = await response.text();
         const result = await parseStringPromise(xmlText);
         const items = result.rss.channel[0].item || [];
-        const liveMatch = items.find(item => titleToSlug(item.title[0]) === slug);
+        const liveMatch = items.find(item => titleToSlug(item.title[0]) === cleanSlug);
         if (liveMatch) {
           trendName = liveMatch.title[0];
           const newsItem = liveMatch['ht:news_item'] ? liveMatch['ht:news_item'][0] : null;
@@ -721,27 +821,41 @@ fastify.get('/t/:slug', async (request, reply) => {
     console.error('Error matching slug against live trends:', err.message);
   }
 
-  if (isMarkdown && !isFound) {
+  const supported = ['es', 'fr', 'ja'];
+  const isLocalized = supported.includes(cleanLang);
+
+  // AC-1: Invalid slugs return 404
+  if (!isFound && (isMarkdown || isLocalized)) {
     return reply.status(404).send({ error: 'Trend not found' });
   }
 
   if (!trendName) {
-    trendName = slug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    trendName = cleanSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
   }
 
-  let explanation;
+  let localizedData;
   try {
-    explanation = await getTrendExplanation(trendName, headline, snippet);
+    localizedData = await getLocalizedTrendExplanation(trendName, cleanLang, headline, snippet);
   } catch (err) {
     fastify.log.error(err);
-    explanation = {
+    // fallback to English or raw structure
+    const fallbackExpl = {
       hook: `Why is everyone talking about ${trendName}?`,
       whatIsIt: `Trending search topic: ${trendName}.`,
       whyIsItViral: [`High volume search interest on Google Trends.`],
       takeaway: `Keep an eye on this trend as it develops.`,
       polls: await getPollData(trendName)
     };
+    localizedData = {
+      title: `Why is ${trendName} Trending? | TrendJacker`,
+      meta_description: fallbackExpl.hook,
+      explanation: fallbackExpl,
+      lang: 'en'
+    };
   }
+
+  const actualLang = localizedData.lang;
+  const explanation = localizedData.explanation;
 
   if (isMarkdown) {
     let md = `# ${trendName}\n\n`;
@@ -770,8 +884,8 @@ fastify.get('/t/:slug', async (request, reply) => {
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "NewsArticle",
-      "headline": `Why is ${trendName} Trending? Genius vs Overrated Explanation`,
-      "description": explanation.hook,
+      "headline": localizedData.title,
+      "description": localizedData.meta_description,
       "articleBody": `${explanation.whatIsIt} Takeaway: ${explanation.takeaway}`,
       "author": {
         "@type": "Organization",
@@ -779,18 +893,31 @@ fastify.get('/t/:slug', async (request, reply) => {
       }
     };
 
+    const ogUrl = actualLang === 'en'
+      ? `https://viraljacker.com/t/${cleanSlug}`
+      : `https://viraljacker.com/t/${cleanSlug}/${actualLang}`;
+
+    const alternateLinks = `
+  <link rel="alternate" hreflang="x-default" href="https://viraljacker.com/t/${cleanSlug}" />
+  <link rel="alternate" hreflang="en" href="https://viraljacker.com/t/${cleanSlug}" />
+  <link rel="alternate" hreflang="es" href="https://viraljacker.com/t/${cleanSlug}/es" />
+  <link rel="alternate" hreflang="fr" href="https://viraljacker.com/t/${cleanSlug}/fr" />
+  <link rel="alternate" hreflang="ja" href="https://viraljacker.com/t/${cleanSlug}/ja" />
+`;
+
     const seoMeta = `
   <!-- SEO & GEO Meta Tags dynamically generated by TrendJacker Agent -->
-  <title>Why is ${trendName} Trending? | TrendJacker</title>
-  <meta name="description" content="${explanation.hook}">
-  <meta property="og:title" content="Why is ${trendName} Trending? | TrendJacker">
-  <meta property="og:description" content="${explanation.hook}">
+  <title>${localizedData.title}</title>
+  <meta name="description" content="${localizedData.meta_description}">
+  <meta property="og:title" content="${localizedData.title}">
+  <meta property="og:description" content="${localizedData.meta_description}">
   <meta property="og:type" content="article">
-  <meta property="og:url" content="https://viraljacker.com/t/${slug}">
+  <meta property="og:url" content="${ogUrl}">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="Why is ${trendName} Trending? | TrendJacker">
-  <meta name="twitter:description" content="${explanation.hook}">
+  <meta name="twitter:title" content="${localizedData.title}">
+  <meta name="twitter:description" content="${localizedData.meta_description}">
   <link rel="alternate" type="text/markdown" href="/llms.txt">
+  ${alternateLinks}
   
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd, null, 2)}
@@ -798,19 +925,50 @@ fastify.get('/t/:slug', async (request, reply) => {
   
   <!-- Preloaded Data block for client hydration -->
   <script id="preloaded-trend-data" type="application/json">
-    ${JSON.stringify({ trend: trendName, slug, explanation })}
+    ${JSON.stringify({ trend: trendName, slug: cleanSlug, explanation, lang: actualLang })}
   </script>
     `;
 
+    // Replace the default title and description
     html = html.replace(/<title>.*?<\/title>/, '');
     html = html.replace(/<meta\s+name="description"\s+content=".*?">/, '');
     html = html.replace('</head>', `${seoMeta}\n</head>`);
+    html = html.replace('<html lang="en">', `<html lang="${actualLang}">`);
 
     reply.type('text/html').send(html);
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to render trend page.' });
   }
+}
+
+// POST /api/explain - Explains a trend using Gemini (supports localization)
+fastify.post('/api/explain', async (request, reply) => {
+  const { trend, snippet, headline, lang } = request.body || {};
+  if (!trend) {
+    return reply.status(400).send({ error: 'Trend name is required.' });
+  }
+
+  try {
+    const localizedData = await getLocalizedTrendExplanation(trend, lang || 'en', headline, snippet);
+    return localizedData.explanation;
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: 'Failed to generate trend explanation.' });
+  }
+});
+
+// GET /t/:slug - Dynamically renders a trend explainer page
+fastify.get('/t/:slug', async (request, reply) => {
+  const { slug } = request.params;
+  const lang = request.query.lang || 'en';
+  return handleTrendRequest(request, reply, slug, lang);
+});
+
+// GET /t/:slug/:lang - Dynamically renders a localized trend explainer page
+fastify.get('/t/:slug/:lang', async (request, reply) => {
+  const { slug, lang } = request.params;
+  return handleTrendRequest(request, reply, slug, lang);
 });
 
 // GET /robots.txt - Dynamic robots.txt
@@ -900,7 +1058,7 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     const slugs = latestTrends.map(item => titleToSlug(item.title));
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+    xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
     
     // Add homepage
     xml += `  <url>\n`;
@@ -909,13 +1067,25 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
     
-    // Add trend pages
+    // Add trend pages for each locale (en, es, fr, ja)
+    const locales = ['en', 'es', 'fr', 'ja'];
     for (const slug of slugs) {
-      xml += `  <url>\n`;
-      xml += `    <loc>https://viraljacker.com/t/${slug}</loc>\n`;
-      xml += `    <changefreq>daily</changefreq>\n`;
-      xml += `    <priority>0.8</priority>\n`;
-      xml += `  </url>\n`;
+      for (const lang of locales) {
+        const loc = lang === 'en'
+          ? `https://viraljacker.com/t/${slug}`
+          : `https://viraljacker.com/t/${slug}/${lang}`;
+        
+        xml += `  <url>\n`;
+        xml += `    <loc>${loc}</loc>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.8</priority>\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="https://viraljacker.com/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="en" href="https://viraljacker.com/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="es" href="https://viraljacker.com/t/${slug}/es" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="fr" href="https://viraljacker.com/t/${slug}/fr" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="ja" href="https://viraljacker.com/t/${slug}/ja" />\n`;
+        xml += `  </url>\n`;
+      }
     }
     
     xml += `</urlset>`;

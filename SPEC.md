@@ -1,68 +1,133 @@
-# Specification — Client-Side Image Fallbacks for Broken Assets
+# Specification: Gemini AI Multi-Language Localization Engine
 
-This specification outlines the requirements and implementation plan to handle client-side image and favicon loading failures on the TrendJacker website. When external images (OG images or publisher favicons) fail to load due to 404/403 errors, network failures, or CORS policies, the app must gracefully revert to CSS-based placeholders or default icons rather than displaying broken image indicators.
-
----
-
-## 🎯 Acceptance Criteria
-
-### `[AC-1]` List Item Thumbnail Fallback
-- **Requirement**: If a trend's thumbnail image (`trend.news.ogImage`) fails to load in the sidebar/trend list, the broken image must be hidden and the CSS-based gradient placeholder (`.trend-thumbnail-placeholder`) must be shown in its place.
-- **Verification**: In Playwright, intercept the `ogImage` URL to return a `404` status code. Navigate to the page and assert that the `<img>` element with class `.trend-thumbnail` is either hidden or has `display: none` applied, and the `.trend-thumbnail-placeholder` is visible.
-
-### `[AC-2]` List Item Publisher Favicon Fallback
-- **Requirement**: If a trend's publisher favicon (`trend.news.favicon`) fails to load in the sidebar/trend list, the `<img>` element with class `.publisher-favicon` must be hidden.
-- **Verification**: Intercept the favicon URL to return a `404` status code. Assert that the `.publisher-favicon` element is either removed from the DOM or has `display: none` applied.
-
-### `[AC-3]` Detail View Hero Image Fallback
-- **Requirement**: If a trend's detail hero image (`#detail-hero-image`) fails to load, the image must hide (`display: none`), and the CSS gradient fallback (`.detail-hero-gradient`) must be displayed (`display: block`).
-- **Verification**: Intercept the detail hero image URL to return a `404`. Assert that `#detail-hero-image` is hidden and `.detail-hero-gradient` is visible.
-
-### `[AC-4]` News Footer Favicon Fallback
-- **Requirement**: If the favicon (`#footer-favicon-img`) in the news footer fails to load, the image must be hidden, and the generic newspaper SVG (`svg.lucide-newspaper`) must be displayed.
-- **Verification**: Intercept the news footer favicon URL to return a `404`. Assert that `#footer-favicon-img` is hidden and `svg.lucide-newspaper` is visible.
+## Background & Objective
+TrendJacker is a dynamic viral trend explainer platform. To maximize international SEO and GEO search visibility, we are introducing a dynamic localization engine powered by Google Gemini AI. This engine will support translation of viral explainer content and metadata on the fly, implement localized routing, generate localized JSON-LD schemas and page copy, and cache outputs.
 
 ---
 
-## 🚫 Out of Scope
+## Acceptance Criteria
 
-- Re-scraping metadata or introducing server-side image proxy endpoints/third-party image proxying services.
-- Designing or hosting new static image files/assets for placeholders (all placeholders must use the existing CSS classes `.trend-thumbnail-placeholder` and `.detail-hero-gradient`).
+### [AC-1] Locale Route & Query Handling
+- **Description**: The server must resolve localized trend requests via both:
+  1. Route parameter: `/t/:slug/:lang` (e.g. `/t/google-gemini/es`)
+  2. Query parameter: `/t/:slug?lang=:lang` (e.g. `/t/google-gemini?lang=es`)
+- **Fallback**: If no language is requested or if the requested language is unsupported/empty, fallback to English (`en`).
+- **Markdown Support**: The server must support localized markdown requests:
+  - `/t/:slug/:lang.md`
+  - `/t/:slug.md?lang=:lang`
+  These must return HTTP 200 with `Content-Type: text/plain` containing the translated trend explanation in markdown.
+- **Verification**: GET requests to `/t/google-gemini/es` or `/t/google-gemini?lang=es` return HTML with HTTP 200. GET requests to `/t/google-gemini/es.md` return raw markdown in Spanish with HTTP 200. Invalid slugs must return 404.
 
----
+### [AC-2] Gemini AI Localized Translation Engine
+- **Description**: Under production (live API), the server uses `gemini-3.5-flash` with a JSON schema to translate the explanation (`hook`, `whatIsIt`, `whyIsItViral` array, `takeaway`), page title, and meta description in a single call.
+- **Mock mode (Tests)**: In test mode (`process.env.NODE_ENV === 'test'`), the engine must intercept calls to Gemini and return predefined mock translations for supported locales:
+  - `es` (Spanish): Appends/translates content and adds `(en español)` suffixes.
+  - `fr` (French): Appends/translates content and adds `(en français)` suffixes.
+  - `ja` (Japanese): Appends/translates content and adds `(日本語訳)` suffixes.
+- **Verification**: Check that requesting `/t/google-gemini/es` under mock mode renders text containing `(en español)` in the preloaded script and page copy.
 
-## 🛠️ Implementation Slices
+### [AC-3] Database Caching of Localized Explanations
+- **Description**: Caching must prevent duplicate Gemini API translation calls.
+- **SQLite Schema**: A new table `localized_explanations` must be created with:
+  - `trend TEXT`
+  - `lang TEXT`
+  - `title TEXT`
+  - `meta_description TEXT`
+  - `explanation TEXT` (JSON text containing hook, whatIsIt, whyIsItViral, takeaway)
+  - `created_at TEXT`
+  - Primary Key: `(trend, lang)`
+- **Firestore Collection**: An equivalent collection `localized_explanations` with document ID format `${trend}_${lang}`.
+- **Verification**: Querying the database or cache check function after the first fetch returns the cached translation without calling Gemini again.
 
-### `[S-1]` Add E2E Tests for Client-Side Image Load Errors
-- **Description**: Add new E2E tests in `tests/og-favicon.spec.js` that mock/intercept the trends API and route image requests to return HTTP `404` errors. Assert that the frontend hides the broken images and shows the corresponding fallbacks.
-- **Target Files**: 
-  - `tests/og-favicon.spec.js`
-- **Mapped ACs**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`
-- **Dependency**: None (Independent)
-- **Test Strategy**: Additive / Tests First. The tests must be added and verified to fail (or run with mocked fallbacks asserting properly) before the code is updated.
+### [AC-4] Dynamic Localized SEO & Schema.org JSON-LD (SSR)
+- **Description**: The server-rendered HTML must reflect the localized metadata.
+- **HTML tags updated**:
+  - `<html lang=":lang">` where `:lang` is the requested language code.
+  - `<title>` set to the translated page title.
+  - `<meta name="description" content="...">` set to the translated hook.
+  - Open Graph (`og:title`, `og:description`, `og:url` updated to match locale).
+  - Twitter Cards (`twitter:title`, `twitter:description`).
+  - Structured data script `<script type="application/ld+json">` contains localized `headline`, `description`, and `articleBody` (`${whatIsIt} Takeaway: ${takeaway}`).
+- **Verification**: Inspecting the HTML response of `/t/google-gemini/es` confirms these elements are translated and correct.
 
-### `[S-2]` Implement List Item Image Fallbacks
-- **Description**: Update the template literal generation in `public/app.js` for trend items. For thumbnails, render both the `<img>` and a hidden `.trend-thumbnail-placeholder` side-by-side, adding an `onerror` handler to the `<img>` to hide itself and show the placeholder. For publisher favicons, add an `onerror` handler to hide the element.
-- **Target Files**:
-  - `public/app.js`
-- **Mapped ACs**: `[AC-1]`, `[AC-2]`
-- **Dependency**: `[S-1]`
-
-### `[S-3]` Implement Detail View & News Footer Image Fallbacks
-- **Description**: In `public/app.js`, add `onerror` listeners to `#detail-hero-image` and `#footer-favicon-img` inside the detail views population logic. The hero image error listener will hide itself and show the gradient fallback. The footer favicon error listener will hide itself and restore the generic newspaper SVG icon.
-- **Target Files**:
-  - `public/app.js`
-- **Mapped ACs**: `[AC-3]`, `[AC-4]`
-- **Dependency**: `[S-1]`
-
----
-
-## 💡 Playwright Assertions Guidelines
-- **Polling & Retrying**: Use Playwright's retrying assertions rather than arbitrary timeouts when asserting visibility changes of images and fallbacks after error states are triggered.
-- **Correct Syntax**: Remember that the correct syntax for polling assertions in Playwright is:
-  ```javascript
-  await expect(async () => {
-    // assertion logic
-  }).toPass();
+### [AC-5] Alternate Link Tags & Localized Sitemap
+- **Description**: Standard SEO alternate linkage.
+- **Alternate links in `<head>`**: Inject alternate links in page headers:
+  ```html
+  <link rel="alternate" hreflang="x-default" href="https://viraljacker.com/t/:slug" />
+  <link rel="alternate" hreflang="en" href="https://viraljacker.com/t/:slug" />
+  <link rel="alternate" hreflang="es" href="https://viraljacker.com/t/:slug/es" />
+  <link rel="alternate" hreflang="fr" href="https://viraljacker.com/t/:slug/fr" />
+  <link rel="alternate" hreflang="ja" href="https://viraljacker.com/t/:slug/ja" />
   ```
-  Attempting to pass the assertion block as an argument (e.g., `expect(async () => {}).toPass()`) is required.
+- **Sitemap.xml**: `/sitemap.xml` must map all trend slugs for each locale (`en`, `es`, `fr`, `ja`) as distinct `<url>` items, with each containing the `<xhtml:link rel="alternate" ... />` references.
+- **Verification**: Fetch `/sitemap.xml` and verify it contains all localized routes and alternate hreflang link nodes.
+
+### [AC-6] Client UI Translation & Interactive Switcher
+- **Description**: Add a language selection dropdown (`#lang-select`) in the navbar.
+- **Client-side UI localizer**: Map a dictionary of static UI strings (`whatIsIt`, `takeaway`, `whyViral`, `sentiment`, `pollPrompt`, `digDeeper`, `chatPlaceholder`, etc.) for `en`, `es`, `fr`, `ja`.
+- **Navigation Flow**: Changing `#lang-select` updates the URL state via `pushState` (e.g. `/t/:slug/:lang`), translates static UI text elements on the page, and requests the localized explanation from `/api/explain` using `{ lang }` in the POST body to hydrate the page.
+- **Verification**: Selecting "Español" in the dropdown updates the URL to `/t/google-gemini/es` and translates the UI labels to Spanish instantly without a page reload.
+
+---
+
+## Out of Scope
+- Translating the live sentiment feed location flags and cities (these remain dynamic per their raw values).
+- Localizing the social media generator platforms (e.g. X, LinkedIn) or their raw option structures beyond the prompt inputs.
+- Translating external news article snippets and headlines (only explainer contents, titles, metadata, and UI labels are localized).
+
+---
+
+## Slices
+
+### [S-1] Database Schema & Caching Helpers
+- **ACs mapped**: `[AC-3]`
+- **Files**: `db.js`
+- **Dependency**: None (Base DB file).
+- **Test Strategy (Additive)**: Write unit tests in `tests/caching.spec.js` or a new `tests/localization.spec.js` first, checking that `getLocalizedExplanation` and `setLocalizedExplanation` store and retrieve entries in SQLite and in-memory Map mock.
+- **Implementation**:
+  - Add `localized_explanations` table initialization to `db.js`.
+  - Add Firestore collection helper operations in `db.js` matching standard patterns.
+
+### [S-2] Server Route Handling & Mock Translation Logic
+- **ACs mapped**: `[AC-1]`, `[AC-2]`
+- **Files**: `server.js`
+- **Dependency**: `[S-1]`
+- **Test Strategy (Additive)**: Write integration tests verifying requests to `/t/:slug/:lang`, `/t/:slug?lang=...` and markdown variations. Assert mock responses under test mode.
+- **Implementation**:
+  - Register `/t/:slug/:lang` route in Fastify.
+  - Update route parameters extraction to handle `.md` extensions on slugs/languages.
+  - Implement translation handler with mock logic and production Gemini JSON-schema integration.
+  - Extend `/api/explain` endpoint to accept `lang` parameter and return translated explanation.
+
+### [S-3] SEO/GEO Metadata SSR & Sitemap alternate tags
+- **ACs mapped**: `[AC-4]`, `[AC-5]`
+- **Files**: `server.js`
+- **Dependency**: `[S-2]`
+- **Test Strategy (Additive)**: Add assertions verifying html attributes and metadata in SSR responses and alternate tag existence in sitemap.xml.
+- **Implementation**:
+  - Modify HTML generation for `/t/:slug` and `/t/:slug/:lang` to dynamically replace `<html lang="en">` with correct locale.
+  - Dynamically generate Open Graph, Twitter cards, and JSON-LD structured data in correct locale.
+  - Inject alternate hreflang link tags into `<head>`.
+  - Update `/sitemap.xml` route handler to output `xhtml:link` alternates.
+
+### [S-4] Client-Side Language Dropdown & Dictionary Hydration
+- **ACs mapped**: `[AC-6]`
+- **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
+- **Dependency**: `[S-3]`
+- **Test Strategy (Additive)**: Playwright E2E browser tests mimicking dropdown selection, verifying single-page navigation and text content updates.
+- **Implementation**:
+  - Inject `#lang-select` into the HTML navbar.
+  - Update `public/app.js` to parse locale on initialization.
+  - Add UI localization dictionary and DOM helper to translate labeled fields.
+  - Wire dropdown change event to update URL with `pushState` and perform ajax fetch to `/api/explain` with target `lang`.
+
+---
+
+## Test & Concurrency Guidelines
+
+### Playwright Retrying Assertions
+- The correct syntax for polling assertions in Playwright is `expect(async () => { ... }).toPass();` to prevent flaky failures under heavy runner load. Do NOT use `expect().toPass(...)`.
+
+### SQLite & Playwright Concurrency
+- Run Playwright tests with a single worker (`--workers=1`) or enable SQLite WAL mode to prevent transient "database is locked" errors caused by concurrent writes on a shared DB file.
