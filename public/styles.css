@@ -2422,5 +2422,71 @@ body {
   box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
 }
 
+/* Demographic Selector & Theme Customizations */
+.demographic-selector {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.demo-pill {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  backdrop-filter: blur(4px);
+}
+
+.demo-pill:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: var(--text-heading);
+}
+
+.demo-pill.active {
+  background: var(--accent-gradient);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.25);
+}
+
+/* Kids & Teens energetic styling */
+#explainer-view[data-demographic="kids_teens"],
+.kids-teens-theme {
+  --glow-color: #f43f5e;
+  box-shadow: 0 0 25px rgba(244, 63, 94, 0.35) !important;
+  border: 1.5px solid rgba(244, 63, 94, 0.5) !important;
+}
+
+#explainer-view[data-demographic="kids_teens"] .viral-tag {
+  background: var(--accent-gradient) !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+/* Seniors style adaptation - text scaled up & contrast maximized */
+#explainer-view[data-demographic="seniors"] #detail-hook {
+  font-size: 1.35rem !important;
+  color: #ffffff !important;
+  line-height: 1.8 !important;
+}
+
+#explainer-view[data-demographic="seniors"] #detail-what,
+#explainer-view[data-demographic="seniors"] #detail-takeaway,
+#explainer-view[data-demographic="seniors"] #detail-news-snippet,
+#explainer-view[data-demographic="seniors"] .news-snippet {
+  font-size: 1.25rem !important;
+  color: #ffffff !important;
+  line-height: 1.8 !important;
+}
+
+
 
 

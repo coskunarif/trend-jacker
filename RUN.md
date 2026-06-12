@@ -1,51 +1,49 @@
-task: Prevent visual text overlapping and clipping on dynamically generated infographic sharing cards to increase social share rate. (Moves: Infographic share card download and sharing rate. Why now: Current implementation uses static vertical offsets for custom text and hooks which causes layout collision when text is long. Runner-up: Progressive Enhancement for Web Share API and Download Feedback.) tier: T2   creativity: 0.5
-state: complete
-branch: asf/20260612-canvas-overflow          checkpoint: asf/20260612-canvas-overflow/green-1
+task: Customize trend presentation dynamically to increase average session duration across all age brackets from 7 to 70. (Moves: Average session duration. Why now: The platform currently serves a single explanation style, failing to capture or retain younger demographics (kids/teens) or older users (seniors) who require different context types and presentation styles. Runner-up: Segment voting choices and visual timelines by demographic brackets to increase social sharing and voter engagement.) tier: T2   creativity: 0.5
+state: complete             budget: repairs 0/3
+branch: asf/20260612-dynamic-presentation checkpoint: asf/20260612-dynamic-presentation/green-1
 caps: agents,ui,web,human
 
 ## Log
 - 2026-06-12: Conductor starting fresh run with Scout phase.
-- 2026-06-12: Scout running local dev server on port 3080.
-- 2026-06-12: Scout phase completed. Selected Dynamic Canvas Positioning & Layout Overflow Prevention as the task winner.
-- 2026-06-12: Conductor starting Architect phase.
-- 2026-06-12: Architect completed SPEC.md.
-- 2026-06-12: Conductor starting Tester phase.
-- 2026-06-12: Tester completed tests. Observed state: red.
-- 2026-06-12: Conductor starting Builder phase.
-- 2026-06-12: Builder completed all slices. Observed state: green.
-- 2026-06-12: Conductor starting Verifier phase.
-- 2026-06-12: Verifier completed validation checks successfully. All checks passed.
-- 2026-06-12: Conductor starting Shipper phase.
-- 2026-06-12: Shipper completed final tagging, verification, PR creation, and integration.
-
+- 2026-06-12: Scout phase completed. Winner selected: Customize trend presentation dynamically. Conductor starting Architect phase.
+- 2026-06-12: Architect completed SPEC.md. Conductor starting Tester phase.
+- 2026-06-12: Tester completed tests. Observed state: red. Conductor starting Builder phase.
+- 2026-06-12: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-12: Verifier started dev server on port 3005.
+- 2026-06-12: Verifier completed validation checks successfully. All checks passed. Conductor starting Shipper phase.
 ## Verdict
-- **[AC-1] Dynamic Subtitle & Header Positioning (Infographic)**: PASS. Layout shifts dynamically when custom subtitle exists (+65px spacing). Default y-coordinate 275 when absent. Verified via telemetry.
-- **[AC-2] Enhanced wrapText Helper**: PASS. Accepts `dryRun` flag, returns final y-coordinate, does not draw if `dryRun: true`. Verified via programmatic test assertions.
-- **[AC-3] Dynamic Hook Box Sizing (Infographic)**: PASS. RoundRect box scales dynamically to `(lastHookTextY - hookTextStartY) + 80` (min 120px). Verified via telemetry.
-- **[AC-4] Dynamic Font Scaling & Footer Boundary Constraint (Infographic)**: PASS. Constrained to y=540 by loop reduction of font size (18px -> 12px) and line height (28px -> 19px) and capped if still exceeding at 12px. Verified via E2E test.
-- **[AC-5] Dynamic Positioning & Sizing on Standard Share Card**: PASS. Sizes hook box, shifts subsequent sections down, applies font-scaling loop. Verified via telemetry.
-- **[AC-6] Global Layout Telemetry**: PASS. Telemetry values written to `window.__canvasLayouts.infographic` and `window.__canvasLayouts.trendCard`. Verified in Playwright.
-- **[AC-7] E2E Layout & Overlay Validation**: PASS. `tests/infographic-overlays.spec.js` covers no subtitle, normal subtitle, and long subtitle + long hook scenarios. All 114 suite tests pass.
-- **Visual & Behavioral Dogfooding**: PASS. Executed browser automation using `agent-browser` on local dev server. Captured screenshots, checked layout, and verified zero console errors.
+- [AC-1] API Extension: PASS. verified POST /api/explain accepts bracket parameter and returns success.
+- [AC-2] Backend Demographic Generation Guidelines: PASS. Verified prompt customize templates in server.js (energetic tone/emojis for kids_teens, historical/plain language for seniors).
+- [AC-3] Database Caching with Bracket Key: PASS. Verified that non-default brackets are cached in trend_explanations and localized_explanations tables using the `{trend}:{bracket}` suffix.
+- [AC-4] Interactive UI demographic selector: PASS. Verified rendering of pills "Adult (Default)", "Kids & Teens", and "Seniors" below the hero container.
+- [AC-5] Client-side Dynamic Presentation Switching: PASS. Verified dynamic styling variables for kids-teens-theme and text scaling / maximized contrast for seniors.
+- [AC-6] LocalStorage Persistence: PASS. Verified preference saved to local storage and restored on reload/navigation.
+- [AC-7] Test Mode / Mock Support: PASS. Checked mock response wording with slang/context in test mode.
+- E2E Tests: PASS. Verified Playwright test suite passes (120/120 tests passed).
+- Dogfooding: PASS. Explored the frontend features without encountering console or visual errors.
 
 ## Done
+### What Shipped:
+- Added dynamic trend presentation options based on demographic brackets ("Kids & Teens", "Seniors", and "Adults") to increase user engagement and average session duration.
+- Integrated age-bracketed template instructions on the backend to customize explanation tone (slang and emojis for kids/teens; historical context, respectful, and plain language for seniors).
+- Sized fonts up to 1.25x and maximized contrast for the Seniors demographic theme.
+- Sourced energetic theme colors and custom layout overrides for the Kids & Teens demographic theme.
+- Cached dynamic bracket explanations in the database tables (`trend_explanations`, `localized_explanations`) using the suffix format `{trend}:{bracket}` to preserve separate demographic variants.
+- Saved user demographic choice in `localStorage` to persist layout preference upon reload and navigation.
 
-### Summary of Shipped Work
-We successfully resolved visual text overlapping and clipping on dynamically generated infographic and standard sharing cards. By enhancing the text wrapping utility with a `dryRun` execution option, the canvas generators dynamically measure text blocks and calculate coordinate offsets. Spacing updates dynamically based on subtitle wraps (+65px spacing), and the background hook box scales dynamically. A boundary-fitting loop reduces the hook text's font size (from 18px down to 12px) and line-height if the layout exceeds y=540. If the text still exceeds limits at the minimum font size, the box height is constrained, preventing overlap with the footer.
+### Acceptance Criteria Evidence
 
-### Acceptance Criteria & Verification Evidence
+| Acceptance Criterion | Verification Status | Evidence / Verification Method |
+| --- | --- | --- |
+| [AC-1] API Extension | PASS | Verified `POST /api/explain` handles `bracket` payload correctly. |
+| [AC-2] Backend Demographic Guidelines | PASS | Verified Gemini guidelines customized for kids_teens (energetic/emojis) and seniors (historical context). |
+| [AC-3] Database Caching with Bracket Key | PASS | Database tables cache `{trend}:{bracket}` variations. |
+| [AC-4] Interactive UI demographic selector | PASS | Selector pills (Kids & Teens, Adults, Seniors) render in UI. |
+| [AC-5] Client-side Dynamic Presentation Switching | PASS | Dynamic styles applied (1.25x zoom for seniors; theme color overrides for kids). |
+| [AC-6] LocalStorage Persistence | PASS | Preference successfully persisted in `localStorage`. |
+| [AC-7] Test Mode / Mock Support | PASS | Deterministic mock responses returned correctly in test mode. |
 
-| Acceptance Criterion | Verification Evidence / Pass State |
-|----------------------|------------------------------------|
-| **[AC-1] Dynamic Subtitle & Header Positioning** | Passed. Telemetry checks confirm "THE AI HOOK" header shifts dynamically to subtitle bottom plus 65px (defaults to 275px). |
-| **[AC-2] Enhanced wrapText Helper** | Passed. Supports `dryRun: true` and calculates wrapped layout height without executing `ctx.fillText`. |
-| **[AC-3] Dynamic Hook Box Sizing** | Passed. Canvas roundRect hook box height dynamically matches `(lastHookTextY - hookTextStartY) + 80`, min 120px. |
-| **[AC-4] Footer Boundary Constraint** | Passed. Limits layout to y=540 using recursive scale reduction on font sizes (18px -> 12px) and line heights (28px -> 19px). |
-| **[AC-5] Standard Share Card Dynamic Sizing** | Passed. Sizes hook box, shifts community sentiment and poll down, and applies scale loop to fit under y=540. |
-| **[AC-6] Global Layout Telemetry** | Passed. Card generators populate layout data on `window.__canvasLayouts.infographic` and `window.__canvasLayouts.trendCard`. |
-| **[AC-7] E2E Layout & Overlay Validation** | Passed. Checked three distinct scenarios: no subtitle, 1-line subtitle, and multi-line subtitle with long hook text. All 114 tests passed. |
-
-### Pull Request & Integration Details
-- **Pull Request Link**: [PR #23](https://github.com/coskunarif/trend-jacker/pull/23)
-- **Integration Method**: `gh pr merge --merge` to merge the branch `asf/20260612-canvas-overflow` into `main`.
-- **Production URL**: Local production server.
+### PR & Deploy links:
+- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/25 (Squash merge to `main`)
+- **Deployment Action**: https://github.com/coskunarif/trend-jacker/actions (GitHub Actions Run)
+- **Tag**: `asf/20260612-dynamic-presentation/green-1`

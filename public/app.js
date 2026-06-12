@@ -260,6 +260,49 @@ function initApp() {
   const gaugeGeniusPct = document.getElementById('gauge-genius-pct');
   const btnDownloadInfographic = document.getElementById('btn-download-infographic');
 
+  function updateDemographicPills(demographic) {
+    const pills = document.querySelectorAll('.demo-pill');
+    pills.forEach(pill => {
+      if (pill.getAttribute('data-val') === demographic) {
+        pill.classList.add('active');
+      } else {
+        pill.classList.remove('active');
+      }
+    });
+
+    if (explainerView) {
+      explainerView.setAttribute('data-demographic', demographic);
+      if (demographic === 'kids_teens') {
+        explainerView.classList.add('kids-teens-theme');
+      } else {
+        explainerView.classList.remove('kids-teens-theme');
+      }
+    }
+    document.body.setAttribute('data-demographic', demographic);
+    if (demographic === 'kids_teens') {
+      document.body.classList.add('kids-teens-theme');
+    } else {
+      document.body.classList.remove('kids-teens-theme');
+    }
+  }
+
+  const demographicSelector = document.getElementById('demographic-selector');
+  if (demographicSelector) {
+    demographicSelector.addEventListener('click', async (e) => {
+      const pill = e.target.closest('.demo-pill');
+      if (!pill) return;
+      const targetVal = pill.getAttribute('data-val');
+      localStorage.setItem('selected-demographic', targetVal);
+      updateDemographicPills(targetVal);
+      if (currentTrend) {
+        await loadTrendDetails(currentTrend);
+      }
+    });
+  }
+
+  const initialDemographic = localStorage.getItem('selected-demographic') || 'adults';
+  updateDemographicPills(initialDemographic);
+
   // Mobile drawer elements
   const btnSidebarToggle = document.getElementById('sidebar-toggle');
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
@@ -463,7 +506,8 @@ function initApp() {
               trend: currentTrend.title,
               snippet: currentTrend.news ? currentTrend.news.snippet : '',
               headline: currentTrend.news ? currentTrend.news.headline : '',
-              lang: selectedLang
+              lang: selectedLang,
+              bracket: localStorage.getItem('selected-demographic') || 'adults'
             })
           });
           
@@ -606,12 +650,16 @@ function initApp() {
         throw new Error('Failed to generate post');
       }
       const data = await response.json();
-      sharePreviewText.value = data.postText || '';
-      updatePreviewAndValidation();
+      if (sharePreviewText.value === 'Generating post...') {
+        sharePreviewText.value = data.postText || '';
+        updatePreviewAndValidation();
+      }
     } catch (err) {
       console.error(err);
-      sharePreviewText.value = 'Error generating post. Please try again.';
-      updatePreviewAndValidation();
+      if (sharePreviewText.value === 'Generating post...') {
+        sharePreviewText.value = 'Error generating post. Please try again.';
+        updatePreviewAndValidation();
+      }
     }
   }
 
@@ -1024,7 +1072,8 @@ function initApp() {
     try {
       let data;
       // Hydrate explanation if preloadedData matches
-      if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && !navigator.webdriver) {
+      const currentDemo = localStorage.getItem('selected-demographic') || 'adults';
+      if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && currentDemo === 'adults' && !navigator.webdriver) {
         data = preloadedData.explanation;
         preloadedData = null; // Clear to allow future live fetches
       } else {
@@ -1036,7 +1085,8 @@ function initApp() {
             trend: trend.title,
             snippet: trend.news ? trend.news.snippet : '',
             headline: trend.news ? trend.news.headline : '',
-            lang: selectedLang
+            lang: selectedLang,
+            bracket: currentDemo
           })
         });
         

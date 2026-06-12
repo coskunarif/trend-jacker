@@ -618,9 +618,10 @@ fastify.get('/api/sentiment-stream', (request, reply) => {
 });
 
 // Helper to get explanation from Gemini
-async function getTrendExplanation(trend, headline = '', snippet = '') {
+async function getTrendExplanation(trend, headline = '', snippet = '', bracket = 'adults') {
+  const trendKey = (bracket && bracket !== 'adults') ? `${trend}:${bracket}` : trend;
   // Check the cache first
-  const cached = await getCachedExplanation(trend);
+  const cached = await getCachedExplanation(trendKey);
   if (cached) {
     cached.polls = await getPollData(trend);
     return cached;
@@ -628,12 +629,28 @@ async function getTrendExplanation(trend, headline = '', snippet = '') {
 
   let explanation;
   if (process.env.NODE_ENV === 'test') {
-    explanation = {
-      hook: 'Gemini is capturing developer mindshare with low latency and long context.',
-      whatIsIt: 'Google Gemini is a suite of multimodal generative AI models.',
-      whyIsItViral: ['Long context window', 'Low latency API', 'Reasoning capability'],
-      takeaway: 'Expect Gemini to power next-gen agentic workflows.'
-    };
+    if (bracket === 'kids_teens') {
+      explanation = {
+        hook: 'This trend is absolutely cooking right now, no cap!',
+        whatIsIt: 'It is a viral phenomenon that is taking over everyone\'s feed.',
+        whyIsItViral: ['Pure brainrot energy', 'Massive memes', 'High key addictive content'],
+        takeaway: 'Vibe check passed. We are locked in.'
+      };
+    } else if (bracket === 'seniors') {
+      explanation = {
+        hook: 'This topic has gained significant interest and historical context is helpful.',
+        whatIsIt: 'It is a modern technological development built on years of research.',
+        whyIsItViral: ['Long-term industry shifts', 'Broader economic patterns', 'Clear societal impact'],
+        takeaway: 'A mature perspective suggests steady progress lies ahead.'
+      };
+    } else {
+      explanation = {
+        hook: 'Gemini is capturing developer mindshare with low latency and long context.',
+        whatIsIt: 'Google Gemini is a suite of multimodal generative AI models.',
+        whyIsItViral: ['Long context window', 'Low latency API', 'Reasoning capability'],
+        takeaway: 'Expect Gemini to power next-gen agentic workflows.'
+      };
+    }
   } else {
     if (!genAI) {
       throw new Error('Gemini API not configured.');
@@ -656,17 +673,27 @@ async function getTrendExplanation(trend, headline = '', snippet = '') {
             takeaway: { type: "STRING" }
           },
           required: ["hook", "whatIsIt", "whyIsItViral", "takeaway"]
-        },
-        thinkingConfig: { thinkingLevel: 'LOW' }
+        }
       }
     });
+
+    let promptDemographicGuideline = '';
+    if (bracket === 'kids_teens') {
+      promptDemographicGuideline = `Explain the trend for a younger demographic (Kids & Teens). Use simple analogies, gaming/meme/internet reference points, emojis, and an energetic tone. Avoid corporate fluff and dry explanations.`;
+    } else if (bracket === 'seniors') {
+      promptDemographicGuideline = `Explain the trend for an older demographic (Seniors). Use clear definitions, historical/long-term context, and high readability. Do NOT use transient internet slang, keep the language respectful, plain, and easy to understand.`;
+    } else {
+      promptDemographicGuideline = `Explain the trend for an adult demographic. Write in a catchy, active voice, and keep it concise. Avoid fluff.`;
+    }
 
     const prompt = `You are a viral trend analyst. Explain why the topic "${trend}" is trending.
 Here is the context headline: "${headline || ''}".
 Here is the context snippet: "${snippet || ''}".
 
-Style guidelines:
-Write in a catchy, active voice, and keep it concise. Avoid fluff.
+Demographic Target:
+${promptDemographicGuideline}
+
+General Style guidelines:
 Do NOT use any of the following blacklisted/banned words: delve, tapestry, revolutionize, unlock, moreover, testament to, it is important to note, firstly, in conclusion, embark.`;
 
     const result = await model.generateContent(prompt);
@@ -681,13 +708,13 @@ Do NOT use any of the following blacklisted/banned words: delve, tapestry, revol
   }
 
   // Write explanation to cache
-  await setCachedExplanation(trend, explanation);
+  await setCachedExplanation(trendKey, explanation);
 
   // Retrieve live poll statistics
   explanation.polls = await getPollData(trend);
 
   // Fetch newly cached object to get created_at
-  const freshlyCached = await getCachedExplanation(trend);
+  const freshlyCached = await getCachedExplanation(trendKey);
   if (freshlyCached) {
     explanation.created_at = freshlyCached.created_at;
   } else {
@@ -698,13 +725,15 @@ Do NOT use any of the following blacklisted/banned words: delve, tapestry, revol
 }
 
 // Helper to get localized trend explanation (production + mock/test mode)
-async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet = '') {
+async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet = '', bracket = 'adults') {
   const normalizedLang = (lang || 'en').toLowerCase().trim();
   const supported = ['es', 'fr', 'ja'];
 
+  const trendKey = (bracket && bracket !== 'adults') ? `${trend}:${bracket}` : trend;
+
   if (!supported.includes(normalizedLang)) {
     // Fallback/Use English
-    const explanation = await getTrendExplanation(trend, headline, snippet);
+    const explanation = await getTrendExplanation(trend, headline, snippet, bracket);
     return {
       title: `Why is ${trend} Trending? | TrendJacker`,
       meta_description: explanation.hook,
@@ -715,7 +744,7 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
   }
 
   // Check localized cache first
-  const cached = await getLocalizedExplanation(trend, normalizedLang);
+  const cached = await getLocalizedExplanation(trendKey, normalizedLang);
   if (cached) {
     cached.explanation.polls = await getPollData(trend);
     return {
@@ -730,7 +759,7 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
   let result;
   if (process.env.NODE_ENV === 'test') {
     const suffix = normalizedLang === 'es' ? '(en español)' : normalizedLang === 'fr' ? '(en français)' : '(日本語訳)';
-    const englishExpl = await getTrendExplanation(trend, headline, snippet);
+    const englishExpl = await getTrendExplanation(trend, headline, snippet, bracket);
     const explanation = {
       hook: `${englishExpl.hook} ${suffix}`,
       whatIsIt: `${englishExpl.whatIsIt} ${suffix}`,
@@ -750,7 +779,7 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
       throw new Error('Gemini API not configured.');
     }
 
-    const englishExpl = await getTrendExplanation(trend, headline, snippet);
+    const englishExpl = await getTrendExplanation(trend, headline, snippet, bracket);
 
     const model = genAI.getGenerativeModel({
       model: 'gemini-3.5-flash',
@@ -808,14 +837,14 @@ Ensure all translated fields conform to the response schema and are in the langu
   }
 
   // Save to cache
-  await setLocalizedExplanation(trend, normalizedLang, result);
+  await setLocalizedExplanation(trendKey, normalizedLang, result);
 
   // Attach polls
   result.explanation.polls = await getPollData(trend);
   result.lang = normalizedLang;
 
   // Retrieve to get created_at timestamp
-  const freshlyCached = await getLocalizedExplanation(trend, normalizedLang);
+  const freshlyCached = await getLocalizedExplanation(trendKey, normalizedLang);
   if (freshlyCached) {
     result.created_at = freshlyCached.created_at;
   } else {
@@ -1078,13 +1107,16 @@ async function handleTrendRequest(request, reply, slug, lang) {
 
 // POST /api/explain - Explains a trend using Gemini (supports localization)
 fastify.post('/api/explain', async (request, reply) => {
-  const { trend, snippet, headline, lang } = request.body || {};
+  const { trend, snippet, headline, lang, bracket = 'adults' } = request.body || {};
   if (!trend) {
     return reply.status(400).send({ error: 'Trend name is required.' });
   }
 
+  const validBrackets = ['kids_teens', 'adults', 'seniors'];
+  const activeBracket = validBrackets.includes(bracket) ? bracket : 'adults';
+
   try {
-    const localizedData = await getLocalizedTrendExplanation(trend, lang || 'en', headline, snippet);
+    const localizedData = await getLocalizedTrendExplanation(trend, lang || 'en', headline, snippet, activeBracket);
     return localizedData.explanation;
   } catch (err) {
     fastify.log.error(err);
