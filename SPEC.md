@@ -1,38 +1,36 @@
-# SPEC.md — Consolidate social sharing buttons into a unified high-fidelity share modal
+# Specification — High-DPI Visual Share Card Rendering
 
-## Acceptance Criteria
+Retina-ready high-resolution rendering of social share cards (Trend Explainer and Infographic Cards) to ensure clear, pixel-perfect social click-through previews on high-DPI screens and mobile devices.
 
-- **[AC-1] Unified Modal Component Structure**:
-  - The UI must have a single `#share-modal` overlays elements with `hidden` class toggle control.
-  - The modal must contain:
-    - `#share-modal-title` for the dynamic header.
-    - `#btn-close-share-modal` to close the modal.
-    - `#share-context-select` dropdown (values: `general` and `poll`).
-    - Four `.platform-pill` buttons (data-platform: `x`, `linkedin`, `facebook`, `reddit`).
-    - `#share-preview-text` textarea showing generating status or final generated text.
-    - `#btn-copy-share` button to copy content to clipboard.
-    - `#btn-post-share` button to trigger the sharing intent url.
+---
 
-- **[AC-2] Pre-selection & Behavior**:
-  - Opening via `#btn-share-trend` opens modal with `#share-context-select` set to `general`.
-  - Opening via `#btn-share-poll` opens modal with `#share-context-select` set to `poll`.
-  - Selecting another context select option or platform pill must update the post preview dynamically via backend API `/api/generate-post`.
+## 🎯 Acceptance Criteria
 
-- **[AC-3] Redundant Button Removal**:
-  - Legacy individual buttons `#btn-share-x` and `#btn-share-poll-x` must not be attached or rendered.
+- **[AC-1] High-DPI Canvas Scaling Factor**:
+  - The canvas dimensions must be scaled by a multiplier of `2` (making the physical size `2400x1260` instead of `1200x630`) to output high-definition images.
+  - The 2D rendering context must use `ctx.scale(2, 2)` so that existing vector math coordinates do not have to be manually recalculated.
+- **[AC-2] Unified Quality in Sharing/Downloads**:
+  - Both the **Trend Card** (`generateTrendCardImage`) and the **Infographic Card** (`generateInfographicCard`) must render sharp text, borders, gradients, and SVGs on download or share.
+- **[AC-3] Automated Validation**:
+  - Playwright integration tests must mock the download trigger and assert that the generated/downloaded PNG images possess high-DPI dimensions (`2400` width and `1260` height).
 
-- **[AC-4] Social Media Copy Constraints**:
-  - Platform X: Under 280 characters, includes target URL, contains 2-3 relevant hashtags.
-  - Platform LinkedIn: Professional style, includes target URL, contains exactly 3 hashtags on the last line.
-  - Platform Facebook: Clean style, includes target URL, contains 1-2 relevant hashtags.
-  - Platform Reddit: Reddit styling, includes target URL, headline hook, structured body, contains no hashtags.
+---
 
-## Out of Scope
-- Creating new backend API endpoints for other platforms.
-- Implementing actual server-side posting to social networks.
+## 🚷 Out of Scope
 
-## Slices
+- Redesigning the visual assets/layout or modifying text content of the cards.
+- Adding third-party image manipulation libraries.
 
-- **[S-1] Setup SPEC and Validate Test Suite**:
-  - Files: `SPEC.md`, `tests/viral-generator.spec.js`
-  - Already completed & verified as part of architecture bootstrap. No further action needed.
+---
+
+## 🛠️ Slices
+
+### [S-1] Additive/Refinement: High-DPI Canvas Scaling Implementation
+- **Description**: Add canvas scale logic inside `generateTrendCardImage` and `generateInfographicCard` in `public/app.js`. Scale canvas dimensions to `2400x1260` and execute `ctx.scale(2, 2)` before drawing.
+- **Files**: `public/app.js`
+- **ACs**: `[AC-1]`, `[AC-2]`
+
+### [S-2] Test: High-DPI E2E Verification
+- **Description**: Update Playwright test suite to mock the download and check that the exported files have the high-resolution (`2400x1260`) properties.
+- **Files**: `tests/viral-generator.spec.js`, `tests/visual.spec.js`
+- **ACs**: `[AC-3]`
