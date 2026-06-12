@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Search Authority & GEO Optimization Tests', () => {
-  let db;
   let getCachedExplanation;
   let getLocalizedExplanation;
   let setCachedExplanation;
@@ -24,21 +23,6 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
       setLocalizedExplanation = dbModule.setLocalizedExplanation;
     } catch (err) {
       console.warn('Could not import caching functions from db.js:', err.message);
-    }
-    try {
-      db = new DatabaseSync(dbPath);
-    } catch (err) {
-      console.warn('Could not connect to SQLite database:', err.message);
-    }
-  });
-
-  test.afterAll(() => {
-    if (db) {
-      try {
-        db.close();
-      } catch (err) {
-        // ignore
-      }
     }
   });
 
@@ -177,7 +161,10 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
    * Verification: datePublished and dateModified are set dynamically using explanation's `created_at`.
    */
   test('AC-1: JSON-LD uses created_at from database when available', async ({ request }) => {
-    if (!db) {
+    let localDb;
+    try {
+      localDb = new DatabaseSync(dbPath);
+    } catch (err) {
       test.skip(true, 'SQLite database is not available for seeding');
     }
 
@@ -186,7 +173,7 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
     
     // Insert/update a trend explanation record with a fixed created_at in sqlite
     try {
-      db.prepare(`
+      localDb.prepare(`
         INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
         VALUES (?, ?, ?)
       `).run(
@@ -200,6 +187,10 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
         testTime
       );
 
+      // Close the connection before calling the API to prevent database locking
+      localDb.close();
+      localDb = null;
+
       const response = await request.get('/t/google-gemini');
       expect(response.status()).toBe(200);
       const html = await response.text();
@@ -211,11 +202,24 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
       expect(jsonLd['datePublished']).toBe(testTime);
       expect(jsonLd['dateModified']).toBe(testTime);
     } finally {
-      // Clean up/restore database row if needed
-      try {
-        db.prepare('DELETE FROM trend_explanations WHERE trend = ?').run(trendName);
-      } catch (e) {
-        // ignore
+      if (localDb) {
+        try {
+          localDb.prepare('DELETE FROM trend_explanations WHERE trend = ?').run(trendName);
+        } catch (e) {
+          // ignore
+        }
+        localDb.close();
+      } else {
+        try {
+          const cleanupDb = new DatabaseSync(dbPath);
+          try {
+            cleanupDb.prepare('DELETE FROM trend_explanations WHERE trend = ?').run(trendName);
+          } finally {
+            cleanupDb.close();
+          }
+        } catch (e) {
+          // ignore
+        }
       }
     }
   });

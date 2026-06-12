@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Database Explanation Caching [AC-2]', () => {
-  let db;
   let getCachedExplanation;
   let setCachedExplanation;
 
@@ -24,26 +23,24 @@ test.describe('Database Explanation Caching [AC-2]', () => {
     } catch (err) {
       console.warn('Could not import caching functions from db.js:', err.message);
     }
-    db = new DatabaseSync(dbPath);
-  });
-
-  test.afterAll(() => {
-    if (db) {
-      db.close();
-    }
   });
 
   // [AC-2] Schema Verification: SQLite table trend_explanations exists and has correct columns
   test('should have the trend_explanations table created in SQLite with correct schema', async () => {
-    const stmt = db.prepare(`
-      SELECT sql FROM sqlite_master 
-      WHERE type = 'table' AND name = 'trend_explanations'
-    `);
-    const row = stmt.get();
-    expect(row).toBeDefined();
-    expect(row.sql).toContain('trend TEXT PRIMARY KEY');
-    expect(row.sql).toContain('explanation TEXT');
-    expect(row.sql).toContain('created_at TEXT');
+    const db = new DatabaseSync(dbPath);
+    try {
+      const stmt = db.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'trend_explanations'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('trend TEXT PRIMARY KEY');
+      expect(row.sql).toContain('explanation TEXT');
+      expect(row.sql).toContain('created_at TEXT');
+    } finally {
+      db.close();
+    }
   });
 
   // [AC-2] getCachedExplanation and setCachedExplanation unit tests
@@ -64,12 +61,17 @@ test.describe('Database Explanation Caching [AC-2]', () => {
     await setCachedExplanation(testTrend, testExpl);
 
     // Retrieve directly from SQLite table to confirm serialization
-    const checkStmt = db.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
-    const dbRow = checkStmt.get(testTrend);
-    expect(dbRow).toBeDefined();
-    const parsed = JSON.parse(dbRow.explanation);
-    expect(parsed).toEqual(testExpl);
-    expect(dbRow.created_at).toBeDefined();
+    const db = new DatabaseSync(dbPath);
+    try {
+      const checkStmt = db.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
+      const dbRow = checkStmt.get(testTrend);
+      expect(dbRow).toBeDefined();
+      const parsed = JSON.parse(dbRow.explanation);
+      expect(parsed).toEqual(testExpl);
+      expect(dbRow.created_at).toBeDefined();
+    } finally {
+      db.close();
+    }
 
     // Retrieve via getCachedExplanation function
     const cached = await getCachedExplanation(testTrend);
@@ -106,20 +108,23 @@ test.describe('Trend Explanation API Caching [AC-1]', () => {
 
     // Verify it exists in SQLite database
     const db = new DatabaseSync(dbPath);
-    const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
-    const rowBefore = checkStmt.get(testTrend);
-    expect(rowBefore).toBeDefined();
+    try {
+      const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
+      const rowBefore = checkStmt.get(testTrend);
+      expect(rowBefore).toBeDefined();
 
-    // 2. Modify database record directly to set specific custom text
-    const customExplanation = {
-      hook: 'Custom Cached Hook',
-      whatIsIt: 'Custom Cached Explanation text',
-      whyIsItViral: ['Custom reason 1', 'Custom reason 2'],
-      takeaway: 'Custom Cached Takeaway'
-    };
-    const updateStmt = db.prepare('UPDATE trend_explanations SET explanation = ? WHERE trend = ?');
-    updateStmt.run(JSON.stringify(customExplanation), testTrend);
-    db.close();
+      // 2. Modify database record directly to set specific custom text
+      const customExplanation = {
+        hook: 'Custom Cached Hook',
+        whatIsIt: 'Custom Cached Explanation text',
+        whyIsItViral: ['Custom reason 1', 'Custom reason 2'],
+        takeaway: 'Custom Cached Takeaway'
+      };
+      const updateStmt = db.prepare('UPDATE trend_explanations SET explanation = ? WHERE trend = ?');
+      updateStmt.run(JSON.stringify(customExplanation), testTrend);
+    } finally {
+      db.close();
+    }
 
     // 3. Second request: should load from cache, and thus return our custom modification
     const res2 = await request.post('/api/explain', {
@@ -149,15 +154,18 @@ test.describe('Live Dynamic Sentiment Poll Integration [AC-3]', () => {
       takeaway: 'Static Cached Takeaway'
     };
     
-    const insertStmt = db.prepare(`
-      INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
-      VALUES (?, ?, ?)
-    `);
-    insertStmt.run(testTrend, JSON.stringify(customExplanation), new Date().toISOString());
+    try {
+      const insertStmt = db.prepare(`
+        INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
+        VALUES (?, ?, ?)
+      `);
+      insertStmt.run(testTrend, JSON.stringify(customExplanation), new Date().toISOString());
 
-    // Initialize/seed poll votes
-    db.prepare('INSERT OR REPLACE INTO votes (trend, overrated, genius) VALUES (?, 10, 20)').run(testTrend);
-    db.close();
+      // Initialize/seed poll votes
+      db.prepare('INSERT OR REPLACE INTO votes (trend, overrated, genius) VALUES (?, 10, 20)').run(testTrend);
+    } finally {
+      db.close();
+    }
 
     // 2. First explanation request: should return static explanation merged with the initial votes
     const res1 = await request.post('/api/explain', {
