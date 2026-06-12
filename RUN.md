@@ -1,5 +1,5 @@
 task: Achieve 100% E2E test pass rate. Metric: Test Suite Pass Rate. Why now: Baseline test suite is failing due to a race condition. Runner-up: Consolidate sharing UI to increase viral share conversion. tier: T2   creativity: 0.3
-state: Tester                 budget: repairs 1/3
+state: Verifier               budget: repairs 1/3
 branch: asf/20260612-test-repair         checkpoint: none
 caps: agents,ui,web,human
 
@@ -12,24 +12,7 @@ caps: agents,ui,web,human
 - 2026-06-12: Tester completed test repair. Observed state: green.
 - 2026-06-12: Conductor starting Verifier phase.
 - 2026-06-12: Verifier reported failure on AC-2 (database is locked in tests/caching.spec.js). Hypothesis: Persistent database connection or un-isolated sqlite access is blocking parallel writes. Conductor starting Tester phase to repair tests/caching.spec.js.
+- 2026-06-12: Tester successfully resolved locking contention in caching, localization, and seo tests.
+- 2026-06-12: Conductor starting Verifier phase.
 ## Verdict
-- **[AC-1] Prevent SQLite Locks in LLM Caching Tests**: PASS
-- **[AC-2] Complete Parallel Pass Rate**: FAIL
-
-### Failure Details:
-- **AC Broken**: `[AC-2]`
-- **Evidence**:
-  ```
-  1) [chromium] › tests/caching.spec.js:96:3 › Trend Explanation API Caching [AC-1] › should serve explanation from cache on subsequent API calls (verified via DB modification) 
-
-    Error: database is locked
-
-      119 |     };
-      120 |     const updateStmt = db.prepare('UPDATE trend_explanations SET explanation = ? WHERE trend = ?');
-    > 121 |     updateStmt.run(JSON.stringify(customExplanation), testTrend);
-          |                ^
-      122 |     db.close();
-  ```
-- **Suspected Cause**: The test `tests/caching.spec.js` (and potentially other test files) still maintains persistent SQLite connections (e.g., opened in `beforeAll` and only closed in `afterAll`), or performs un-isolated database operations while parallel test workers or the active webServer are running. These overlapping connection lifetimes cause "database is locked" errors during parallel execution (`--workers=4`).
-
 ## Done
