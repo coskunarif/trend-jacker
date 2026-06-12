@@ -1,11 +1,12 @@
-task: Increase viral sharing rates through user-customized infographic overlays  tier: T2   creativity: 0.5
-state: complete                budget: repairs 0/3
-branch: asf/20260612-infographic-overlays     checkpoint: asf/20260612-infographic-overlays/green-1
+task: Prevent visual text overlapping and clipping on dynamically generated infographic sharing cards to increase social share rate. (Moves: Infographic share card download and sharing rate. Why now: Current implementation uses static vertical offsets for custom text and hooks which causes layout collision when text is long. Runner-up: Progressive Enhancement for Web Share API and Download Feedback.) tier: T2   creativity: 0.5
+state: complete
+branch: asf/20260612-canvas-overflow          checkpoint: asf/20260612-canvas-overflow/green-1
 caps: agents,ui,web,human
 
 ## Log
 - 2026-06-12: Conductor starting fresh run with Scout phase.
-- 2026-06-12: Scout phase completed. Selected task: Increase viral sharing rates through user-customized infographic overlays.
+- 2026-06-12: Scout running local dev server on port 3080.
+- 2026-06-12: Scout phase completed. Selected Dynamic Canvas Positioning & Layout Overflow Prevention as the task winner.
 - 2026-06-12: Conductor starting Architect phase.
 - 2026-06-12: Architect completed SPEC.md.
 - 2026-06-12: Conductor starting Tester phase.
@@ -15,39 +16,36 @@ caps: agents,ui,web,human
 - 2026-06-12: Conductor starting Verifier phase.
 - 2026-06-12: Verifier completed validation checks successfully. All checks passed.
 - 2026-06-12: Conductor starting Shipper phase.
+- 2026-06-12: Shipper completed final tagging, verification, PR creation, and integration.
+
 ## Verdict
-- **[AC-1] Infographic Customization Panel UI**: PASS
-  - Verified that customization panel HTML exists in `#card-snapshot-share` with `#info-theme-select`, `#info-overlay-badge-select`, and `#info-custom-text-input`. Tested via Playwright E2E.
-- **[AC-2] Interactive Theme Styles & Background Customization**: PASS
-  - Verified colors and gradients map correctly per theme (Midnight, Cyberpunk, Sunset, Forest). Output size verified at exactly 2400x1260. Tested via Playwright E2E.
-- **[AC-3] Custom Sticker / Badge Overlay Drawing**: PASS
-  - Verified custom badges render correctly on the canvas in the top-right quadrant. Tested via Playwright E2E.
-- **[AC-4] Custom Text Overlay Render & Word Wrap**: PASS
-  - Verified subtitle text wrap and dynamic vertical positioning shift of the AI hook section. Tested via Playwright E2E.
-- **[AC-5] E2E Playwright Automation & Dimensions Validation**: PASS
-  - Verified all 109 Playwright E2E tests, including dedicated test files (`tests/infographic-overlays.spec.js` and `tests/viral-generator.spec.js`), run and pass cleanly.
-- **Visual / Browser Dogfooding**: SKIPPED
-  - Web browser dogfooding skipped as E2E test verification fully exercises the canvas generation, layout structure, and pixel-exact dimension headers in a headless execution environment.
+- **[AC-1] Dynamic Subtitle & Header Positioning (Infographic)**: PASS. Layout shifts dynamically when custom subtitle exists (+65px spacing). Default y-coordinate 275 when absent. Verified via telemetry.
+- **[AC-2] Enhanced wrapText Helper**: PASS. Accepts `dryRun` flag, returns final y-coordinate, does not draw if `dryRun: true`. Verified via programmatic test assertions.
+- **[AC-3] Dynamic Hook Box Sizing (Infographic)**: PASS. RoundRect box scales dynamically to `(lastHookTextY - hookTextStartY) + 80` (min 120px). Verified via telemetry.
+- **[AC-4] Dynamic Font Scaling & Footer Boundary Constraint (Infographic)**: PASS. Constrained to y=540 by loop reduction of font size (18px -> 12px) and line height (28px -> 19px) and capped if still exceeding at 12px. Verified via E2E test.
+- **[AC-5] Dynamic Positioning & Sizing on Standard Share Card**: PASS. Sizes hook box, shifts subsequent sections down, applies font-scaling loop. Verified via telemetry.
+- **[AC-6] Global Layout Telemetry**: PASS. Telemetry values written to `window.__canvasLayouts.infographic` and `window.__canvasLayouts.trendCard`. Verified in Playwright.
+- **[AC-7] E2E Layout & Overlay Validation**: PASS. `tests/infographic-overlays.spec.js` covers no subtitle, normal subtitle, and long subtitle + long hook scenarios. All 114 suite tests pass.
+- **Visual & Behavioral Dogfooding**: PASS. Executed browser automation using `agent-browser` on local dev server. Captured screenshots, checked layout, and verified zero console errors.
 
 ## Done
-### Shipped Features
-- User-customized infographic overlays to increase viral sharing rates.
-- Interactive customization panel UI allowing users to select themes, overlay badge/stickers, and custom overlays text.
-- Full E2E Playwright tests verifying the UI components, theme styling, background rendering, badge drawing, and text wrapping.
 
-### Acceptance Criteria Verification Evidence
+### Summary of Shipped Work
+We successfully resolved visual text overlapping and clipping on dynamically generated infographic and standard sharing cards. By enhancing the text wrapping utility with a `dryRun` execution option, the canvas generators dynamically measure text blocks and calculate coordinate offsets. Spacing updates dynamically based on subtitle wraps (+65px spacing), and the background hook box scales dynamically. A boundary-fitting loop reduces the hook text's font size (from 18px down to 12px) and line-height if the layout exceeds y=540. If the text still exceeds limits at the minimum font size, the box height is constrained, preventing overlap with the footer.
 
-| Criteria | Result | Evidence |
-|---|---|---|
-| **[AC-1] Infographic Customization Panel UI** | PASS | Customization panel with themes, badges, and custom text inputs exists and is fully interactive. |
-| **[AC-2] Interactive Theme Styles & Background Customization** | PASS | Custom background styling and theme selections map to output dimensions correctly (2400x1260). |
-| **[AC-3] Custom Sticker / Badge Overlay Drawing** | PASS | Custom badges/stickers draw in correct positions on the generated canvas. |
-| **[AC-4] Custom Text Overlay Render & Word Wrap** | PASS | Overlaid texts wrapping correctly with dynamic line breaks and layout positioning. |
-| **[AC-5] E2E Playwright Automation & Dimensions Validation** | PASS | 109 tests passed, including exact checks for dimensions and rendering logic. |
+### Acceptance Criteria & Verification Evidence
 
-### Integration & Deployment Info
-- **Pull Request**: [coskunarif/trend-jacker#22](https://github.com/coskunarif/trend-jacker/pull/22)
-- **Integration Method**: Squash and merge (`gh pr merge --squash --delete-branch`)
-- **Deployment Target**: [Production App](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Green Checkpoint Tag**: `asf/20260612-infographic-overlays/green-1`
+| Acceptance Criterion | Verification Evidence / Pass State |
+|----------------------|------------------------------------|
+| **[AC-1] Dynamic Subtitle & Header Positioning** | Passed. Telemetry checks confirm "THE AI HOOK" header shifts dynamically to subtitle bottom plus 65px (defaults to 275px). |
+| **[AC-2] Enhanced wrapText Helper** | Passed. Supports `dryRun: true` and calculates wrapped layout height without executing `ctx.fillText`. |
+| **[AC-3] Dynamic Hook Box Sizing** | Passed. Canvas roundRect hook box height dynamically matches `(lastHookTextY - hookTextStartY) + 80`, min 120px. |
+| **[AC-4] Footer Boundary Constraint** | Passed. Limits layout to y=540 using recursive scale reduction on font sizes (18px -> 12px) and line heights (28px -> 19px). |
+| **[AC-5] Standard Share Card Dynamic Sizing** | Passed. Sizes hook box, shifts community sentiment and poll down, and applies scale loop to fit under y=540. |
+| **[AC-6] Global Layout Telemetry** | Passed. Card generators populate layout data on `window.__canvasLayouts.infographic` and `window.__canvasLayouts.trendCard`. |
+| **[AC-7] E2E Layout & Overlay Validation** | Passed. Checked three distinct scenarios: no subtitle, 1-line subtitle, and multi-line subtitle with long hook text. All 114 tests passed. |
 
+### Pull Request & Integration Details
+- **Pull Request Link**: [PR #23](https://github.com/coskunarif/trend-jacker/pull/23)
+- **Integration Method**: `gh pr merge --merge` to merge the branch `asf/20260612-canvas-overflow` into `main`.
+- **Production URL**: Local production server.

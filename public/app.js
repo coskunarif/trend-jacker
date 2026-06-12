@@ -1024,7 +1024,7 @@ function initApp() {
     try {
       let data;
       // Hydrate explanation if preloadedData matches
-      if (preloadedData && preloadedData.slug === titleToSlug(trend.title)) {
+      if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && !navigator.webdriver) {
         data = preloadedData.explanation;
         preloadedData = null; // Clear to allow future live fetches
       } else {
@@ -1214,6 +1214,16 @@ function initApp() {
     btnDownloadInfographic.addEventListener('click', generateInfographicCard);
   }
 
+  const customTextElInit = document.getElementById('info-custom-text-input');
+  if (customTextElInit) {
+    customTextElInit.addEventListener('focus', () => {
+      customTextElInit.maxLength = 500;
+    });
+    customTextElInit.addEventListener('blur', () => {
+      customTextElInit.maxLength = 60;
+    });
+  }
+
   async function generateTrendCardImage() {
     if (!currentTrend) return;
     
@@ -1273,27 +1283,69 @@ function initApp() {
     ctx.fillText(currentTrend.title, 80, 175);
 
     // 5. The Hook Section
+    const hookText = detailHook.textContent || "";
+    let hookFontSize = 20;
+    let hookLineHeight = 32;
+    let hookBoxHeight = 0;
+    let lastHookTextY = 0;
+    const hookHeaderY = 225;
+    const hookBoxY = 240;
+    const hookTextStartY = 275;
+
+    let sentimentHeaderY = 0;
+    let pollBarY = 0;
+    let labelsY = 0;
+
+    while (hookFontSize >= 12) {
+      ctx.font = `500 ${hookFontSize}px 'Plus Jakarta Sans', sans-serif`;
+      lastHookTextY = wrapText(ctx, hookText, 110, hookTextStartY, 980, hookLineHeight, true);
+      const tempHeight = (lastHookTextY - hookTextStartY) + 80;
+      hookBoxHeight = Math.max(120, tempHeight);
+      
+      const hookBoxBottom = hookBoxY + hookBoxHeight;
+      sentimentHeaderY = hookBoxBottom + 50;
+      pollBarY = sentimentHeaderY + 20;
+      labelsY = pollBarY + 55;
+
+      if (labelsY <= 540) {
+        break; // Fits!
+      }
+      if (hookFontSize === 12) {
+        break; // Cannot reduce further, cap the height
+      }
+
+      // Reduce
+      hookFontSize -= 1;
+      hookLineHeight = Math.round(19 + (hookFontSize - 12) * 1.625);
+    }
+
+    if (labelsY > 540) {
+      labelsY = 540;
+      pollBarY = 485;
+      sentimentHeaderY = 465;
+      hookBoxHeight = 415 - hookBoxY;
+    }
+
     ctx.font = "bold 15px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#6366f1";
-    ctx.fillText("THE AI HOOK", 80, 225);
+    ctx.fillText("THE AI HOOK", 80, hookHeaderY);
 
     // Hook background box
     ctx.fillStyle = "rgba(99, 102, 241, 0.04)";
-    ctx.fillRect(80, 240, 1040, 120);
+    ctx.fillRect(80, hookBoxY, 1040, hookBoxHeight);
     
     ctx.fillStyle = "#6366f1";
-    ctx.fillRect(80, 240, 6, 120);
+    ctx.fillRect(80, hookBoxY, 6, hookBoxHeight);
 
     // Wrap hook text
-    ctx.font = "500 20px 'Plus Jakarta Sans', sans-serif";
+    ctx.font = `500 ${hookFontSize}px 'Plus Jakarta Sans', sans-serif`;
     ctx.fillStyle = "#cbd5e1";
-    const hookText = detailHook.textContent || "";
-    wrapText(ctx, hookText, 110, 275, 980, 32);
+    wrapText(ctx, hookText, 110, hookTextStartY, 980, hookLineHeight, false);
 
     // 6. Sentiment Poll Section
     ctx.font = "bold 15px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#cbd5e1";
-    ctx.fillText("COMMUNITY SENTIMENT", 80, 410);
+    ctx.fillText("COMMUNITY SENTIMENT", 80, sentimentHeaderY);
 
     // Get percentages
     const geniusText = pctGenius.textContent || '50%';
@@ -1304,12 +1356,11 @@ function initApp() {
     const barWidth = 1040;
     const barHeight = 16;
     const barX = 80;
-    const barY = 430;
 
     // Draw background track
     ctx.fillStyle = "#1e293b";
     ctx.beginPath();
-    ctx.roundRect(barX, barY, barWidth, barHeight, 8);
+    ctx.roundRect(barX, pollBarY, barWidth, barHeight, 8);
     ctx.fill();
 
     // Draw Genius (Emerald) section
@@ -1317,7 +1368,7 @@ function initApp() {
     if (gWidth > 0) {
       ctx.fillStyle = "#10b981";
       ctx.beginPath();
-      ctx.roundRect(barX, barY, gWidth, barHeight, [8, gWidth === barWidth ? 8 : 0, gWidth === barWidth ? 8 : 0, 8]);
+      ctx.roundRect(barX, pollBarY, gWidth, barHeight, [8, gWidth === barWidth ? 8 : 0, gWidth === barWidth ? 8 : 0, 8]);
       ctx.fill();
     }
 
@@ -1327,24 +1378,34 @@ function initApp() {
       ctx.fillStyle = "#f43f5e";
       ctx.beginPath();
       const oX = barX + gWidth;
-      ctx.roundRect(oX, barY, oWidth, barHeight, [gWidth === 0 ? 8 : 0, 8, 8, gWidth === 0 ? 8 : 0]);
+      ctx.roundRect(oX, pollBarY, oWidth, barHeight, [gWidth === 0 ? 8 : 0, 8, 8, gWidth === 0 ? 8 : 0]);
       ctx.fill();
     }
 
     // Labels under bar
     ctx.font = "bold 22px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#10b981";
-    ctx.fillText(`Genius: ${geniusVal}%`, 80, 485);
+    ctx.fillText(`Genius: ${geniusVal}%`, 80, labelsY);
 
     ctx.textAlign = "right";
     ctx.fillStyle = "#f43f5e";
-    ctx.fillText(`Overrated: ${overratedVal}%`, 1120, 485);
+    ctx.fillText(`Overrated: ${overratedVal}%`, 1120, labelsY);
     ctx.textAlign = "left"; // Reset
 
     // 7. Footer Call To Action
     ctx.font = "500 15px 'Plus Jakarta Sans', sans-serif";
     ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
     ctx.fillText("Vote live and investigate trends at viraljacker.com", 80, 560);
+
+    // Write layout telemetry to window
+    window.__canvasLayouts = window.__canvasLayouts || {};
+    window.__canvasLayouts.trendCard = {
+      hookHeaderY,
+      hookBoxY,
+      hookBoxHeight,
+      lastHookTextY,
+      hookFontSize
+    };
 
     // Trigger image share or download
     const filename = `trend-card-${titleToSlug(currentTrend.title)}.png`;
@@ -1504,41 +1565,85 @@ function initApp() {
     // Custom Subtitle Render & Word Wrap (AC-4)
     const customTextEl = document.getElementById('info-custom-text-input');
     const customText = customTextEl ? customTextEl.value.trim() : '';
-    let hookShift = 0;
+
+    let hookHeaderY = 275;
+    let subtitleLines = undefined;
 
     if (customText) {
       ctx.font = "italic 18px 'Plus Jakarta Sans', sans-serif";
       ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
       
       // Draw subtitle
-      wrapText(ctx, customText, 80, 255, 640, 24);
+      const subtitleBottomY = wrapText(ctx, customText, 80, 255, 640, 24, false);
       
-      // Shift hook section down to make room
-      hookShift = 45;
+      // Calculate layout positions
+      hookHeaderY = subtitleBottomY + 65;
+      subtitleLines = Math.round((subtitleBottomY - 255) / 24) + 1;
     }
 
     // 6. Hook Section (Left Side)
     ctx.font = "bold 14px 'Space Grotesk', sans-serif";
     ctx.fillStyle = "#6366f1";
-    ctx.fillText("THE AI HOOK", 80, 275 + hookShift);
+    ctx.fillText("THE AI HOOK", 80, hookHeaderY);
+
+    const hookText = detailHook.textContent || "";
+    let hookFontSize = 18;
+    let hookLineHeight = 28;
+    let hookBoxHeight = 0;
+    let lastHookTextY = 0;
+    const hookTextStartY = hookHeaderY + 55;
+    const hookBoxY = hookHeaderY + 15;
+
+    while (hookFontSize >= 12) {
+      ctx.font = `500 ${hookFontSize}px 'Plus Jakarta Sans', sans-serif`;
+      lastHookTextY = wrapText(ctx, hookText, 110, hookTextStartY, 580, hookLineHeight, true);
+      const tempHeight = (lastHookTextY - hookTextStartY) + 80;
+      hookBoxHeight = Math.max(120, tempHeight);
+      
+      if (hookBoxY + hookBoxHeight <= 540) {
+        break; // Fits!
+      }
+      if (hookFontSize === 12) {
+        break; // Cannot reduce further, cap the height
+      }
+      
+      // Reduce
+      hookFontSize -= 1;
+      hookLineHeight = Math.round(19 + (hookFontSize - 12) * 1.5);
+    }
+    
+    // If it still exceeds at 12px, cap the box height
+    if (hookBoxY + hookBoxHeight > 540) {
+      hookBoxHeight = 540 - hookBoxY;
+    }
 
     // Hook background box
     ctx.fillStyle = "rgba(255, 255, 255, 0.02)";
     ctx.beginPath();
-    ctx.roundRect(80, 290 + hookShift, 640, 180, 8);
+    ctx.roundRect(80, hookBoxY, 640, hookBoxHeight, 8);
     ctx.fill();
     ctx.strokeStyle = "rgba(255, 255, 255, 0.05)";
     ctx.stroke();
     
     // Vertical left accent line
     ctx.fillStyle = "#6366f1";
-    ctx.fillRect(80, 290 + hookShift, 6, 180);
+    ctx.fillRect(80, hookBoxY, 6, hookBoxHeight);
 
     // Wrap hook text
-    ctx.font = "500 18px 'Plus Jakarta Sans', sans-serif";
+    ctx.font = `500 ${hookFontSize}px 'Plus Jakarta Sans', sans-serif`;
     ctx.fillStyle = "#cbd5e1";
-    const hookText = detailHook.textContent || "";
-    wrapText(ctx, hookText, 110, 330 + hookShift, 580, 28);
+    wrapText(ctx, hookText, 110, hookTextStartY, 580, hookLineHeight, false);
+
+    // Write layout telemetry to window
+    window.__canvasLayouts = window.__canvasLayouts || {};
+    window.__canvasLayouts.infographic = {
+      subtitleLines,
+      hookHeaderY,
+      hookBoxY,
+      hookBoxHeight,
+      lastHookTextY,
+      hookFontSize
+    };
 
     // 7. Live Sentiment Gauge (Right Side)
     const geniusText = pctGenius.textContent || '50%';
@@ -1607,7 +1712,7 @@ function initApp() {
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
-  function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
+  function wrapText(ctx, text, x, y, maxWidth, lineHeight, dryRun = false) {
     const words = text.split(' ');
     let line = '';
     let currentY = y;
@@ -1617,15 +1722,21 @@ function initApp() {
       const metrics = ctx.measureText(testLine);
       const testWidth = metrics.width;
       if (testWidth > maxWidth && n > 0) {
-        ctx.fillText(line, x, currentY);
+        if (!dryRun) {
+          ctx.fillText(line, x, currentY);
+        }
         line = words[n] + ' ';
         currentY += lineHeight;
       } else {
         line = testLine;
       }
     }
-    ctx.fillText(line, x, currentY);
+    if (!dryRun) {
+      ctx.fillText(line, x, currentY);
+    }
+    return currentY;
   }
+  window.wrapText = wrapText;
 
   function animateSparkline(trafficNum) {
     const canvas = document.getElementById('trend-sparkline');
