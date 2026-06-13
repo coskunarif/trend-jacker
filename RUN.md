@@ -1,6 +1,6 @@
 task: Limit conversational message count to optimize LLM query costs and drive organic referral traffic. Why now: Chat has zero restrictions, risking high API costs and missing viral referral loops. Runner-up: Normalize caching keys to lowercase.              tier: T2   creativity: 0.3
-state: SHIPPER                budget: repairs 1/3
-branch: asf/20260613-chat-limit          checkpoint: none
+state: complete               budget: repairs 1/3
+branch: asf/20260613-chat-limit          checkpoint: asf/20260613-chat-limit/green-1
 caps: agents,ui,web,human
 
 ## Log
@@ -29,3 +29,28 @@ caps: agents,ui,web,human
 - **Dogfood Evidence**: Screenshots and reports saved to `dogfood-output/20260613-chat-limit/`.
 
 ## Done
+
+### What Shipped
+We shipped the Conversational Message Count Limit and Referral Loop functionality to prevent high Gemini API costs and drive organic loops. Conversational requests (`POST /api/chat`) check message counts against `3 + 5 * referrals`. If the limit is reached, a styled lock overlay `#chat-lock-container` replaces the input form, providing a personalized referral URL `?ref=clientId` and a check status button. Visiting with a referrer's query string captures the connection, and checking status on the referrer's browser unlocks extra chat queries. Caching keys for chat and posts have also been normalized to lowercase to avoid redundant LLM invocations.
+
+### Acceptance Criteria Verification
+
+| Acceptance Criteria | Verdict | Evidence / Details |
+| :--- | :--- | :--- |
+| **[AC-1] Lowercase Caching Keys** | PASS | Cache keys in `db.js` normalized to lowercase for `chat_cache` and `generated_posts`. |
+| **[AC-2] Persistent Client ID** | PASS | Client ID is persisted in `localStorage` as `clientId`, surviving page reloads. |
+| **[AC-3] Chat tracking & Referrals** | PASS | `client_referrals` and `client_chat_counts` DB schemas initialize and handle CRUD operations. |
+| **[AC-4] Enforcing Chat Limits** | PASS | Backend `POST /api/chat` rejects messages with `403` once the limit is hit. Bypassed in `test` mode. |
+| **[AC-5] Chat Limit UI & Locked State** | PASS | `#chat-lock-container` shows limit, referral link, and status button. Screenshot: `dogfood-output/20260613-chat-limit/screenshots/locked-desktop.png`. |
+| **[AC-6] Referral Visit Loop** | PASS | Visit via `/?ref=clientId` creates referral connection. Checking status on referrer's end increments limit and unlocks chat. Screenshot: `dogfood-output/20260613-chat-limit/screenshots/unlocked-desktop.png`. |
+
+### Integration and Deployment
+- **Green Tag State:** `asf/20260613-chat-limit/green-1` (pointing to commit `6eaa2501285ae8d29d68b78c6f2d213c9ba7a35e`)
+- **Pull Request:** [GitHub PR #30](https://github.com/coskunarif/trend-jacker/pull/30)
+- **Integration Method:** Squash and merge
+- **Deployment Target:** [Google Cloud Run Live URL](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
+
+### Verification Screenshots
+
+![Chat Locked State](dogfood-output/20260613-chat-limit/screenshots/locked-desktop.png)
+![Chat Unlocked State](dogfood-output/20260613-chat-limit/screenshots/unlocked-desktop.png)
