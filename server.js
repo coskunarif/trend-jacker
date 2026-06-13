@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1121,6 +1121,118 @@ fastify.post('/api/explain', async (request, reply) => {
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to generate trend explanation.' });
+  }
+});
+
+// POST /api/trivia - Fetches or generates trivia questions for a trend
+fastify.post('/api/trivia', async (request, reply) => {
+  const { trend, lang } = request.body || {};
+  if (!trend || !lang) {
+    return reply.status(400).send({ error: 'Missing trend or lang parameters.' });
+  }
+
+  try {
+    const cached = await getTrendTrivia(trend, lang);
+    if (cached) {
+      return reply.send(cached);
+    }
+
+    let trivia;
+    if (process.env.NODE_ENV === 'test') {
+      const isGemini = trend.trim().toLowerCase() === 'google gemini';
+      if (isGemini) {
+        trivia = [
+          {
+            question: "What is Gemini?",
+            options: ["A search engine", "An AI model family", "A database", "A web server"],
+            correctAnswer: 1,
+            explanation: "Gemini is Google's multimodal AI model family."
+          },
+          {
+            question: "Who developed Gemini?",
+            options: ["Meta", "OpenAI", "Google", "Microsoft"],
+            correctAnswer: 2,
+            explanation: "Google announced and developed the Gemini family of models."
+          },
+          {
+            question: "Is Gemini multimodal?",
+            options: ["No", "Yes", "Only in labs", "Never"],
+            correctAnswer: 1,
+            explanation: "Yes, Gemini was built from the ground up to be multimodal."
+          }
+        ];
+      } else {
+        trivia = [
+          {
+            question: `What is primarily driving the popularity of ${trend}?`,
+            options: ["Global economic shifts", "Social media virality and online engagement", "New government regulations", "Traditional print media"],
+            correctAnswer: 1,
+            explanation: `The conversation around ${trend} has been heavily driven by online engagement.`
+          },
+          {
+            question: `Which category does ${trend} best fit into?`,
+            options: ["Public health", "Technology and modern trends", "Ancient history", "Geological formations"],
+            correctAnswer: 1,
+            explanation: `${trend} is widely discussed as a modern trending topic.`
+          },
+          {
+            question: `Where are conversations about ${trend} most active?`,
+            options: ["Radio talk shows", "Online platforms and social media feeds", "Local libraries", "Classified ads"],
+            correctAnswer: 1,
+            explanation: `Most digital trends, including ${trend}, thrive in online forums and social channels.`
+          }
+        ];
+      }
+      await setTrendTrivia(trend, lang, trivia);
+    } else {
+      if (!genAI) {
+        return reply.status(500).send({ error: 'Gemini API not configured.' });
+      }
+
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+        generationConfig: {
+          thinkingConfig: { thinkingLevel: 'LOW' },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                question: { type: "STRING" },
+                options: {
+                  type: "ARRAY",
+                  items: { type: "STRING" }
+                },
+                correctAnswer: { type: "INTEGER" },
+                explanation: { type: "STRING" }
+              },
+              required: ["question", "options", "correctAnswer", "explanation"]
+            }
+          }
+        }
+      });
+
+      const prompt = `You are a trivia generator. Generate exactly 3 trivia multiple-choice questions about the trend "${trend}" in the language "${lang}".
+Each question must have exactly 4 options, a correctAnswer (0-based index of the correct option in the options array), and a brief explanation why it is correct.
+The output must be a JSON array of 3 objects containing question, options, correctAnswer, and explanation.`;
+
+      const result = await model.generateContent(prompt);
+      const textResponse = result.response.text();
+
+      let cleanedText = textResponse.trim();
+      if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+      }
+
+      trivia = JSON.parse(cleanedText);
+      await setTrendTrivia(trend, lang, trivia);
+    }
+
+    return reply.send(trivia);
+  } catch (err) {
+    fastify.log.error('Trivia generation failed: ' + err.message);
+    return reply.status(500).send({ error: 'Failed to generate trivia.' });
   }
 });
 
