@@ -1,5 +1,5 @@
 task: Implement gamified trend predictions to increase daily user retention and viral share conversions.              tier: T2   creativity: 0.3
-state: shipper                budget: repairs 1/3
+state: complete               budget: repairs 1/3
 branch: asf/20260613-trend-predictions          checkpoint: none
 caps: agents,ui,web,human
 
@@ -32,4 +32,26 @@ caps: agents,ui,web,human
 
 ## Done
 
+### What Shipped
+Implement gamified trend predictions where users can predict if a trend will rise or fall tomorrow. This increases daily user retention and rewards them with message capacity bonus limits (+3 messages per correct prediction) dynamically and synchronously.
 
+### Acceptance Criteria Verification
+
+| Criterion | Evidence | Status |
+|---|---|---|
+| **[AC-1] Database Schema & Methods** | SQLite and mock `client_predictions` database schema verify successfully, normalizations/casing are normalized to lowercase, and deterministic hash outcomes are fully operational. | PASS |
+| **[AC-2] Backend Route Handlers** | `POST /api/predict`, `GET /api/predictions`, and `/api/chat-limit` include prediction bonus limits and auto-resolutions dynamically. | PASS |
+| **[AC-3] Trend Predictor UI Card** | The prediction card loads below the interactive grid, allows voting/prediction, shows history/badges, and disables once predicted. | PASS |
+| **[AC-4] Celebratory Toast & Immediate Sync** | Immediate un-awaited synchronization check of limits on prediction submit, showing unlock toasts for correct predictions. | PASS |
+| **[AC-5] Shareable Canvas Prediction Card** | Canvas renders a beautiful 2400x1260 PNG with user's predictions, correct count, and brand markings. | PASS |
+| **[AC-6] Unified Share Preview Integration** | Unified share context dropdown has a prediction option, generating viral prediction copy in `/api/generate-post`. | PASS |
+
+### PR Link
+- PR: [PR #38: Implement gamified trend predictions](https://github.com/coskunarif/trend-jacker/pull/38)
+- Integration Method: Squash and Merge
+
+### Visual Evidence
+- [Before Prediction Screen](dogfood-output/20260613-trend-predictions/screenshots/step-1-before-predict.png)
+- [After Prediction Screen](dogfood-output/20260613-trend-predictions/screenshots/step-2-after-predict.png)
+- [Downloaded Prediction Card](dogfood-output/20260613-trend-predictions/screenshots/step-3-after-download.png)
+- [Interactive Walkthrough Video](dogfood-output/20260613-trend-predictions/videos/prediction-walkthrough.webm)
