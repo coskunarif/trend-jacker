@@ -1,5 +1,5 @@
 task: Redesign the sidebar layout to remove stacked feed divisions to improve user retention. Metric: UX & Retention. Why now: Stacked feeds create visual clutter and double scrollbar issues on desktop. Runner-up: Simplify sidebar to show Trending Searches only.              tier: T2   creativity: 0.5
-state: VERIFY                 budget: repairs 0/3
+state: SHIP                   budget: repairs 0/3
 branch: asf/20260612-redesign-sidebar          checkpoint: none
 caps: agents,ui,web,human
 
@@ -9,6 +9,7 @@ caps: agents,ui,web,human
 - 2026-06-12: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-12: Tester completed tests. Observed state: red. Conductor starting Builder phase.
 - 2026-06-12: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-12: Verifier completed validation checks successfully. All checks passed. Conductor starting Shipper phase.
 ## Verdict
 - **[AC-1] Desktop Double-Blade Sidebar Grid**: PASS. The side-by-side blades (Trending Searches and Global Sentiment Feed) render simultaneously on desktop viewports (>= 769px) with equal 320px widths and a 1px border. Verified in both E2E tests and dogfooding screenshots.
 - **[AC-2] Scrollbar & Overflow Isolation**: PASS. Parent containers hide overflow, and inner scroll lists scroll independently as verified by layout styles and E2E tests.
