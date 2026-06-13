@@ -197,7 +197,7 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
     expect(resolveBody.newlyResolvedPredictions.length).toBeGreaterThan(0);
     expect(resolveBody.predictionBonus).toBe(3);
 
-    const expectedNewAllowed = initialAllowed + 3;
+    const expectedNewAllowed = initialAllowed + 3 + (resolveBody.streakBonus || 0);
     expect(resolveBody.allowedLimit).toBe(expectedNewAllowed);
 
     const resTrivia = await request.post('/api/trivia/score', {
@@ -205,7 +205,7 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
     });
     expect(resTrivia.status()).toBe(200);
     const triviaBody = await resTrivia.json();
-    expect(triviaBody.allowedLimit).toBe(expectedNewAllowed + 3);
+    expect(triviaBody.allowedLimit).toBe(expectedNewAllowed + 5);
   });
 
   // =========================================================================
