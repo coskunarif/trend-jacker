@@ -28,6 +28,7 @@ const inMemoryExplanations = new Map();
 const inMemoryLocalizedExplanations = new Map();
 const inMemoryChatCache = new Map();
 const inMemoryGeneratedPosts = new Map();
+const inMemoryTopicImages = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -89,6 +90,23 @@ if (!firestore) {
         trend TEXT,
         platform TEXT,
         post_text TEXT,
+        created_at TEXT
+      )
+    `);
+    try {
+      const schemaRow = sqliteDb.prepare(`
+        SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
+      `).get();
+      if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+        sqliteDb.exec('DROP TABLE topic_images');
+      }
+    } catch (e) {
+      // ignore check/drop error
+    }
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS topic_images (
+        trend TEXT PRIMARY KEY COLLATE NOCASE,
+        svg TEXT,
         created_at TEXT
       )
     `);
@@ -736,6 +754,85 @@ export async function getViralPostHistory() {
   }
   
   return [...inMemoryViralPostHistory].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+}
+
+/**
+ * Retrieves the cached topic SVG image for a trend.
+ * @param {string} trend 
+ * @returns {Promise<string | null>}
+ */
+export async function getCachedTopicImage(trend) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        return doc.data().svg || null;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getCachedTopicImage for "${normalizedTrend}":`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT svg FROM topic_images WHERE trend = ?');
+      const row = stmt.get(normalizedTrend);
+      if (row && row.svg !== undefined) {
+        return row.svg;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getCachedTopicImage "${normalizedTrend}":`, err.message);
+      return null;
+    }
+  }
+
+  return inMemoryTopicImages.get(normalizedTrend) || null;
+}
+
+/**
+ * Caches the topic SVG image for a trend.
+ * @param {string} trend 
+ * @param {string} svg 
+ * @returns {Promise<void>}
+ */
+export async function setCachedTopicImage(trend, svg) {
+  const createdAt = new Date().toISOString();
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      await docRef.set({
+        trend: normalizedTrend,
+        svg,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setCachedTopicImage for "${normalizedTrend}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO topic_images (trend, svg, created_at)
+        VALUES (?, ?, ?)
+      `).run(normalizedTrend, svg, createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setCachedTopicImage "${normalizedTrend}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryTopicImages.set(normalizedTrend, svg);
 }
 
 

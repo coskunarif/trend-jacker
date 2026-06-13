@@ -15,3 +15,4 @@
 - **Responsive Twin-Blade Layouts**: When transitioning stacked scrollable feeds to a side-by-side desktop layout, isolate each column with `overflow: hidden` and style the inner list container with `overflow-y: auto` to prevent double-scrollbar clutter and outer layout leakage.
 - **Firestore Cache and NODE_ENV**: Set `NODE_ENV=production` in deploy workflows and documentation examples (like GCP Cloud Run configs) to ensure Firestore client caching behaves as intended in production environments.
 - **Grid Layout Simplification**: When refactoring dashboard sidebars, replacing complex twin-blade flex configurations with a single responsive CSS grid template (e.g. `320px 1fr`) reduces mobile-desktop layout leaks and simplifies element removal.
+- **Case-Insensitive Cache Lookups**: Normalize database cache lookup keys to lowercase (e.g. in db.js and server.js) to avoid redundant generation costs and cache misses due to casing mismatches.

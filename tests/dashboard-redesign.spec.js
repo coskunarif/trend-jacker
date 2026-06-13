@@ -194,6 +194,16 @@ test.describe('Dashboard Redesign Verification', () => {
       });
     });
 
+    await page.addInitScript(() => {
+      const originalGetElementById = document.getElementById;
+      document.getElementById = function(id) {
+        if (id === 'preloaded-trend-data') {
+          return null;
+        }
+        return originalGetElementById.apply(this, arguments);
+      };
+    });
+
     await page.goto('/');
     
     const welcomeView = page.locator('#welcome-view');

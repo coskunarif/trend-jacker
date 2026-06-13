@@ -14,6 +14,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   let setCachedChatResponse;
   let getCachedGeneratedPost;
   let setCachedGeneratedPost;
+  let getCachedTopicImage;
+  let setCachedTopicImage;
 
   test.beforeAll(async () => {
     // Attempt to import the required database functions.
@@ -25,6 +27,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       setCachedChatResponse = dbModule.setCachedChatResponse;
       getCachedGeneratedPost = dbModule.getCachedGeneratedPost;
       setCachedGeneratedPost = dbModule.setCachedGeneratedPost;
+      getCachedTopicImage = dbModule.getCachedTopicImage;
+      setCachedTopicImage = dbModule.setCachedTopicImage;
     } catch (err) {
       console.warn('Could not import caching functions from db.js:', err.message);
     }
@@ -272,5 +276,99 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
         expect(section.content.toLowerCase()).toContain(word.toLowerCase());
       }
     }
+  });
+
+  // --- AC-1: Database Caching Schema & Helpers ---
+
+  // [AC-1] Schema Verification: SQLite table topic_images exists
+  test('should have the topic_images table created in SQLite with correct schema', async () => {
+    const localDb = new DatabaseSync(dbPath);
+    try {
+      const stmt = localDb.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'topic_images'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('trend TEXT PRIMARY KEY');
+      expect(row.sql).toContain('svg TEXT');
+      expect(row.sql).toContain('created_at TEXT');
+    } finally {
+      localDb.close();
+    }
+  });
+
+  // [AC-1] getCachedTopicImage and setCachedTopicImage unit tests
+  test('should write and retrieve a generated SVG topic image from the database cache helper', async () => {
+    if (typeof setCachedTopicImage !== 'function' || typeof getCachedTopicImage !== 'function') {
+      throw new Error('getCachedTopicImage or setCachedTopicImage is not exported from db.js');
+    }
+
+    const testTrend = `test-trend-${Date.now()}`;
+    const testSvg = '<svg>test</svg>';
+
+    // Store in cache
+    await setCachedTopicImage(testTrend, testSvg);
+
+    // Retrieve via helper
+    const cached = await getCachedTopicImage(testTrend);
+    expect(cached).toBe(testSvg);
+  });
+
+  // --- AC-2: Dynamic SVG Image Generation Endpoint ---
+
+  // [AC-2] API Integration: GET /api/topic-image/:slug
+  test('should return a generated SVG image with correct headers', async ({ request }) => {
+    const testSlug = `test-trend-${Date.now()}`;
+    const res = await request.get(`/api/topic-image/${testSlug}`);
+    expect(res.status()).toBe(200);
+    expect(res.headers()['content-type']).toContain('image/svg+xml');
+    
+    const svgContent = await res.text();
+    expect(svgContent).toContain('<svg');
+    expect(svgContent).toContain('</svg>');
+  });
+
+  // [AC-2] Cache validation on endpoint (verified via direct DB modification)
+  test('should cache the generated SVG and serve from cache on subsequent calls', async ({ request }) => {
+    const testSlug = `image-api-trend-${Date.now()}`;
+    
+    // Clean database records if needed
+    let localDb = new DatabaseSync(dbPath);
+    try {
+      localDb.prepare("DELETE FROM topic_images WHERE trend = ?").run(testSlug);
+    } catch (err) {
+      // Ignored if table doesn't exist yet
+    } finally {
+      localDb.close();
+    }
+
+    // 1. First request: should return SVG
+    const res1 = await request.get(`/api/topic-image/${testSlug}`);
+    expect(res1.status()).toBe(200);
+    const svg1 = await res1.text();
+
+    // Verify it was cached in SQLite and update it directly to verify cache hit on next request
+    localDb = new DatabaseSync(dbPath);
+    const hijackedSvg = '<svg id="hijacked"></svg>';
+    try {
+      // Find trend title (Title Case or matched trend)
+      const titleCaseTrend = testSlug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+      const checkStmt = localDb.prepare('SELECT * FROM topic_images WHERE trend = ?');
+      const row = checkStmt.get(titleCaseTrend);
+      expect(row).toBeDefined();
+
+      // 2. Modify database record directly
+      const updateStmt = localDb.prepare('UPDATE topic_images SET svg = ? WHERE trend = ?');
+      updateStmt.run(hijackedSvg, titleCaseTrend);
+    } finally {
+      localDb.close();
+    }
+
+    // 3. Second request: should return our hijacked cached SVG
+    const res2 = await request.get(`/api/topic-image/${testSlug}`);
+    expect(res2.status()).toBe(200);
+    const svg2 = await res2.text();
+    expect(svg2).toBe(hijackedSvg);
   });
 });

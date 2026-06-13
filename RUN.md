@@ -1,64 +1,44 @@
-task: Redesign dashboard, remove Global Sentiment Feed, make main dashboard bigger, use modern UI/UX practices              tier: T2   creativity: 0.5
-state: complete                budget: repairs 0/3
-branch: asf/20260613-expand-dashboard          checkpoint: asf/20260613-expand-dashboard/green-1
+task: still some images are not shown/broken regarding topic. and make sure we generate one image per topic, and cache it to avoid llm costs.              tier: T2   creativity: 0.18
+state: complete                  budget: repairs 2/3
+branch: asf/20260613-cache-images          checkpoint: asf/20260613-cache-images/green-1
 caps: agents,ui,web,human
 
-## Task
-- **Objective**: Remove visual clutter from the dashboard layout to increase the primary content screen space and improve user engagement.
-- **Metric**: User Engagement (UX Retention)
-- **Why Now**: Direct user request to eliminate visual noise and expand the main dashboard panel.
-- **Runner-up**: Redesign card layouts inside the main explainer panel to improve mobile/desktop visual consistency.
-
 ## Log
-- 2026-06-13: Conductor starting fresh run with T2. Starting Scout phase.
-- 2026-06-13: Scout spawned background dev server on port 3005 (task-81) to dogfood the UI.
-- 2026-06-13: Scout completed task selection. Conductor starting Architect phase.
+- 2026-06-13: Conductor starting fresh run with T2. Starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
-- 2026-06-13: Builder disputed obsolete tab transition test. Conductor ruled in favor. Conductor recalling Tester to amend.
+- 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-13: Verifier reported failing cache hit due to case-sensitive slug mismatch. Conductor ruled code wrong, reduced budget (repairs 1/3), decreased creativity to 0.3. Dispatching hypothesis to Builder: Normalize all topic-image cache trend lookup keys to lowercase in db.js and server.js.
+- 2026-06-13: Builder completed repair. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-13: Verifier reported failing welcome-view test. Conductor ruled test wrong, reduced budget (repairs 2/3), decreased creativity to 0.18. Dispatching hypothesis to Tester: Mock/remove preloaded-trend-data block in tests/dashboard-redesign.spec.js using addInitScript to prevent hydration from hiding welcome-view.
 - 2026-06-13: Tester completed test amendment. Conductor starting Verifier phase.
-- 2026-06-13: Verifier reported failing timeline test due to race condition. Conductor ruled test wrong. Tester recalling to fix test race condition.
-- 2026-06-13: Tester completed test race condition fix. Conductor starting Verifier phase.
-- 2026-06-13: Verifier spawned background dev server on port 3005 (task-63) to dogfood the UI.
 - 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
 ## Verdict
-All checks passed. No failures observed.
+### Check 1: Database Caching Schema & Helpers [AC-1] - PASS
+- Table `topic_images` exists in SQLite with correct COLLATE NOCASE schema. Caching helpers in `db.js` successfully normalize lookup keys to lowercase and function properly.
 
-### Acceptance Criteria Results
-- **[AC-1] Global Sentiment Feed Removal**: PASS (Verified DOM absence of `#live-sentiment-feed` and `.live-feed-section`).
-- **[AC-2] Sidebar Tab Bar Removal**: PASS (Verified DOM absence of `.sidebar-tabs` and its buttons).
-- **[AC-3] Expanded Desktop Grid Layout**: PASS (Verified `320px 1fr` layout grid columns on desktop viewports).
-- **[AC-4] Sidebar Mobile Drawer Width Preservation**: PASS (Verified mobile `.sidebar-panel` width remains `290px` with no tabs or live feed inside).
-- **[AC-5] SSE Stream Resilience**: PASS (Verified `api/sentiment-stream` SSE event updates poll stats without throwing errors when `#live-sentiment-feed` is absent).
-- **[AC-6] Redesigned Welcome Screen**: PASS (Verified styled glassmorphism welcome container formatting and typography).
-- **[AC-7] Modern Card & Border Aesthetics**: PASS (Verified fine, low-opacity borders `rgba(255, 255, 255, 0.08)` and subtle transitions on `.glass-card` elements).
+### Check 2: Dynamic SVG Image Generation Endpoint [AC-2] - PASS
+- The endpoint `/api/topic-image/:slug` resolves correctly, serves topic-themed SVGs with the `image/svg+xml` Content-Type, and uses casing-normalized lookup to prevent redundant LLM costs.
 
-### Test Suite Results
-- Playwright E2E and visual tests: PASS (121/121 tests passed).
+### Check 3: Client-Side Image Integration & Fallback [AC-3] - PASS
+- Client-side code in `public/app.js` correctly falls back to `/api/topic-image/:slug` for both thumbnails and detail view hero image when the primary `ogImage` is absent or fails to load.
+
+### Check 4: Full Test Suite Execution - PASS
+- All 125 tests executed successfully via Playwright with no failures. The preloaded data hydration bypass in `tests/dashboard-redesign.spec.js` resolved the welcome view test issue.
 
 ## Done
+- **What Shipped**: Implemented dynamic SVG generation and caching for missing/broken topic/trend images via Gemini, including frontend fallback handlers.
+- **Integration PR**: [PR #28](https://github.com/coskunarif/trend-jacker/pull/28)
+- **Deployment Pipeline**: [deploy.yml Workflow](https://github.com/coskunarif/trend-jacker/actions/workflows/deploy.yml)
+- **Production URL**: [viraljacker.com](https://viraljacker.com) (alternative: [trend-jacker-250134012801.us-central1.run.app](https://trend-jacker-250134012801.us-central1.run.app))
+- **Verification Evidence**:
 
-The TrendJacker dashboard redesign was successfully shipped. The Global Sentiment Feed and related tab switcher were removed from the DOM, and the main explainer workspace area was expanded to occupy the remainder of the viewport. In addition, the welcome screen was restyled with modern glassmorphic card boundaries, subtle hover transition effects, and reduced layout margins to present a cleaner first-impression UI.
+| Acceptance Criteria (AC) | Status | Verification Evidence / Details |
+|---|---|---|
+| `[AC-1] Database Caching Schema & Helpers` | PASS | SQLite `topic_images` table successfully created. Caching helpers in `db.js` normalize lookup keys to lowercase and correctly fetch/save SVGs. |
+| `[AC-2] Dynamic SVG Image Generation Endpoint` | PASS | `GET /api/topic-image/:slug` endpoint implemented. Resolves to SVGs, handles casing-normalized queries, and returns cached values or requests new ones via Gemini JSON schema enforcement. |
+| `[AC-3] Client-Side Image Integration & Fallback` | PASS | `public/app.js` updated to immediately load fallback `/api/topic-image/:slug` if `ogImage` is absent, and dynamically replaces broken URLs with `/api/topic-image/:slug` via `onerror` handler in list thumbnails and detail views. |
+| `[AC-4] Full Test Suite Execution` | PASS | 125 Playwright tests execute successfully, including new schema/API verification and preloaded data hydration bypass. |
 
-### Acceptance Criteria & Verification Evidence
-
-| AC ID | Acceptance Criteria | Verification Method / Evidence | Status |
-|---|---|---|---|
-| **[AC-1]** | Global Sentiment Feed Removal | Verified DOM absence of `#live-sentiment-feed` and `.live-feed-section`. | PASS |
-| **[AC-2]** | Sidebar Tab Bar Removal | Verified DOM absence of `.sidebar-tabs` and related tab elements. | PASS |
-| **[AC-3]** | Expanded Desktop Grid Layout | Verified `.dashboard-grid` columns styled to `320px 1fr` on viewport >= 769px. | PASS |
-| **[AC-4]** | Sidebar Mobile Drawer Width Preservation | Verified mobile `.sidebar-panel` width remains exactly `290px` with no tabs or live feed inside. | PASS |
-| **[AC-5]** | SSE Stream Resilience | Verified `/api/sentiment-stream` updates active trend polls dynamically without console errors. | PASS |
-| **[AC-6]** | Redesigned Welcome Screen | Verified welcome view (`#welcome-view`) features modern glassmorphism styling. | PASS |
-| **[AC-7]** | Modern Card & Border Aesthetics | Verified low-opacity borders (`rgba(255, 255, 255, 0.08)`) and hover translate animations on `.glass-card`. | PASS |
-
-### Artifacts and Links
-- **Green Checkpoint Tag**: `asf/20260613-expand-dashboard/green-1`
-- **Pull Request**: [coskunarif/trend-jacker#27](https://github.com/coskunarif/trend-jacker/pull/27) (Squash and merge)
-- **Production URL**: [https://trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Deployment Pipeline**: Deploy to Cloud Run GitHub Actions Workflow
-
-### UI Redesign Screenshots
-
-![Dashboard Redesign Homepage](/home/ubuntuadmin/.gemini/antigravity-cli/brain/eabcedff-6f71-4469-849b-34c77ed739ff/desktop-home.png)
-![Dashboard Redesign Detail](/home/ubuntuadmin/.gemini/antigravity-cli/brain/eabcedff-6f71-4469-849b-34c77ed739ff/desktop-detail.png)
+- **UI Screenshot**:
+![Broken Topic Images and Empty Placeholder Boxes](/home/ubuntuadmin/.gemini/antigravity-cli/brain/e1fb209f-f190-4134-a58d-c80d7a83329f/s_20260613_014947.png)
