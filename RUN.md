@@ -9,4 +9,19 @@ caps: agents,ui,web,human
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
 ## Verdict
+### Check 1: Database Caching Schema & Helpers [AC-1] - PASS
+- Table `topic_images` exists in SQLite with correct schema. Caching helpers are exported and function properly.
+
+### Check 2: Dynamic SVG Image Generation Endpoint [AC-2] - FAIL
+- **AC Broken**: AC-2 (Avoid redundant LLM generation costs by caching one image per topic).
+- **Reproduction / Evidence**:
+  1. A trend title is fetched as lowercase or mixed case (e.g., `ind vs afg`).
+  2. The first request to `/api/topic-image/ind-vs-afg` hits while the trend is in `latestTrends`, caching it under `ind vs afg`.
+  3. When `latestTrends` is later refreshed or cleared, a subsequent request to `/api/topic-image/ind-vs-afg` falls back to generating the title via slug splitting/capping: `Ind Vs Afg`.
+  4. The SQLite SELECT queries `topic_images` with `trend = 'Ind Vs Afg'`. Because SQLite string lookup is case-sensitive, this queries a cache miss and calls Gemini again, incurring extra cost.
+- **Suspected Cause**: Code. The cache keys in `db.js` and `server.js` are not normalized (e.g., using lowercase slugs as primary keys), allowing casing discrepancies to bypass the cache.
+
+### Check 3: Client-Side Image Integration & Fallback [AC-3] - PASS
+- Client-side code in `public/app.js` correctly falls back to `/api/topic-image/:slug` for both thumbnails and detail view hero image when the primary `ogImage` is absent or fails to load.
+
 ## Done
