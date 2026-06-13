@@ -1,74 +1,79 @@
-# SPEC: Dynamic demographic trend presentation
+# SPEC: Desktop Side-by-Side Double-Blade Sidebar Redesign
 
-We will customize the trend explanation and UI styling dynamically based on the user's selected age bracket (Kids/Teens, Adults, Seniors) to increase session duration and user engagement.
+To improve user experience and retention, we will redesign the sidebar layout on desktop viewports. The current vertical stacking of the **Trending Searches** and the **Global Sentiment Live Feed** creates visual clutter and a double scrollbar issue. We will transition this to a side-by-side "Twin Blades" layout on desktop screens, while fully preserving the drawer behavior and tab switching capability on mobile devices.
+
+---
+
+## Visual Layout Mockup (Desktop Viewport)
+
+```mermaid
+graph TD
+  subgraph Dashboard ["Dashboard Layout (.dashboard-grid: 640px 1fr)"]
+    subgraph SidebarPanel ["Sidebar Panel (.sidebar-panel: flex-direction: row, width: 640px)"]
+      subgraph TrendsBlade ["Trending Searches Blade (.trends-section: flex: 1, border-right)"]
+        H1["Header: Trending Searches (.panel-header)"]
+        L1["Trending List Scroll Area (#trends-list: overflow-y: auto)"]
+      end
+      subgraph FeedBlade ["Sentiment Feed Blade (.live-feed-section: flex: 1)"]
+        H2["Header: Global Sentiment Feed (.feed-header)"]
+        B1["Explanation Banner (#sentiment-explanation-banner)"]
+        L2["Live Feed Scroll Area (#live-sentiment-feed: overflow-y: auto)"]
+      end
+    end
+    MainContent["Main Content Panel (.main-panel: flex-grow: 1)"]
+  end
+```
+
+---
 
 ## Acceptance Criteria
 
-- **[AC-1] API Extension**: 
-  - The `POST /api/explain` endpoint accepts an optional `bracket` field in the request body (allowed values: `"kids_teens"`, `"adults"`, `"seniors"`; default is `"adults"`).
-  - Validation: Checked by querying `/api/explain` with different `bracket` values in JSON payload and asserting success.
+- **[AC-1] Desktop Double-Blade Sidebar Grid**:
+  - In viewports >= 769px (desktop), the main dashboard layout container (`.dashboard-grid`) must display two columns: a `640px` sidebar column and a flexible `1fr` main panel column (`grid-template-columns: 640px 1fr`).
+  - The left sidebar (`.sidebar-panel`) must layout its child components horizontally side-by-side using `flex-direction: row`.
+  - The first blade (Trending Searches, wrapped in `.trends-section`) and the second blade (Global Sentiment Feed, `.live-feed-section`) must divide the sidebar space equally (each `320px` wide).
+  - A vertical border of `1px solid var(--border)` must separate the two blades.
+  - Validation: E2E Playwright tests on desktop viewports (e.g., width 1280px) must verify that `.trends-section` and `.live-feed-section` are visible simultaneously, have the same vertical top position (`y` coordinate within a 5px margin of error), and have distinct `x` coordinates (side-by-side), with their combined bounding box widths totaling `640px`.
 
-- **[AC-2] Backend Demographic Generation Guidelines**:
-  - The LLM generation prompt for Gemini is customized based on the selected `bracket`:
-    - `"kids_teens"`: Simple analogies, gaming/meme/internet reference points, emojis, energetic tone, avoiding corporate fluff.
-    - `"seniors"`: Clear definitions, historical/long-term context, no transient slang, high readability, respectful and plain language.
-    - `"adults"`: Default catchy, active, concise tone.
-  - Validation: Inspected through LLM prompt construction logs or output structure.
+- **[AC-2] Scrollbar & Overflow Isolation**:
+  - Prevent redundant scrollbars on the parent columns. The `.trends-section` and `.live-feed-section` containers must have `overflow: hidden`.
+  - Only the inner list containers (`#trends-list` and `#live-sentiment-feed` / `.feed-scroll-container`) should be scrollable (`overflow-y: auto;`).
+  - Column headers (`.panel-header` and `.feed-header`) must remain static and fixed at the top of their respective columns on desktop.
+  - Validation: Verify in E2E tests that parent container elements do not have active vertical overflow, while inner scroll containers allow vertical scroll events.
 
-- **[AC-3] Database Caching with Bracket Key**:
-  - To support independent caching without database schema migrations:
-    - Standard `"adults"` bracket uses the default `{trend}` string as cache key.
-    - Non-default brackets (`"kids_teens"`, `"seniors"`) append their bracket identifier to the cache key in format `{trend}:{bracket}` when querying/saving in `trend_explanations` and `localized_explanations`.
-  - Validation: Direct inspection of SQLite database rows after requesting specialized explanations.
+- **[AC-3] Mobile Drawer & Tab Switcher Behavior Preservation**:
+  - In viewports <= 768px (mobile), the sidebar drawer must remain `290px` wide.
+  - The mobile tab switcher (`.sidebar-tabs`) must toggle visibility between the Trending Searches list and the Global Sentiment Feed list:
+    - **"Trending" Tab Active**: The Trending Searches header text and `#trends-list` must be visible. The Global Sentiment Feed (`.live-feed-section`) must be hidden (`display: none !important`).
+    - **"Sentiment Feed" Tab Active**: The tab bar and `.live-feed-section` must be visible. The `#trends-list` and `.panel-header-text` must be hidden. The `.trends-section` wrapper must shrink to fit only the tab header height (`flex: 0 0 auto; height: auto;`), allowing `.live-feed-section` to expand and occupy the full remaining vertical space.
+  - Validation: E2E tests on a mobile viewport (e.g., width 375px) must toggle between both tabs and verify visibility transitions using robust retrying assertions (e.g., Playwright's `expect().toPass()`).
 
-- **[AC-4] Interactive UI demographic selector**:
-  - The explainer view contains a visible demographic selector right below the velocity gauge / above the title.
-  - The selector contains 3 option pills styled to match the dark glassmorphic layout: "Adult (Default)", "Kids & Teens", and "Seniors".
-  - Validation: Playwright assertions checking presence and visibility of selectors in the DOM.
+- **[AC-4] View Transitions Integrity**:
+  - View Transitions API integration during mobile tab switches must not be disabled or bypassed based on `navigator.webdriver`.
+  - Validation: Verify that the view transition tests continue to pass and transitions execute in automated testing environments.
 
-- **[AC-5] Client-side Dynamic Presentation Switching**:
-  - Selecting a demographic bracket dynamically updates a `data-demographic` attribute on the `#explainer-view` or `body` element.
-  - When `"kids_teens"` is active, energetic visual styles (e.g. customized border glow, vibrant styling highlights) are applied.
-  - When `"seniors"` is active, all primary text blocks (hook, what is it, takeaway, news snippets) are scaled up (1.25x font size) and contrast is maximized.
-  - Selecting a style triggers a smooth transition and fetches/re-renders the bracket-specific text content.
-  - Validation: Playwright E2E verification of CSS variables/styles and viewport changes under different selector states.
-
-- **[AC-6] LocalStorage Persistence**:
-  - The user's demographic preference is stored as `selected-demographic` in `localStorage`.
-  - Subsequent trend detail loads or page reloads automatically read this value, set the active pill, and request the appropriate explanation bracket.
-  - Validation: Refreshing the page or switching trends preserves the active demographic selector and styling.
-
-- **[AC-7] Test Mode / Mock Support**:
-  - When running in `process.env.NODE_ENV === 'test'`, the backend returns predefined mock explanations tailored to the requested bracket (e.g., slang for `"kids_teens"` and definitions/context for `"seniors"`) to make assertions deterministic without calling the live Gemini API.
-  - Validation: Automated test assertions check for specific wording in mock responses.
+---
 
 ## Out of Scope
 
-- User authentication, sign-up forms, or persistent profiles to store age data.
-- Demographic segmentation of the global activity feed or live voting statistics.
+- Simplifying the sidebar layout to show Trending Searches only (this is the runner-up and is not selected).
+- Any modifications to the main panel (`.main-panel`) layout, logic, or styles.
+- Modifying backend APIs, SSE feed logic, or caching schemas.
+
+---
 
 ## Slices
 
-Task type: **additive** (dynamic presentation capabilities). Test strategy: **tests first** (write E2E tests before implementation).
+Task type: **refinement** (layout update). Test strategy: **update/snapshot tests** (Tester will update existing E2E sidebar tests before Builder implements the slices).
 
-- **[S-1] Test Suite & Backend API updates**
-  - **Description**: Add E2E tests verifying `/api/explain` returns different content for each bracket in test mode. Update `server.js` route handlers, prompt compilation, and mock handlers to support and test the `bracket` parameter.
-  - **ACs mapped**: `[AC-1]`, `[AC-2]`, `[AC-7]`
-  - **Files**: `server.js`, `tests/demographic-presentation.spec.js`
+- **[S-1] HTML DOM Wrapping**:
+  - **Description**: In `public/index.html`, wrap the Trending Searches elements (the first `.panel-header` and `#trends-list`) in a new container div with the class `trends-section`. Keep `.live-feed-section` as a sibling to `.trends-section` inside `.sidebar-panel`.
+  - **ACs mapped**: `[AC-1]`, `[AC-3]`
+  - **Files**: `public/index.html`
+  - *This slice is independent.*
 
-- **[S-2] DB Caching compatibility**
-  - **Description**: Extend caching functions in `server.js`/`db.js` to append `:{bracket}` to the trend key for non-default brackets. Verify that caching works correctly across multiple brackets for the same trend.
-  - **ACs mapped**: `[AC-3]`
-  - **Files**: `server.js`, `db.js`, `tests/demographic-presentation.spec.js`
-
-- **[S-3] Frontend UI Selector & LocalStorage Integration**
-  - **Description**: Add the selector pills to `public/index.html` and wire the event listeners in `public/app.js`. Handle state persistence in `localStorage`, showing loading skeletons/indicators during selection changes, and re-fetching explanation blocks.
-  - **ACs mapped**: `[AC-4]`, `[AC-6]`
-  - **Files**: `public/index.html`, `public/app.js`, `tests/demographic-presentation.spec.js`
-  - *Note: Can be built in parallel with S-4 once S-1/S-2 are completed.*
-
-- **[S-4] Styling & Dynamic Layout Adaptation**
-  - **Description**: Add CSS rules in `public/styles.css` matching `[data-demographic="seniors"]` and `[data-demographic="kids_teens"]`. Scale body text, titles, lists, and metadata blocks for seniors, and apply energetic glow variables for kids/teens.
-  - **ACs mapped**: `[AC-5]`
-  - **Files**: `public/styles.css`, `public/app.js`, `tests/demographic-presentation.spec.js`
-  - *Note: Can be built in parallel with S-3 once S-1/S-2 are completed.*
+- **[S-2] CSS Layout & Responsiveness Implementation**:
+  - **Description**: Add CSS rules in `public/styles.css` for the side-by-side layout on desktop (using a media query `@media (min-width: 769px)`). Apply `grid-template-columns: 640px 1fr` to `.dashboard-grid` and `flex-direction: row` to `.sidebar-panel`. Add `border-left: 1px solid var(--border)` and remove `border-top` on `.live-feed-section` on desktop. Set `overflow: hidden` on the outer containers and keep `overflow-y: auto` on inner containers. On mobile (under `@media (max-width: 768px)`), ensure `.trends-section` shrinks to auto height when `.show-sentiment` is active.
+  - **ACs mapped**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`
+  - **Files**: `public/styles.css`
+  - *Depends on [S-1].*
