@@ -1,6 +1,6 @@
 task: Increase user retention and sharing virality via daily streak recovery mechanics and social achievements.              tier: T2   creativity: 0.5
-state: SHIPPER                budget: repairs 0/3
-branch: asf/20260613-streak-achievements          checkpoint: none
+state: complete
+branch: asf/20260613-streak-achievements          checkpoint: asf/20260613-streak-achievements/green-1
 caps: agents,ui,web,human
 
 ## Task
@@ -25,7 +25,24 @@ caps: agents,ui,web,human
 - **[AC-5] Lock Screen Streak Retention CTA**: PASS. Verified via automated and behavioral browser checks that reaching message limit displays the lock container with correct retention prompt: `Come back tomorrow to keep your 🔥 {nextStreakCount}-Day streak alive and unlock +{nextStreakBonus} messages!`.
 - **[AC-6] Smooth Unlock Transition & Celebratory Toast**: PASS. Tested transition fades from lock container to chat form over 300ms upon successful trivia scoring, displaying the celebratory unlock toast message that auto-dismisses after 2.5s.
 - **Dogfooding & Layout Audit**: Verified mobile and desktop viewport screenshots at `dogfood-output/20260613-streak-achievements/screenshots/`. No regressions, overlapping layouts, or console errors detected.
-
 ## Done
 
+### Summary of Shipped Work
+We have implemented daily streak recovery mechanics and gamified chat limits to drive user retention and social sharing virality. The backend now persists user activity streaks in a SQLite database with robust consecutive day calculation logic and normalizes client IDs to lowercase. It exposes capacity status endpoints using a unified allowed capacity formula `3 + 5 * referrals + triviaBonus + streakBonus`. The frontend includes a responsive chat capacity progress bar that dynamically colors based on capacity percentage, a pulsing streak badge in the header, and an animated lock screen with a retention CTA when capacity is exceeded. Completing trivia/challenges smoothly triggers a fade-out of the lock screen, fades in the chat form, and shows a celebratory toast notification.
 
+### Acceptance Criteria & Verification Evidence
+
+| Acceptance Criterion | Verification Evidence / Pass State |
+|----------------------|------------------------------------|
+| **[AC-1] SQLite/Firestore Streak Persistence & Helpers** | Passed. Verified table columns and streak calculations with consecutive and gap days. Unit tests pass. |
+| **[AC-2] Backend API & Chat Limit Logic Integration** | Passed. Limits are correctly checked and returned by `GET /api/chat-limit` and enforced on `POST /api/chat`. |
+| **[AC-3] Chat Capacity Progress Bar UI** | Passed. Progress bar colors transition between emerald (<50%), amber (50%-80%), and red (>80%) depending on capacity. |
+| **[AC-4] Dynamic Daily Streak UI Badge** | Passed. Renders fire emoji and active streak counts with `pulse-streak` animations when streak is active. |
+| **[AC-5] Lock Screen Streak Retention CTA** | Passed. Displayed lock container with the streak preservation prompt encouraging users to return tomorrow. |
+| **[AC-6] Smooth Unlock Transition & Celebratory Toast** | Passed. Seamless fade transition (300ms) from lock screen to chat form and auto-dismissing (2.5s) celebratory toast. |
+| **Dogfooding & Layout Audit** | Passed. Visual verification shows responsive layouts and correct badge/progress bar formatting. See screenshots: [locked.png](dogfood-output/20260613-streak-achievements/screenshots/locked.png) and [desktop-active-trend.png](dogfood-output/20260613-streak-achievements/screenshots/desktop-active-trend.png) |
+
+### Pull Request & Integration Details
+- **Pull Request Link**: [PR #36](https://github.com/coskunarif/trend-jacker/pull/36)
+- **Integration Method**: `gh pr merge --squash --delete-branch` to merge the branch `asf/20260613-streak-achievements` into `main`.
+- **Production URL**: Local production server.
