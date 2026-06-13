@@ -1,5 +1,5 @@
 task: Set NODE_ENV=production in deployment configurations (README.md and deploy.yml) to enable Firestore cache in production.              tier: T1   creativity: 0.5
-state: shipper                 budget: repairs 0/2
+state: complete                budget: repairs 0/2
 branch: asf/20260613-enable-production-firestore          checkpoint: none
 caps: agents,ui,web,human
 
@@ -18,3 +18,16 @@ caps: agents,ui,web,human
 - **Dogfood / Visual Checks**: SKIPPED
   - Reason: The changes are limited to CI/CD and documentation files, which cannot affect the local runtime behavior or web user interface.
 ## Done
+### Delivered Work
+- Enabled Firestore client cache in production by configuring `NODE_ENV=production`.
+
+### Verification Table
+| Acceptance Criterion | Verification Evidence |
+| :--- | :--- |
+| **[AC-1]** Set `NODE_ENV=production` in Cloud Run Deploy Workflow | `.github/workflows/deploy.yml` was successfully configured to include `NODE_ENV=production` in the `--set-env-vars` option of `gcloud run deploy`. |
+| **[AC-2]** Update Example Deployment Command in README.md | `README.md` was updated to document `NODE_ENV=production` inside the `--set-env-vars` list of the example `gcloud run deploy` command. |
+
+### Integration Details
+- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/26
+- **Integration Method**: Squash and merge via `gh pr merge --squash`
+
