@@ -276,6 +276,7 @@ function initApp() {
   const pctOverrated = document.getElementById('pct-overrated');
   const btnDownloadCard = document.getElementById('btn-download-card');
   const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
+  const btnDownloadTriviaReward = document.getElementById('btn-download-trivia-reward');
   
   // Chat elements
   const chatForm = document.getElementById('chat-form');
@@ -768,6 +769,9 @@ function initApp() {
     }
     if (btnDownloadStreakReward) {
       updateButtonForSharing(btnDownloadStreakReward, 'Share Streak Card', 'Share Streak Card');
+    }
+    if (btnDownloadTriviaReward) {
+      updateButtonForSharing(btnDownloadTriviaReward, 'Share Trivia Card', 'Share Trivia Card');
     }
   }
 
@@ -1900,6 +1904,9 @@ function initApp() {
   if (btnDownloadStreakReward) {
     btnDownloadStreakReward.addEventListener('click', generateStreakRewardCardImage);
   }
+  if (btnDownloadTriviaReward) {
+    btnDownloadTriviaReward.addEventListener('click', generateTriviaRewardCardImage);
+  }
 
   // Trivia Click Listeners
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
@@ -2555,6 +2562,81 @@ function initApp() {
     const filename = `streak-reward-card-${streakCount}-day.png`;
     const shareTitle = `My ${streakCount}-Day Streak on TrendJacker`;
     const shareText = `I have a ${streakCount}-day streak on TrendJacker! Unlocked +${streakBonus} message capacity.`;
+    const fallbackUrl = window.location.origin;
+
+    await shareOrDownloadCanvas(canvas, filename, shareTitle, shareText, fallbackUrl);
+  }
+
+  async function generateTriviaRewardCardImage() {
+    if (!currentTrend) return;
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1260;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const score = userScore || 0;
+    const total = triviaQuestions ? triviaQuestions.length : 3;
+    const nickname = localStorage.getItem('trivia-nickname') || 'Anonymous Jacker';
+    const trendTitle = currentTrend.title;
+    const emojiGrid = answerPattern.join('');
+
+    let performanceLevel = 'Trivia Challenger!';
+    let milestoneBadge = 'Curious Mind 🥉';
+    if (score === 3) {
+      performanceLevel = 'Perfect Score! 🧠';
+      milestoneBadge = 'Brainiac Mastermind 🏆';
+    } else if (score === 2) {
+      performanceLevel = 'Great Attempt!';
+      milestoneBadge = 'Sharp Challenger 🥈';
+    }
+
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, '#1e1b4b');
+    bgGrad.addColorStop(1, '#5b21b6');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, 1160, 590);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText("TrendJacker Trivia Milestone", 600, 100);
+
+    ctx.font = "italic 32px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText(trendTitle, 600, 160);
+
+    ctx.font = "bold 44px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillText(performanceLevel, 600, 230);
+
+    ctx.font = "bold 48px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(milestoneBadge, 600, 310);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillText(`Score: ${score} out of ${total}`, 600, 390);
+
+    ctx.font = "32px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillText(nickname, 600, 450);
+
+    ctx.font = "40px sans-serif";
+    ctx.fillText(emojiGrid, 600, 510);
+
+    ctx.font = "24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText("Test your intelligence at viraljacker.com", 600, 570);
+
+    const filename = `trivia-reward-card-${titleToSlug(trendTitle)}.png`;
+    const shareTitle = `My Trivia Score for ${trendTitle} on TrendJacker`;
+    const shareText = `I scored ${score}/${total} on TrendJacker trivia for ${trendTitle}!`;
     const fallbackUrl = window.location.origin;
 
     await shareOrDownloadCanvas(canvas, filename, shareTitle, shareText, fallbackUrl);
