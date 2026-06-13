@@ -16,4 +16,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
 ## Verdict
+- Test 7: Passing localDate in resLimitResolve but not resLimitInitial triggers updateClientStreak, adding +2 streakBonus to the resolved allowedLimit, causing a contradiction between the expected (6) and actual (8) values.
+
 ## Done
+
