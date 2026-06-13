@@ -54,7 +54,7 @@ The TrendJacker dashboard redesign was successfully shipped. The Global Sentimen
 
 ### Artifacts and Links
 - **Green Checkpoint Tag**: `asf/20260613-expand-dashboard/green-1`
-- **Pull Request**: [coskunarif/trend-jacker#27](https://github.com/coskunarif/trend-jacker/pull/27)
+- **Pull Request**: [coskunarif/trend-jacker#27](https://github.com/coskunarif/trend-jacker/pull/27) (Squash and merge)
 - **Production URL**: [https://trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
 - **Deployment Pipeline**: Deploy to Cloud Run GitHub Actions Workflow
 
