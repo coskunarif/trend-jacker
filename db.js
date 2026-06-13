@@ -1340,6 +1340,9 @@ function parseLocalDate(dateStr) {
  * @returns {Promise<{client_id: string, streak_count: number, last_active_date: string} | null>}
  */
 export async function getClientStreak(clientId) {
+  if (clientId === null || clientId === undefined) {
+    return null;
+  }
   const normalized = (clientId || '').trim().toLowerCase();
 
   if (firestore) {

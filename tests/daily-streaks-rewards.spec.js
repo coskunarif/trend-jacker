@@ -14,6 +14,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
     try {
+      // Ensure WAL mode and busy timeout are configured to match backend settings
+      db.exec('PRAGMA journal_mode = WAL;');
+      db.exec('PRAGMA busy_timeout = 5000;');
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
     } catch (e) {
       // client_streaks table might not exist yet, which is expected to fail AC-1 initially
@@ -33,9 +36,13 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   // [AC-1] SQLite/Firestore Streak Persistence & Helpers
   // ==========================================
   test.describe('[AC-1] SQLite/Firestore Streak Persistence & Helpers', () => {
+    
+    // AC-1: Verify client_streaks table schema
     test('should verify client_streaks table exists with correct columns', async () => {
       const db = new DatabaseSync(dbPath);
       try {
+        db.exec('PRAGMA journal_mode = WAL;');
+        db.exec('PRAGMA busy_timeout = 5000;');
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
           WHERE type = 'table' AND name = 'client_streaks'
@@ -50,6 +57,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       }
     });
 
+    // AC-1: Verify updateClientStreak and getClientStreak logic and normalization
     test('should verify updateClientStreak and getClientStreak logic and normalization', async () => {
       const dbModule = await import('../db.js');
       expect(dbModule.updateClientStreak).toBeDefined();
@@ -100,10 +108,66 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       expect(streakPastDay.last_active_date).toBe(date4);
     });
 
+    // AC-1: Verify in-memory fallback Map exists and functions
     test('should verify in-memory fallback Map exists and functions when db is not used', async () => {
       const dbModule = await import('../db.js');
       expect(dbModule.inMemoryClientStreaks).toBeDefined();
       expect(dbModule.inMemoryClientStreaks).toBeInstanceOf(Map);
+    });
+
+    // AC-1: Adversarial test cases: null/empty/whitespace client IDs and case normalization on update/get
+    test('should handle edge cases, empty/whitespace IDs, and case normalization on update/get', async () => {
+      const dbModule = await import('../db.js');
+      const { updateClientStreak, getClientStreak } = dbModule;
+
+      const clientIdMixed = '  My-WeIrD-ClIeNt-123  ';
+      const clientIdNormalized = 'my-weird-client-123';
+      
+      await updateClientStreak(clientIdMixed, '2026-06-13');
+      const streakObj = await getClientStreak(clientIdNormalized);
+      expect(streakObj).toBeDefined();
+      expect(streakObj.client_id).toBe(clientIdNormalized);
+      expect(streakObj.streak_count).toBe(1);
+
+      const streakObjMixed = await getClientStreak(' MY-weIRD-clIENT-123 ');
+      expect(streakObjMixed).toBeDefined();
+      expect(streakObjMixed.client_id).toBe(clientIdNormalized);
+      expect(streakObjMixed.streak_count).toBe(1);
+
+      const emptyStreak = await getClientStreak(null);
+      expect(emptyStreak).toBeNull();
+
+      await updateClientStreak(null, '2026-06-13');
+      const emptyUpdated = await getClientStreak('');
+      expect(emptyUpdated).toBeDefined();
+      expect(emptyUpdated.client_id).toBe('');
+      expect(emptyUpdated.streak_count).toBe(1);
+    });
+
+    // AC-1: Adversarial test cases: malformed or out-of-order date strings
+    test('should handle malformed or out-of-order date strings gracefully', async () => {
+      const dbModule = await import('../db.js');
+      const { updateClientStreak, getClientStreak } = dbModule;
+      const tempClientId = `temp-date-test-${Date.now()}`;
+
+      await updateClientStreak(tempClientId, '2026-06-13');
+      let streak = await getClientStreak(tempClientId);
+      expect(streak.streak_count).toBe(1);
+
+      // Malformed date string (does not match YYYY-MM-DD but is string)
+      await updateClientStreak(tempClientId, 'not-a-date');
+      streak = await getClientStreak(tempClientId);
+      expect(streak.streak_count).toBe(1);
+
+      // Reset to 1 on out-of-order/past date
+      await updateClientStreak(tempClientId, '2026-06-13');
+      await updateClientStreak(tempClientId, '2026-06-14');
+      streak = await getClientStreak(tempClientId);
+      expect(streak.streak_count).toBe(2);
+
+      await updateClientStreak(tempClientId, '2026-06-13');
+      streak = await getClientStreak(tempClientId);
+      expect(streak.streak_count).toBe(1);
     });
   });
 
@@ -111,39 +175,36 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   // [AC-2] Backend API & Chat Limit Logic Integration
   // ==========================================
   test.describe('[AC-2] Backend API & Chat Limit Logic Integration', () => {
+    
+    // AC-2: Calculate allowedLimit with streak bonus via GET /api/chat-limit
     test('should calculate allowedLimit with streak bonus via GET /api/chat-limit', async ({ request }) => {
-      // Query without localDate. It should return streakCount: 0 and streakBonus: 0 since client has no streak.
       const res1 = await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}`);
       expect(res1.status()).toBe(200);
       const data1 = await res1.json();
       expect(data1.streakCount).toBe(0);
       expect(data1.streakBonus).toBe(0);
-      expect(data1.allowedLimit).toBe(3); // base 3
+      expect(data1.allowedLimit).toBe(3);
 
-      // Query with localDate "2026-06-13". Streak initialized to 1 (bonus +2)
       const res2 = await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}&localDate=2026-06-13`);
       expect(res2.status()).toBe(200);
       const data2 = await res2.json();
       expect(data2.streakCount).toBe(1);
       expect(data2.streakBonus).toBe(2);
-      expect(data2.allowedLimit).toBe(5); // 3 + 2 = 5
+      expect(data2.allowedLimit).toBe(5);
 
-      // Query with next day "2026-06-14". Streak increments to 2 (bonus +4)
       const res3 = await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}&localDate=2026-06-14`);
       expect(res3.status()).toBe(200);
       const data3 = await res3.json();
       expect(data3.streakCount).toBe(2);
       expect(data3.streakBonus).toBe(4);
-      expect(data3.allowedLimit).toBe(7); // 3 + 4 = 7
+      expect(data3.allowedLimit).toBe(7);
     });
 
+    // AC-2: Verify capacity formula is used in POST /api/trivia/score and POST /api/chat
     test('should verify capacity formula is used in POST /api/trivia/score and POST /api/chat', async ({ request }) => {
-      // Establish streak = 2 (bonus +4)
       await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}&localDate=2026-06-13`);
       await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}&localDate=2026-06-14`);
 
-      // Submit trivia score 2 (participation +3 bonus)
-      // allowedLimit should be 3 (base) + 3 (trivia) + 4 (streak) = 10
       const triviaRes = await request.post('/api/trivia/score', {
         data: { clientId, trend, score: 2 }
       });
@@ -151,7 +212,6 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       const triviaData = await triviaRes.json();
       expect(triviaData.allowedLimit).toBe(10);
 
-      // Send 10 chats, expect them to be allowed
       for (let i = 0; i < 10; i++) {
         const chatRes = await request.post('/api/chat', {
           headers: { 'x-enforce-limits': 'true' },
@@ -160,7 +220,6 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         expect(chatRes.status()).toBe(200);
       }
 
-      // 11th chat should be locked
       const chatRes11 = await request.post('/api/chat', {
         headers: { 'x-enforce-limits': 'true' },
         data: { trend, query: `Query 11`, history: [], clientId }
@@ -170,14 +229,55 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       expect(chatData11.error).toBe('limit_reached');
       expect(chatData11.allowedLimit).toBe(10);
     });
+
+    // AC-2: Missing query params on GET /api/chat-limit returns 400 Bad Request
+    test('should return 400 Bad Request if clientId or trend is missing on GET /api/chat-limit', async ({ request }) => {
+      const res1 = await request.get('/api/chat-limit');
+      expect(res1.status()).toBe(400);
+
+      const res2 = await request.get(`/api/chat-limit?clientId=${clientId}`);
+      expect(res2.status()).toBe(400);
+
+      const res3 = await request.get(`/api/chat-limit?trend=${trend}`);
+      expect(res3.status()).toBe(400);
+    });
+
+    // AC-2: Missing parameters on POST /api/trivia/score returns 400 Bad Request
+    test('should return 400 Bad Request if parameters are missing on POST /api/trivia/score', async ({ request }) => {
+      const res1 = await request.post('/api/trivia/score', { data: {} });
+      expect(res1.status()).toBe(400);
+
+      const res2 = await request.post('/api/trivia/score', { data: { clientId } });
+      expect(res2.status()).toBe(400);
+
+      const res3 = await request.post('/api/trivia/score', { data: { clientId, trend } });
+      expect(res3.status()).toBe(400);
+    });
+
+    // AC-2: Mixed-case/whitespace ID normalization verification via /api/chat-limit
+    test('should normalize clientId case and trim whitespaces in GET /api/chat-limit', async ({ request }) => {
+      const mixedId = '  My-Weird-Client-ID-AC2  ';
+      const normalizedId = 'my-weird-client-id-ac2';
+
+      const res = await request.get(`/api/chat-limit?clientId=${mixedId}&trend=${trend}&localDate=2026-06-13`);
+      expect(res.status()).toBe(200);
+      const data = await res.json();
+      expect(data.streakCount).toBe(1);
+
+      const dbModule = await import('../db.js');
+      const streak = await dbModule.getClientStreak(normalizedId);
+      expect(streak).toBeDefined();
+      expect(streak.streak_count).toBe(1);
+    });
   });
 
   // ==========================================
   // [AC-3] Chat Capacity Progress Bar UI
   // ==========================================
   test.describe('[AC-3] Chat Capacity Progress Bar UI', () => {
+    
+    // AC-3: Display progress bar elements and correct color-coding based on capacity
     test('should display progress bar elements and correct color-coding based on capacity', async ({ page }) => {
-      // Mock API responses for different capacity percentages
       // Case A: < 50% messages used (1/4 -> 25%) => emerald green (#10b981)
       await page.route('**/api/chat-limit*', async (route) => {
         await route.fulfill({
@@ -193,8 +293,10 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
+      const responsePromiseA = page.waitForResponse('**/api/chat-limit*');
       await page.goto('/');
       await page.locator('.trend-item').first().click();
+      await responsePromiseA;
 
       const capBar = page.locator('#chat-capacity-bar');
       const capFill = page.locator('#chat-capacity-fill');
@@ -204,10 +306,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       await expect(capFill).toBeVisible();
       await expect(capText).toBeVisible();
 
-      // Check text label content format
       await expect(capText).toHaveText('Message Capacity: 1 / 4');
-
-      // Check color representation for < 50%
       await expect(capFill).toHaveCSS('background-color', 'rgb(16, 185, 129)');
 
       // Case B: 50% - 80% messages used (2/4 -> 50%) => amber/orange (#f59e0b)
@@ -224,8 +323,10 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
           })
         });
       });
+      const responsePromiseB = page.waitForResponse('**/api/chat-limit*');
       await page.reload();
       await page.locator('.trend-item').first().click();
+      await responsePromiseB;
       await expect(capText).toHaveText('Message Capacity: 2 / 4');
       await expect(capFill).toHaveCSS('background-color', 'rgb(245, 158, 11)');
 
@@ -243,8 +344,10 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
           })
         });
       });
+      const responsePromiseC = page.waitForResponse('**/api/chat-limit*');
       await page.reload();
       await page.locator('.trend-item').first().click();
+      await responsePromiseC;
       await expect(capText).toHaveText('Message Capacity: 4 / 4');
       await expect(capFill).toHaveCSS('background-color', 'rgb(239, 68, 68)');
     });
@@ -254,6 +357,8 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   // [AC-4] Dynamic Daily Streak UI Badge
   // ==========================================
   test.describe('[AC-4] Dynamic Daily Streak UI Badge', () => {
+    
+    // AC-4: Show pulsing badge for active streak and style inactive when 0
     test('should show pulsing badge for active streak and style inactive when 0', async ({ page }) => {
       // 1. Mock active streak
       await page.route('**/api/chat-limit*', async (route) => {
@@ -270,17 +375,17 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
+      const responsePromiseActive = page.waitForResponse('**/api/chat-limit*');
       await page.goto('/');
       await page.locator('.trend-item').first().click();
+      await responsePromiseActive;
 
       const streakBadge = page.locator('#streak-badge-container');
       await expect(streakBadge).toBeVisible();
-      // Text displays fire emoji, streak count (3-Day Streak), and bonus (+6 capacity)
       await expect(streakBadge).toContainText('🔥');
       await expect(streakBadge).toContainText('3-Day Streak');
       await expect(streakBadge).toContainText('+6 capacity');
 
-      // Pulsing keyframes check or active class (e.g. check animation style / css class)
       await expect(streakBadge).toHaveCSS('animation', /pulse-streak/);
 
       // 2. Mock inactive streak (streak count is 0)
@@ -297,9 +402,11 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
           })
         });
       });
+      const responsePromiseInactive = page.waitForResponse('**/api/chat-limit*');
       await page.reload();
       await page.locator('.trend-item').first().click();
-      // Must remain hidden or styled as inactive (translucent/opacity or hidden)
+      await responsePromiseInactive;
+
       await expect(async () => {
         const isHidden = await streakBadge.isHidden();
         const opacity = await streakBadge.evaluate(el => window.getComputedStyle(el).opacity);
@@ -312,9 +419,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   // [AC-5] Lock Screen Streak Retention CTA
   // ==========================================
   test.describe('[AC-5] Lock Screen Streak Retention CTA', () => {
+    
+    // AC-5: Display next streak rewards in retention CTA when locked
     test('should display next streak rewards in retention CTA when locked', async ({ page }) => {
-      // Mock API: locked, streak = 3, bonus = 6.
-      // Next streak count = 4, next bonus = 8.
       await page.route('**/api/chat-limit*', async (route) => {
         await route.fulfill({
           status: 200,
@@ -329,13 +436,14 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
+      const responsePromise = page.waitForResponse('**/api/chat-limit*');
       await page.goto('/');
       await page.locator('.trend-item').first().click();
+      await responsePromise;
 
       const lockContainer = page.locator('#chat-lock-container');
       await expect(lockContainer).toBeVisible();
 
-      // Check retention prompt text
       const expectedPrompt = 'Come back tomorrow to keep your 🔥 4-Day streak alive and unlock +8 messages!';
       await expect(lockContainer).toContainText(expectedPrompt);
     });
@@ -345,8 +453,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
   // [AC-6] Smooth Unlock Transition & Celebratory Toast
   // ==========================================
   test.describe('[AC-6] Smooth Unlock Transition & Celebratory Toast', () => {
+    
+    // AC-6: Trigger smooth transitions and display celebratory toast when unlocked
     test('should trigger smooth transitions and display celebratory toast when unlocked', async ({ page }) => {
-      // Mock initial state: locked
       let limitReached = true;
       let allowedLimit = 3;
       await page.route('**/api/chat-limit*', async (route) => {
@@ -363,7 +472,6 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
-      // Mock score submission to unlock the chat (perfect score adds +5 capacity reward)
       await page.route('**/api/trivia/score', async (route) => {
         limitReached = false;
         allowedLimit = 8;
@@ -380,7 +488,6 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
-      // Mock trivia questions
       const mockTriviaResponse = [
         { question: 'Q1', options: ['A', 'B', 'C'], answer: 'B' },
         { question: 'Q2', options: ['A', 'B', 'C'], answer: 'C' },
@@ -394,8 +501,10 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         });
       });
 
+      const responsePromise1 = page.waitForResponse('**/api/chat-limit*');
       await page.goto('/');
       await page.locator('.trend-item').first().click();
+      await responsePromise1;
 
       const lockContainer = page.locator('#chat-lock-container');
       const chatForm = page.locator('#chat-form');
@@ -403,7 +512,6 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       await expect(lockContainer).toBeVisible();
       await expect(chatForm).toBeHidden();
 
-      // Trigger trivia play to unlock
       await lockContainer.locator('#chat-lock-play-trivia-btn').click();
       await page.locator('#btn-start-trivia').click();
 
@@ -411,18 +519,18 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
       const options = gameplayScreen.locator('.trivia-option-btn');
       const nextBtn = gameplayScreen.locator('.trivia-nav-btn');
 
-      // Answer questions
       await options.nth(1).click();
       await nextBtn.click();
       await options.nth(2).click();
       await nextBtn.click();
+      
+      const responsePromise2 = page.waitForResponse('**/api/trivia/score');
       await options.nth(1).click();
       await nextBtn.click();
+      await responsePromise2;
 
-      // Verify results screen
       await expect(page.locator('.trivia-results-screen')).toBeVisible();
 
-      // Verify lock container opacity goes to 0 and chat form opacity goes to 1
       await expect(async () => {
         const lockOpacity = await lockContainer.evaluate(el => window.getComputedStyle(el).opacity);
         const formOpacity = await chatForm.evaluate(el => window.getComputedStyle(el).opacity);
@@ -430,12 +538,10 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
         expect(parseFloat(formOpacity)).toBe(1);
       }).toPass();
 
-      // Celebration Toast Verification
       const toast = page.locator('#chat-unlock-toast');
       await expect(toast).toBeVisible();
       await expect(toast).toHaveText('Capacity Unlocked! +5 messages available.');
 
-      // Toast dismissed/removed after 2.5 seconds (we wait up to 4s)
       await expect(async () => {
         const isHidden = await toast.isHidden();
         expect(isHidden).toBe(true);
