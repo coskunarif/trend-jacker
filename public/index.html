@@ -285,11 +285,19 @@
           </div>
 
           <!-- Micro AI Q&A Card -->
-          <div class="glass-card interactive-card flex-col">
+          <div class="glass-card interactive-card flex-col" style="position: relative;">
+            <div id="chat-unlock-toast" class="hidden">Capacity Unlocked! +0 messages available.</div>
             <h3 class="card-heading">
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span id="label-dig-deeper">Dig Deeper with AI</span>
+              <div id="streak-badge-container">
+                🔥 <span id="streak-badge-count">0-Day Streak</span> <span id="streak-badge-bonus">+0 capacity</span>
+              </div>
             </h3>
+            <div id="chat-capacity-bar">
+              <div id="chat-capacity-fill"></div>
+              <span id="chat-capacity-text">Message Capacity: 0 / 3</span>
+            </div>
             <div id="chat-history" class="chat-history-container" role="log" aria-live="polite">
               <div class="chat-bubble bot">
                 Ask me any follow-up question about this trend (e.g., "how can I check this myself?" or "is there a catch?").
@@ -306,6 +314,11 @@
               <p class="lock-instructions" style="margin: 0 0 15px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6);">Invite friends to unlock 5 more messages! Share your link:</p>
               <a id="referral-share-link" href="#" target="_blank" class="share-link-btn" style="display: inline-block; padding: 6px 12px; margin-right: 10px; border-radius: 4px; background: var(--primary-color, #3b82f6); color: white; text-decoration: none; font-size: 0.85rem; font-weight: 500;">Share Link</a>
               <button id="check-status-btn" class="check-status-btn" style="display: inline-block; padding: 6px 12px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; background: transparent; color: white; font-size: 0.85rem; font-weight: 500; cursor: pointer;">Check Status</button>
+              
+              <div id="streak-retention-container" style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <p id="streak-retention-prompt" style="margin: 0; font-size: 0.85rem; color: rgba(255, 255, 255, 0.8); font-weight: 500;"></p>
+              </div>
+
               <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
                 <p class="trivia-lock-instructions" style="margin: 0 0 10px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6);">Complete the Trivia Challenge to earn up to +5 bonus messages!</p>
                 <button id="chat-lock-play-trivia-btn" class="play-trivia-btn" style="display: inline-block; padding: 6px 12px; border: 1px solid var(--primary-color, #3b82f6); border-radius: 4px; background: var(--primary-color, #3b82f6); color: white; font-size: 0.85rem; font-weight: 500; cursor: pointer;">Play Trivia Challenge</button>
