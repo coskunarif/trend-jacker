@@ -1,55 +1,50 @@
-task: Increase user session retention and referral-driven sharing rate              tier: T2   creativity: 0.5
-state: complete               budget: repairs 0/3
-branch: asf/20260613-retention-sharing          checkpoint: asf/20260613-retention-sharing/green-1
+task: Focus on UI/UX, LLM optimized cost, caching, SEO, chat limiting, make the site more enjoying people love and want to stay.              tier: T2   creativity: 0.5
+state: complete              budget: repairs 0/3
+branch: asf/20260613-cost-engagement          checkpoint: none
 caps: agents,ui,web,human
 
 ## Task
-- Objective: Increase user session retention and referral-driven sharing rate.
-- Metric it moves: User session duration, returning user rate, and referral link share rate.
-- Why now: Connecting chat capacity rewards to trivia milestones transforms chat limits from a barrier into an engaging challenge, driving organic referral loops.
-- Runner-up: Decrease network latency and redundant server request count by caching explainer data on the client side.
+- **Objective**: Reduce LLM API transaction costs and improve mobile user engagement and retention metrics.
+- **Metric it moves**: Reduce LLM token consumption/costs by 15%, and increase mobile average session duration by 20%.
+- **Why now**: Duplicate AI API requests from casing mismatches on cache lookups cause redundant token fees, while long text lists on mobile reduce user dwell time and interest.
+- **Runner-up**: Improve mobile typography fluidity and implement gesture-driven navigation drawers.
 
 ## Log
 - 2026-06-13: Conductor starting fresh run with T2 (Scout trigger). Starting Scout phase.
-- 2026-06-13: Scout completed. Selected gamification-driven user retention feature.
-- 2026-06-13: Architect phase started.
+- 2026-06-13: Spawned server on port 4000 (task-39).
+- 2026-06-13: Stopped background server process (task-39). Scout phase completed.
+- 2026-06-13: Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
 - 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
-- 2026-06-13: Shipper tagged green checkpoint, created PR, verified tests, and closed the run.
-
 ## Verdict
-- All checks (deterministic tests, behavioral dogfooding, and visual layout inspection) passed.
-- [AC-1] PASS (Trivia score SQLite cache & helpers verified with correct columns, persistence, and conditional updates)
-- [AC-2] PASS (Normalizes trend strings to lowercase for both score cache and chat count tracking)
-- [AC-3] PASS (Chat limit correctly incorporates Referrals and Trivia milestone bonuses; API endpoints function correctly)
-- [AC-4] PASS (Lock screen displays invitation text and 'Play Trivia' button which scrolls smoothly and focuses)
-- [AC-5] PASS (Results screen features reward display success badge and smooth 'Go to Chat' scroll button)
-- [AC-6] PASS (Completing trivia auto-submits score to backend, checks new limit, and unlocks chat UI dynamically)
+- **AC-1: Case-Insensitive Cache Lookups**: PASS
+  - SQLite columns use `COLLATE NOCASE`. Lookups are normalized using `.toLowerCase()`.
+  - *Note*: Encountered a transient `database is locked` error in `should have the topic_images table created in SQLite with correct schema` during the parallel full-suite test run. Passed consistently on subsequent re-runs.
+- **AC-2: Mobile Trends List Search and Category Filtering**: PASS
+  - Real-time filtering by partial text query and platform source tags (All/Google/Reddit) works correctly.
+- **AC-3: Mobile Trends List Truncation and "Show More" Pagination**: PASS
+  - Correctly shows 6 trends on mobile by default, and expands/collapses list dynamically using the `+ Show More Trends` toggle.
+- **AC-4: Dynamic Emojis & Fluid Mobile Typography**: PASS
+  - Dynamic emojis show up based on keyword classification.
+  - Main titles scale using CSS `clamp(1.6rem, 5vw, 2.25rem)`.
 
 ## Done
-### Shipped Features
-- Gamified chat capacity rewards based on trivia milestones: +5 for a score of 3, +3 for 2, +1 for 0 or 1, and +0 if not played.
-- Trimmed and lowercased trend normalization across all chat limits, chat counts, and trivia score queries.
-- New database table `client_trivia_scores` with columns `client_id`, `trend`, `score`, and `completed_at`.
-- Real-time limit checking and chat container auto-unlocking on the frontend.
-- Scroll-to-trivia and return-to-chat CTA buttons for seamless UX navigation.
+### What Shipped
+Case-insensitive cache lookups and a mobile-first responsive redesign for the trends list (featuring category filters, real-time query search, truncation with toggle on mobile, dynamic emojis, and fluid typography).
 
-### Acceptance Criteria & Evidence
-| AC | Verdict | Evidence |
+### Acceptance Criteria Verification Evidence
+
+| Acceptance Criterion | Verification Method | Evidence (Screenshots / Log Output) |
 |---|---|---|
-| `[AC-1]` Client Trivia Score Cache | PASS | Verification of the `client_trivia_scores` SQLite schema and testing of the `recordTriviaScore` and `getTriviaScore` helpers. |
-| `[AC-2]` Case-Insensitive Key Normalization | PASS | Handled via lowercase trim trend normalization in database operations. Verified via unit & E2E tests. |
-| `[AC-3]` Gamified Chat Limit API | PASS | Verified GET `/api/chat-limit` and POST `/api/chat` limit check formulas. |
-| `[AC-4]` Chat Lock Screen CTA | PASS | Chat lock overlay button `#chat-lock-play-trivia-btn` scrolls to `#trivia-card-container` and focuses start button. |
-| `[AC-5]` Trivia Results Celebration & Return | PASS | Display of `#trivia-reward-display` badge showing message reward details and `#btn-return-to-chat` button. |
-| `[AC-6]` Automatic UI Sync and Unlocking | PASS | Real-time unlocking of `#chat-form` and hiding of lock container upon asynchronous trivia completion. |
+| **AC-1: Case-Insensitive Cache Lookups** | Inspected SQLite schema checks on startup and confirmed normalized caching keys in `db.js`/`server.js` | Checked SQLite schema for `COLLATE NOCASE` and tested `/api/explain` with multiple casing variants. |
+| **AC-2: Mobile Trends List Search and Category Filtering** | Interactive search box `#trends-search` input and `.trends-filter-tabs` selections verified via Playwright/Dogfood | ![search_harden.png](dogfood-output/20260613-cost-engagement/screenshots/search_harden.png) <br> ![filter_reddit.png](dogfood-output/20260613-cost-engagement/screenshots/filter_reddit.png) |
+| **AC-3: Mobile Trends List Truncation and "Show More" Pagination** | Resized viewport to mobile width (375px) to test top-6 item truncation and toggle expanding/collapsing | ![mobile_initial.png](dogfood-output/20260613-cost-engagement/screenshots/mobile_initial.png) <br> ![mobile_expanded.png](dogfood-output/20260613-cost-engagement/screenshots/mobile_expanded.png) |
+| **AC-4: Dynamic Emojis & Fluid Mobile Typography** | Visual checks on emoji display and fluid title text resize validations | ![initial.png](dogfood-output/20260613-cost-engagement/screenshots/initial.png) |
 
-### Integration & Deployment
-- **Pull Request:** [PR #31](https://github.com/coskunarif/trend-jacker/pull/31)
-- **Deployment URL:** [Cloud Run Target](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Integration Method:** Squash and merge (executed via `gh pr merge --squash --delete-branch`)
-
-### Visual Evidence
-![Trivia Results Screen](dogfood-output/20260613-retention-sharing/screenshots/trivia_results.png)
+### PR and Deployment
+- **Pull Request**: [PR #32](https://github.com/coskunarif/trend-jacker/pull/32)
+- **Integration Method**: Squash and Merge (`gh pr merge --squash --delete-branch`)
+- **Deployment Status**: Deployed to GCP Cloud Run via GitHub Actions
+- **Health Check Command / URL**: Checked http://localhost:4000/ and Cloud Run production URL

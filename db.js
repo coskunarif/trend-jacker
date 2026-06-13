@@ -62,17 +62,37 @@ if (!firestore) {
           location TEXT
         )
       `);
+      try {
+        const schemaRow = initDb.prepare(`
+          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'trend_explanations'
+        `).get();
+        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+          initDb.exec('DROP TABLE trend_explanations');
+        }
+      } catch (e) {
+        // ignore
+      }
+      try {
+        const schemaRow = initDb.prepare(`
+          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'localized_explanations'
+        `).get();
+        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+          initDb.exec('DROP TABLE localized_explanations');
+        }
+      } catch (e) {
+        // ignore
+      }
       initDb.exec(`
         CREATE TABLE IF NOT EXISTS trend_explanations (
-          trend TEXT PRIMARY KEY,
+          trend TEXT PRIMARY KEY COLLATE NOCASE,
           explanation TEXT,
           created_at TEXT
         )
       `);
       initDb.exec(`
         CREATE TABLE IF NOT EXISTS localized_explanations (
-          trend TEXT,
-          lang TEXT,
+          trend TEXT COLLATE NOCASE,
+          lang TEXT COLLATE NOCASE,
           title TEXT,
           meta_description TEXT,
           explanation TEXT,
@@ -417,9 +437,10 @@ export async function seedVoteEvents(trend, events) {
  * @returns {Promise<{hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string} | null>}
  */
 export async function getCachedExplanation(trend) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(trend);
+      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -433,7 +454,7 @@ export async function getCachedExplanation(trend) {
       }
       return null;
     } catch (err) {
-      console.error(`Firestore error in getCachedExplanation for "${trend}":`, err.message);
+      console.error(`Firestore error in getCachedExplanation for "${normalizedTrend}":`, err.message);
       return null;
     }
   }
@@ -441,7 +462,7 @@ export async function getCachedExplanation(trend) {
   if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
-      const row = stmt.get(trend);
+      const row = stmt.get(normalizedTrend);
       if (row && row.explanation) {
         const explanation = JSON.parse(row.explanation);
         explanation.created_at = row.created_at;
@@ -449,12 +470,12 @@ export async function getCachedExplanation(trend) {
       }
       return null;
     } catch (err) {
-      console.error(`Local SQLite query failed for getCachedExplanation "${trend}":`, err.message);
+      console.error(`Local SQLite query failed for getCachedExplanation "${normalizedTrend}":`, err.message);
       return null;
     }
   }
 
-  const cached = inMemoryExplanations.get(trend);
+  const cached = inMemoryExplanations.get(normalizedTrend);
   if (cached) {
     return {
       ...cached.explanation,
@@ -471,6 +492,7 @@ export async function getCachedExplanation(trend) {
  * @returns {Promise<void>}
  */
 export async function setCachedExplanation(trend, explanation) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   const createdAt = new Date().toISOString();
   const dataToSave = {
     hook: explanation.hook,
@@ -481,14 +503,14 @@ export async function setCachedExplanation(trend, explanation) {
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(trend);
+      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
       await docRef.set({
         ...dataToSave,
         created_at: createdAt
       });
       return;
     } catch (err) {
-      console.error(`Firestore error in setCachedExplanation for "${trend}":`, err.message);
+      console.error(`Firestore error in setCachedExplanation for "${normalizedTrend}":`, err.message);
       return;
     }
   }
@@ -498,15 +520,15 @@ export async function setCachedExplanation(trend, explanation) {
       sqliteDb.prepare(`
         INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
         VALUES (?, ?, ?)
-      `).run(trend, JSON.stringify(dataToSave), createdAt);
+      `).run(normalizedTrend, JSON.stringify(dataToSave), createdAt);
       return;
     } catch (err) {
-      console.error(`Local SQLite insert failed for setCachedExplanation "${trend}":`, err.message);
+      console.error(`Local SQLite insert failed for setCachedExplanation "${normalizedTrend}":`, err.message);
       return;
     }
   }
 
-  inMemoryExplanations.set(trend, {
+  inMemoryExplanations.set(normalizedTrend, {
     explanation: dataToSave,
     created_at: createdAt
   });
@@ -519,9 +541,11 @@ export async function setCachedExplanation(trend, explanation) {
  * @returns {Promise<{title: string, meta_description: string, explanation: {hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string}} | null>}
  */
 export async function getLocalizedExplanation(trend, lang) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedLang = lang ? lang.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docId = `${trend}_${lang}`;
+      const docId = `${normalizedTrend}_${normalizedLang}`;
       const docRef = firestore.collection('localized_explanations').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
@@ -535,7 +559,7 @@ export async function getLocalizedExplanation(trend, lang) {
       }
       return null;
     } catch (err) {
-      console.error(`Firestore error in getLocalizedExplanation for "${trend}" "${lang}":`, err.message);
+      console.error(`Firestore error in getLocalizedExplanation for "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return null;
     }
   }
@@ -543,7 +567,7 @@ export async function getLocalizedExplanation(trend, lang) {
   if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
-      const row = stmt.get(trend, lang);
+      const row = stmt.get(normalizedTrend, normalizedLang);
       if (row) {
         return {
           title: row.title,
@@ -554,12 +578,12 @@ export async function getLocalizedExplanation(trend, lang) {
       }
       return null;
     } catch (err) {
-      console.error(`Local SQLite query failed for getLocalizedExplanation "${trend}" "${lang}":`, err.message);
+      console.error(`Local SQLite query failed for getLocalizedExplanation "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return null;
     }
   }
 
-  const cached = inMemoryLocalizedExplanations.get(`${trend}_${lang}`);
+  const cached = inMemoryLocalizedExplanations.get(`${normalizedTrend}_${normalizedLang}`);
   if (cached) {
     return {
       ...cached,
@@ -577,16 +601,18 @@ export async function getLocalizedExplanation(trend, lang) {
  * @returns {Promise<void>}
  */
 export async function setLocalizedExplanation(trend, lang, data) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedLang = lang ? lang.trim().toLowerCase() : '';
   const createdAt = new Date().toISOString();
   const { title, meta_description, explanation } = data;
 
   if (firestore) {
     try {
-      const docId = `${trend}_${lang}`;
+      const docId = `${normalizedTrend}_${normalizedLang}`;
       const docRef = firestore.collection('localized_explanations').doc(docId);
       await docRef.set({
-        trend,
-        lang,
+        trend: normalizedTrend,
+        lang: normalizedLang,
         title,
         meta_description,
         explanation,
@@ -594,7 +620,7 @@ export async function setLocalizedExplanation(trend, lang, data) {
       });
       return;
     } catch (err) {
-      console.error(`Firestore error in setLocalizedExplanation for "${trend}" "${lang}":`, err.message);
+      console.error(`Firestore error in setLocalizedExplanation for "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return;
     }
   }
@@ -604,15 +630,15 @@ export async function setLocalizedExplanation(trend, lang, data) {
       sqliteDb.prepare(`
         INSERT OR REPLACE INTO localized_explanations (trend, lang, title, meta_description, explanation, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `).run(trend, lang, title, meta_description, JSON.stringify(explanation), createdAt);
+      `).run(normalizedTrend, normalizedLang, title, meta_description, JSON.stringify(explanation), createdAt);
       return;
     } catch (err) {
-      console.error(`Local SQLite insert failed for setLocalizedExplanation "${trend}" "${lang}":`, err.message);
+      console.error(`Local SQLite insert failed for setLocalizedExplanation "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return;
     }
   }
 
-  inMemoryLocalizedExplanations.set(`${trend}_${lang}`, {
+  inMemoryLocalizedExplanations.set(`${normalizedTrend}_${normalizedLang}`, {
     title,
     meta_description,
     explanation,

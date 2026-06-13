@@ -141,6 +141,69 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       expect(cachedLoc).toBeDefined();
       expect(cachedLoc.title).toBe(testLocData.title);
     });
+
+    // [AC-3] Case-Insensitive Database Caching with Bracket Key
+    test('should normalize demographic cache keys to lowercase for trend_explanations and localized_explanations', async () => {
+      if (!setCachedExplanation || !getCachedExplanation || !setLocalizedExplanation || !getLocalizedExplanation) {
+        throw new Error('Database functions not loaded');
+      }
+
+      const baseTrendMixed = `Test-Cache-Trend-Case-${Date.now()}`;
+      const bracketMixed = `Kids_Teens`;
+      const testExpl = {
+        hook: 'Dynamic Hook',
+        whatIsIt: 'Dynamic explanation text',
+        whyIsItViral: ['Factor A'],
+        takeaway: 'Takeaway text'
+      };
+
+      // 1. Check casing normalization for trend_explanations
+      const kidsKeyMixed = `${baseTrendMixed}:${bracketMixed}`;
+      const kidsKeyLower = `${baseTrendMixed.toLowerCase()}:${bracketMixed.toLowerCase()}`;
+      
+      await setCachedExplanation(kidsKeyMixed, testExpl);
+
+      const db = new DatabaseSync(dbPath);
+      try {
+        const stmt = db.prepare('SELECT trend, explanation FROM trend_explanations WHERE trend = ?');
+        // The record in SQLite must have the lowercase normalized trend key
+        const row = stmt.get(kidsKeyLower);
+        expect(row).toBeDefined();
+        expect(row.trend).toBe(kidsKeyLower);
+      } finally {
+        db.close();
+      }
+
+      const cachedUpper = await getCachedExplanation(kidsKeyMixed.toUpperCase());
+      expect(cachedUpper).toBeDefined();
+      expect(cachedUpper.hook).toBe(testExpl.hook);
+
+      // 2. Check casing normalization for localized_explanations
+      const seniorKeyMixed = `${baseTrendMixed}:Seniors`;
+      const seniorKeyLower = `${baseTrendMixed.toLowerCase()}:seniors`;
+      const testLocData = {
+        title: 'Senior Title',
+        meta_description: 'Senior Meta Description',
+        explanation: testExpl
+      };
+
+      await setLocalizedExplanation(seniorKeyMixed, 'ES', testLocData);
+
+      const db2 = new DatabaseSync(dbPath);
+      try {
+        const stmt = db2.prepare('SELECT trend, lang, title FROM localized_explanations WHERE trend = ? AND lang = ?');
+        const row = stmt.get(seniorKeyLower, 'es');
+        expect(row).toBeDefined();
+        expect(row.trend).toBe(seniorKeyLower);
+        expect(row.lang).toBe('es');
+      } finally {
+        db2.close();
+      }
+
+      const cachedLocUpper = await getLocalizedExplanation(seniorKeyMixed.toUpperCase(), 'ES');
+      expect(cachedLocUpper).toBeDefined();
+      expect(cachedLocUpper.title).toBe(testLocData.title);
+    });
   });
 
   test.describe('Frontend UI & Dynamic Interactivity [AC-4, AC-5, AC-6]', () => {

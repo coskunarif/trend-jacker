@@ -52,6 +52,11 @@ function initApp() {
   let hasWebShare = false;
   let hasFileShare = false;
 
+  let allTrends = [];
+  let searchQuery = '';
+  let activeFilter = 'All';
+  let showAllTrendsMobile = false;
+
   // --- Interactive Sentiment Timeline Dashboard ---
   let prevTimelinePoints = [];
   let currentTimelinePoints = [];
@@ -1229,7 +1234,40 @@ function initApp() {
       });
     }
 
+    const searchInput = document.getElementById('trends-search');
+    const filterTabs = document.querySelectorAll('.trends-filter-tabs .filter-tab');
+    const showMoreBtn = document.getElementById('btn-show-more-trends');
 
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderTrends();
+      });
+    }
+
+    filterTabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        filterTabs.forEach(t => {
+          t.classList.remove('active');
+          t.style.background = 'rgba(255, 255, 255, 0.05)';
+        });
+        e.target.classList.add('active');
+        e.target.style.background = 'var(--primary, #6366f1)';
+        activeFilter = e.target.textContent.trim();
+        renderTrends();
+      });
+    });
+
+    if (showMoreBtn) {
+      showMoreBtn.addEventListener('click', () => {
+        showAllTrendsMobile = !showAllTrendsMobile;
+        renderTrends();
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      renderTrends();
+    });
   }
 
   // Initialize: Load Trends
@@ -1280,34 +1318,71 @@ function initApp() {
       if (!res.ok) throw new Error('Failed to fetch trends');
       const trends = await res.json();
       
-      renderTrends(trends);
+      allTrends = trends;
+      
+      // Hydrate trends list with preloaded item if not already present
+      if (preloadedData && !allTrends.some(t => titleToSlug(t.title) === preloadedData.slug)) {
+        allTrends.unshift({
+          title: preloadedData.trend,
+          traffic: 'Breakout',
+          description: preloadedData.explanation.hook,
+          news: { headline: '', snippet: '', url: '' }
+        });
+      }
+
+      renderTrends();
     } catch (err) {
       console.error(err);
       trendsListContainer.innerHTML = `<p class="error-msg">Error loading live feeds. Please refresh.</p>`;
     }
   }
 
-  function renderTrends(trends) {
+  function renderTrends(trends = allTrends) {
     trendsListContainer.innerHTML = '';
     
-    // Hydrate trends list with preloaded item if not already present
-    if (preloadedData && !trends.some(t => titleToSlug(t.title) === preloadedData.slug)) {
-      trends.unshift({
-        title: preloadedData.trend,
-        traffic: 'Breakout',
-        description: preloadedData.explanation.hook,
-        news: { headline: '', snippet: '', url: '' }
+    // Apply filtering
+    let filtered = [...trends];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t => t.title.toLowerCase().includes(q) || (t.description && t.description.toLowerCase().includes(q)));
+    }
+
+    if (activeFilter.toLowerCase() !== 'all') {
+      const filterLower = activeFilter.toLowerCase();
+      filtered = filtered.filter(t => {
+        const source = (t.source || 'google').toLowerCase();
+        return source === filterLower;
       });
     }
 
-    if (trends.length === 0) {
+    const showMoreBtn = document.getElementById('btn-show-more-trends');
+    const isMobile = window.innerWidth <= 768;
+
+    let displayTrends = [...filtered];
+    if (isMobile && filtered.length > 6) {
+      if (showMoreBtn) {
+        showMoreBtn.style.setProperty('display', 'block', 'important');
+      }
+      if (!showAllTrendsMobile) {
+        displayTrends = filtered.slice(0, 6);
+        if (showMoreBtn) showMoreBtn.textContent = '+ Show More Trends';
+      } else {
+        if (showMoreBtn) showMoreBtn.textContent = '- Show Less Trends';
+      }
+    } else {
+      if (showMoreBtn) {
+        showMoreBtn.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    if (displayTrends.length === 0) {
       trendsListContainer.innerHTML = '<p class="empty-msg">No current trends found.</p>';
       return;
     }
 
     let activeItem = null;
 
-    trends.forEach((trend, index) => {
+    displayTrends.forEach((trend, index) => {
       const a = document.createElement('a');
       a.className = 'trend-item';
       a.href = `/t/${titleToSlug(trend.title)}`;
@@ -1344,10 +1419,24 @@ function initApp() {
         }
       }
 
+      // Dynamic Category Emojis
+      const titleText = trend.title.toLowerCase();
+      let emoji = '🔥';
+      if (titleText.includes('gemini') || titleText.includes('gpt-5') || titleText.includes('vision pro')) {
+        emoji = '🤖';
+      } else if (titleText.includes('bitcoin') || titleText.includes('stock') || titleText.includes('inflation')) {
+        emoji = '📈';
+      } else if (titleText.includes('playstation') || titleText.includes('elden ring')) {
+        emoji = '🎮';
+      }
+
       a.innerHTML = `
         ${thumbnailHtml}
         <div class="trend-item-info">
-          <span class="trend-item-title">${trend.title}</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="trend-category-emoji" style="font-size: 1.2rem;">${emoji}</span>
+            <span class="trend-item-title">${trend.title}</span>
+          </div>
           <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
             ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none';" />` : ''}
             ${sourceBadge}
@@ -1427,6 +1516,13 @@ function initApp() {
         news: { headline: '', snippet: '', url: '' }
       };
       loadTrendDetails(mockTrend);
+    }
+
+    // On mobile viewports, if we are on the home page (no urlSlug) and have more than 6 trends, start with the sidebar open
+    if (window.innerWidth <= 768 && !urlSlug && filtered.length > 6 && sidebarPanel) {
+      sidebarPanel.classList.add('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('hidden');
+      if (btnSidebarToggle) btnSidebarToggle.setAttribute('aria-expanded', 'true');
     }
   }
 

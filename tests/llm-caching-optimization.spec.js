@@ -32,6 +32,87 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     } catch (err) {
       console.warn('Could not import caching functions from db.js:', err.message);
     }
+  });  // --- AC-1: Case-Insensitive Cache Lookups ---
+
+  // [AC-1] Schema Verification: SQLite table trend_explanations has COLLATE NOCASE
+  test('should have trend_explanations table created in SQLite with COLLATE NOCASE on trend', async () => {
+    const localDb = new DatabaseSync(dbPath);
+    try {
+      const stmt = localDb.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'trend_explanations'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('trend TEXT PRIMARY KEY COLLATE NOCASE');
+    } finally {
+      localDb.close();
+    }
+  });
+
+  // [AC-1] Schema Verification: SQLite table localized_explanations has COLLATE NOCASE
+  test('should have localized_explanations table created in SQLite with COLLATE NOCASE on trend and lang', async () => {
+    const localDb = new DatabaseSync(dbPath);
+    try {
+      const stmt = localDb.prepare(`
+        SELECT sql FROM sqlite_master 
+        WHERE type = 'table' AND name = 'localized_explanations'
+      `);
+      const row = stmt.get();
+      expect(row).toBeDefined();
+      expect(row.sql).toContain('trend TEXT COLLATE NOCASE');
+      expect(row.sql).toContain('lang TEXT COLLATE NOCASE');
+    } finally {
+      localDb.close();
+    }
+  });
+
+  // [AC-1] API Integration: Case-Insensitive Cache Lookups for POST /api/explain
+  test('should serve case-insensitive explanation from cache (verified via DB modification)', async ({ request }) => {
+    const uppercaseTrend = `CASE-TEST-${Date.now()}`;
+    const lowercaseTrend = uppercaseTrend.toLowerCase();
+    const mixedcaseTrend = uppercaseTrend.charAt(0).toUpperCase() + uppercaseTrend.slice(1).toLowerCase();
+
+    // 1. Call POST /api/explain with trend "GOOGLE GEMINI" (uppercaseTrend)
+    const res1 = await request.post('/api/explain', {
+      data: { trend: uppercaseTrend, headline: 'Casing News', snippet: 'Casing spike' }
+    });
+    expect(res1.ok()).toBe(true);
+    const data1 = await res1.json();
+    expect(data1.hook).toBeDefined();
+
+    // 2. Modify cached entry in SQLite directly to a unique text string
+    const db = new DatabaseSync(dbPath);
+    const customHook = `Unique Hook for case-insensitive check ${Date.now()}`;
+    try {
+      // Find row in database. The row key in DB should be lowercased "case-test-..."
+      const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
+      const rowBefore = checkStmt.get(lowercaseTrend);
+      expect(rowBefore).toBeDefined();
+      const parsed = JSON.parse(rowBefore.explanation);
+      parsed.hook = customHook;
+      
+      const updateStmt = db.prepare('UPDATE trend_explanations SET explanation = ? WHERE trend = ?');
+      updateStmt.run(JSON.stringify(parsed), lowercaseTrend);
+    } finally {
+      db.close();
+    }
+
+    // 3. Call POST /api/explain with trend "google gemini" (lowercaseTrend)
+    const res2 = await request.post('/api/explain', {
+      data: { trend: lowercaseTrend }
+    });
+    expect(res2.ok()).toBe(true);
+    const data2 = await res2.json();
+    expect(data2.hook).toBe(customHook);
+
+    // 4. Call POST /api/explain with trend "Google Gemini" (mixedcaseTrend)
+    const res3 = await request.post('/api/explain', {
+      data: { trend: mixedcaseTrend }
+    });
+    expect(res3.ok()).toBe(true);
+    const data3 = await res3.json();
+    expect(data3.hook).toBe(customHook);
   });
 
   // --- AC-1: Chat Q&A API Caching ---

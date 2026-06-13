@@ -170,7 +170,7 @@ fastify.get('/', async (request, reply) => {
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="Why is ${trendName} Trending? | TrendJacker">
   <meta name="twitter:description" content="${explanation.hook}">
-  <link rel="alternate" type="text/markdown" href="/llms.txt">
+  <link rel="alternate" type="text/plain" href="/llms.txt">
   
   <script type="application/ld+json">
     ${JSON.stringify(jsonLd, null, 2)}
@@ -186,7 +186,7 @@ fastify.get('/', async (request, reply) => {
     html = html.replace(/<meta\s+name="description"\s+content=".*?">/, '');
     html = html.replace('</head>', `${seoMeta}\n</head>`);
 
-    reply.type('text/html').send(html);
+    reply.type('text/html').header('Link', '</llms.txt>; rel="alternate"; type="text/plain"').send(html);
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to render home page.' });
@@ -619,24 +619,26 @@ fastify.get('/api/sentiment-stream', (request, reply) => {
 
 // Helper to get explanation from Gemini
 async function getTrendExplanation(trend, headline = '', snippet = '', bracket = 'adults') {
-  const trendKey = (bracket && bracket !== 'adults') ? `${trend}:${bracket}` : trend;
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedBracket = bracket ? bracket.trim().toLowerCase() : 'adults';
+  const trendKey = (normalizedBracket && normalizedBracket !== 'adults') ? `${normalizedTrend}:${normalizedBracket}` : normalizedTrend;
   // Check the cache first
   const cached = await getCachedExplanation(trendKey);
   if (cached) {
-    cached.polls = await getPollData(trend);
+    cached.polls = await getPollData(normalizedTrend);
     return cached;
   }
 
   let explanation;
   if (process.env.NODE_ENV === 'test') {
-    if (bracket === 'kids_teens') {
+    if (normalizedBracket === 'kids_teens') {
       explanation = {
         hook: 'This trend is absolutely cooking right now, no cap!',
         whatIsIt: 'It is a viral phenomenon that is taking over everyone\'s feed.',
         whyIsItViral: ['Pure brainrot energy', 'Massive memes', 'High key addictive content'],
         takeaway: 'Vibe check passed. We are locked in.'
       };
-    } else if (bracket === 'seniors') {
+    } else if (normalizedBracket === 'seniors') {
       explanation = {
         hook: 'This topic has gained significant interest and historical context is helpful.',
         whatIsIt: 'It is a modern technological development built on years of research.',
@@ -729,7 +731,9 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
   const normalizedLang = (lang || 'en').toLowerCase().trim();
   const supported = ['es', 'fr', 'ja'];
 
-  const trendKey = (bracket && bracket !== 'adults') ? `${trend}:${bracket}` : trend;
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedBracket = bracket ? bracket.trim().toLowerCase() : 'adults';
+  const trendKey = (normalizedBracket && normalizedBracket !== 'adults') ? `${normalizedTrend}:${normalizedBracket}` : normalizedTrend;
 
   if (!supported.includes(normalizedLang)) {
     // Fallback/Use English
@@ -746,7 +750,7 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
   // Check localized cache first
   const cached = await getLocalizedExplanation(trendKey, normalizedLang);
   if (cached) {
-    cached.explanation.polls = await getPollData(trend);
+    cached.explanation.polls = await getPollData(normalizedTrend);
     return {
       title: cached.title,
       meta_description: cached.meta_description,
@@ -840,7 +844,7 @@ Ensure all translated fields conform to the response schema and are in the langu
   await setLocalizedExplanation(trendKey, normalizedLang, result);
 
   // Attach polls
-  result.explanation.polls = await getPollData(trend);
+  result.explanation.polls = await getPollData(normalizedTrend);
   result.lang = normalizedLang;
 
   // Retrieve to get created_at timestamp
@@ -1079,7 +1083,7 @@ async function handleTrendRequest(request, reply, slug, lang) {
   <meta name="twitter:title" content="${localizedData.title}">
   <meta name="twitter:description" content="${localizedData.meta_description}">
   <meta name="twitter:image" content="${ogImageUrl}">
-  <link rel="alternate" type="text/markdown" href="/llms.txt">
+  <link rel="alternate" type="text/plain" href="/llms.txt">
   ${alternateLinks}
   
   <script type="application/ld+json">
@@ -1098,7 +1102,7 @@ async function handleTrendRequest(request, reply, slug, lang) {
     html = html.replace('</head>', `${seoMeta}\n</head>`);
     html = html.replace('<html lang="en">', `<html lang="${actualLang}">`);
 
-    reply.type('text/html').send(html);
+    reply.type('text/html').header('Link', '</llms.txt>; rel="alternate"; type="text/plain"').send(html);
   } catch (err) {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to render trend page.' });

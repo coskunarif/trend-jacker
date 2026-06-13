@@ -351,4 +351,24 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
     await expect(cite).toHaveText(/Google announces Gemini 3\.5/);
   });
 
+  /**
+   * [AC-3] Plain-Text Citations in Sitemap Aggregators - /llms.txt Alternate Headers & Links
+   * Verification: Verify that the GET / response contains an alternate link header
+   * (e.g., Link: </llms.txt>; rel="alternate"; type="text/plain") and the HTML page contains
+   * a <link rel="alternate" type="text/plain" href="/llms.txt"> tag for auto-discovery.
+   */
+  test('AC-3: GET / response exposes /llms.txt via Link headers and link tag', async ({ request, page }) => {
+    const response = await request.get('/');
+    expect(response.status()).toBe(200);
+    const linkHeader = response.headers()['link'];
+    expect(linkHeader).toBeDefined();
+    expect(linkHeader).toContain('/llms.txt');
+    expect(linkHeader).toContain('rel="alternate"');
+    expect(linkHeader).toContain('type="text/plain"');
+
+    await page.goto('/');
+    const linkTag = page.locator('link[rel="alternate"][type="text/plain"][href="/llms.txt"]');
+    await expect(linkTag).toBeAttached();
+  });
+
 });
