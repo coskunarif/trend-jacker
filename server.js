@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1656,6 +1656,30 @@ fastify.post('/api/trivia/score', async (request, reply) => {
   }
 
   return { success: true, allowedLimit, currentCount, limitReached, rewardCount };
+});
+
+// GET /api/trivia/leaderboard - Get trivia leaderboard for a trend
+fastify.get('/api/trivia/leaderboard', async (request, reply) => {
+  const { trend, clientId } = request.query || {};
+  if (!trend) {
+    return reply.status(400).send({ error: 'trend is required.' });
+  }
+  const result = await getTriviaLeaderboard(trend, clientId);
+  return reply.send(result);
+});
+
+// POST /api/trivia/nickname - Save or update client nickname
+fastify.post('/api/trivia/nickname', async (request, reply) => {
+  const { clientId, nickname } = request.body || {};
+  if (typeof clientId !== 'string' || typeof nickname !== 'string') {
+    return reply.status(400).send({ error: 'clientId and nickname must be strings.' });
+  }
+  const trimmed = nickname.trim();
+  if (trimmed.length === 0 || trimmed.length > 15) {
+    return reply.status(400).send({ error: 'nickname must be non-empty and max 15 characters.' });
+  }
+  await saveClientNickname(clientId, trimmed);
+  return reply.send({ success: true, nickname: trimmed });
 });
 
 // POST /api/chat - Follow-up Q&A chat using Gemini
