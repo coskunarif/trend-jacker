@@ -275,6 +275,7 @@ function initApp() {
   const pctGenius = document.getElementById('pct-genius');
   const pctOverrated = document.getElementById('pct-overrated');
   const btnDownloadCard = document.getElementById('btn-download-card');
+  const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
   
   // Chat elements
   const chatForm = document.getElementById('chat-form');
@@ -736,6 +737,9 @@ function initApp() {
     }
     if (btnDownloadInfographic) {
       updateButtonForSharing(btnDownloadInfographic, 'Share Infographic', 'Share Infographic Card');
+    }
+    if (btnDownloadStreakReward) {
+      updateButtonForSharing(btnDownloadStreakReward, 'Share Streak Card', 'Share Streak Card');
     }
   }
 
@@ -1864,6 +1868,9 @@ function initApp() {
   if (btnDownloadInfographic) {
     btnDownloadInfographic.addEventListener('click', generateInfographicCard);
   }
+  if (btnDownloadStreakReward) {
+    btnDownloadStreakReward.addEventListener('click', generateStreakRewardCardImage);
+  }
 
   // Trivia Click Listeners
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
@@ -2459,6 +2466,71 @@ function initApp() {
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
+  async function generateStreakRewardCardImage() {
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1260;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const streakCount = currentStreakCount || 0;
+    const streakBonus = currentStreakBonus || (streakCount * 2);
+    const nickname = localStorage.getItem('trivia-nickname') || 'Anonymous Jacker';
+
+    let bgStart = '#f97316', bgEnd = '#ef4444';
+    let milestoneName = 'Consistent Jacker 🔥';
+
+    if (streakCount >= 15) {
+      bgStart = '#1e1b4b';
+      bgEnd = '#06b6d4';
+      milestoneName = 'Trend Overlord 🌌';
+    } else if (streakCount >= 7) {
+      bgStart = '#7c3aed';
+      bgEnd = '#db2777';
+      milestoneName = 'Weekly Legend 👑';
+    }
+
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, bgStart);
+    bgGrad.addColorStop(1, bgEnd);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, 1160, 590);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText("TrendJacker Daily Streak Milestone", 600, 120);
+
+    ctx.font = "bold 48px 'Space Grotesk', sans-serif";
+    ctx.fillText(milestoneName, 600, 230);
+
+    ctx.font = "italic 32px 'Space Grotesk', sans-serif";
+    ctx.fillText(nickname, 600, 310);
+
+    ctx.font = "bold 56px 'Space Grotesk', sans-serif";
+    ctx.fillText(`${streakCount}-Day Streak Active!`, 600, 410);
+
+    ctx.font = "bold 32px 'Space Grotesk', sans-serif";
+    ctx.fillText(`Unlocked +${streakBonus} Message Capacity`, 600, 480);
+
+    ctx.font = "24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText("Build your streak at viraljacker.com", 600, 560);
+
+    const filename = `streak-reward-card-${streakCount}-day.png`;
+    const shareTitle = `My ${streakCount}-Day Streak on TrendJacker`;
+    const shareText = `I have a ${streakCount}-day streak on TrendJacker! Unlocked +${streakBonus} message capacity.`;
+    const fallbackUrl = window.location.origin;
+
+    await shareOrDownloadCanvas(canvas, filename, shareTitle, shareText, fallbackUrl);
+  }
+
   function wrapText(ctx, text, x, y, maxWidth, lineHeight, dryRun = false) {
     const words = text.split(' ');
     let line = '';
@@ -2748,6 +2820,15 @@ function initApp() {
           day.classList.remove('active');
         }
       });
+    }
+
+    const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
+    if (btnDownloadStreakReward) {
+      if (streakCount >= 3) {
+        btnDownloadStreakReward.classList.remove('hidden');
+      } else {
+        btnDownloadStreakReward.classList.add('hidden');
+      }
     }
 
     // 3. Update Lock/Unlock layout with transition
