@@ -1,131 +1,80 @@
-# Specification: Interactive AI-Generated Trivia Challenge
+# SPEC.md - Chat Limiting & Referral Loop Architect Spec
 
-This document defines the functional requirements, acceptance criteria, vertical development slices, and test strategy for implementing the interactive AI-Generated Trivia Challenge in TrendJacker.
+## 1. Acceptance Criteria
 
-## Acceptance Criteria
+### [AC-1] Lowercase Caching Keys
+* **Requirement**: Database cache lookup and insertion keys for chat responses (`chat_cache`) and generated social posts (`generated_posts`) must be normalized to lowercase.
+* **Verification**: In test and dev environments, check that querying the cache with mixed-casing trends or query text retrieves the cached data (avoiding redundant LLM generation).
 
-### [AC-1] Trivia Card UI Component
-- **Description:** A new interactive Trivia Challenge card is rendered in the trend detail view below the interactive-grid.
-- **Verification:** When a trend's details load, verify that the `#trivia-card-container` element is visible, styled using the application's glassmorphism style sheet, and displays the "Start Screen" with the active trend's title and a "Start Trivia Challenge" button.
+### [AC-2] Persistent Client ID
+* **Requirement**: The frontend client ID (`localClientId`) must be persisted in `localStorage` so that page reloads do not reset the identifier (which would bypass the message limits).
+* **Verification**: Verify that `localStorage.getItem('clientId')` remains the same across browser reloads.
 
-### [AC-2] On-Demand Trivia Generation / Loading & DB Caching
-- **Description:** Trivia questions are loaded lazily on demand when the user clicks "Start Trivia Challenge", querying the cached database first or generating via Gemini in production.
-- **Verification:** 
-  - Clicking "Start Trivia Challenge" sends a request to `POST /api/trivia` with `trend` and `lang` body parameters.
-  - The server checks SQLite database table `trend_trivia` (or Firestore collection `trend_trivia` in production) first.
-  - If a cache miss occurs in test/mock mode (`process.env.NODE_ENV === 'test'`), return mocked questions.
-  - If a cache miss occurs in production mode, generate 3 trivia questions about the trend using the `gemini-3.5-flash` model, enforcing structured JSON via `responseSchema` containing `question` (string), `options` (array of 4 strings), `correctAnswer` (0-based integer index), and `explanation` (string). Cache the generated questions in the database, and return them to the client.
+### [AC-3] Chat message Tracking & Referral Storage (Backend)
+* **Requirement**: Support server-side storage of client chat counts and referrals.
+  * SQLite schema should declare:
+    * `client_referrals` (Primary Key: `client_id`, `referee_id`)
+    * `client_chat_counts` (Primary Key: `client_id`, `trend`, `count` INTEGER)
+  * Firestore schema must handle corresponding models using equivalent documents and sub-collections.
+* **Verification**: Expose `POST /api/referral` to record referral relationships and `GET /api/chat-limit` to return `{ limitReached, currentCount, allowedLimit }` for a client and trend.
 
-### [AC-3] Interactive Trivia Gameplay
-- **Description:** Users can answer the 3 trivia questions one-by-one with immediate visual correctness feedback and explanation.
-- **Verification:**
-  - The Question Screen displays a progress indicator (e.g. "Question 1 of 3"), the question text, and 4 option buttons.
-  - Clicking an option button locks the selection, disables all options, and reveals the explanation block.
-  - The explanation block shows correct/incorrect feedback (e.g. "Correct! 🟩" or "Incorrect! 🟥"), the correct option highlighted, the explanation text, and a navigation button: "Next Question" (for questions 1 & 2) or "See Results" (for question 3).
+### [AC-4] Enforcing Chat Limits on Chat Endpoint
+* **Requirement**: Intercept `POST /api/chat` calls to verify the client's message count against their computed limit (`3 + 5 * referral_count`).
+  * If limit is reached, return `403 Forbidden` with `{ error: 'limit_reached', allowedLimit }`.
+  * If below limit, increment the count in `client_chat_counts` and return the chat answer.
+  * Limit checks must be bypassed if `process.env.NODE_ENV === 'test'`.
+* **Verification**: Mock a client ID, trigger `POST /api/chat` 4 times, and assert that the 4th request returns a `403 Forbidden` status.
 
-### [AC-4] Wordle-style Score Card & Results Screen
-- **Description:** Upon completing all questions, users are shown their score and a visual Wordle-style score card representation.
-- **Verification:**
-  - The Results Screen displays "Challenge Completed!", the user's score (e.g. "You scored 2 out of 3"), and a block of colored emojis (e.g., `🟩🟥🟩` where green indicates correct and red indicates incorrect).
-  - A "Play Again" button resets the trivia card state machine back to the Start Screen.
+### [AC-5] Chat Limit UI & Locked State (Frontend)
+* **Requirement**: Hide the chat input form `#chat-form` and display a styled `#chat-lock-container` inside the AI Q&A card when the user hits their limit.
+  * The locked interface must clearly state the current limit (e.g. `3/3 messages`), supply share links containing the client's `?ref=clientId` parameter, and display a "Check Status" button.
+* **Verification**: Click on a trend, query the chat 3 times, verify the form is hidden, and verify that the lock overlay/message block is visible.
 
-### [AC-5] Wordle Score Card Social Share & Unified Modal Integration
-- **Description:** Users can share their trivia scores via clipboard copy and the application's Unified Share Modal.
-- **Verification:**
-  - A "Share Score" button on the results screen copies the Wordle score card text representation to the user's clipboard (containing the emoji grid, score, and trend link) and triggers the Unified Share Modal.
-  - The Unified Share Modal context select element dropdown includes a new "Trivia Score" option. When opened from the trivia screen, the modal opens with the "trivia" context active, pre-loading the post textarea with the Wordle-style score card text.
-  - The server-side `POST /api/generate-post` endpoint is updated to support `contextType: 'trivia'` and reads optional `score` and `pattern` body parameters to construct platform-specific post text templates.
+### [AC-6] Referral Visit Loop Execution
+* **Requirement**: On page load, if a `ref` parameter exists in the URL query string and does not match the current visitor's `localClientId`, send `POST /api/referral` to record the referral.
+* **Verification**: Load `/?ref=client-xyz` in a new window/session, check that a database entry records client-xyz as the referrer, and clicking "Check Status" on Client XYZ's screen unlocks their chat.
 
 ---
 
-## Out of Scope
-- Multi-user global leaderboards, user authentication, or database persistence of individual user gameplay histories.
-- Custom trivia settings such as choosing custom number of questions, setting a game timer, or selecting difficulty categories.
+## 2. Out of Scope
+* IP-based rate limiting or CAPTCHA validation.
+* Multi-device client ID syncing (profiles/accounts).
 
 ---
 
-## Slices
+## 3. Slices
 
-### [S-1] Database Schema Migration & Caching Helpers
-- **Description:** Set up the database table and helpers for caching generated trivia questions.
-- **Target Files:**
-  - `db.js`
-- **Implementation Details:**
-  - Add SQL migration to initialize the SQLite `trend_trivia` table: `CREATE TABLE IF NOT EXISTS trend_trivia (trend TEXT, lang TEXT, trivia TEXT, created_at TEXT, PRIMARY KEY (trend, lang))`.
-  - Implement and export helper functions `getTrendTrivia(trend, lang)` and `setTrendTrivia(trend, lang, trivia)` supporting SQLite, Firestore (in production), and in-memory mock map.
-- **ACs Mapped:** `[AC-2]`
-- **Dependencies:** None (Independent)
+### [S-1] Case-Insensitive Caching Keys
+* **Files**: `db.js`
+* **Type**: Refinement
+* **AC Mapping**: `[AC-1]`
+* **Test Strategy**: Update/snapshot tests ensuring keys are converted to lowercase prior to DB insert or query.
+* **Independent**: Yes
 
-### [S-2] Backend API for Trivia Generation
-- **Description:** Create the API endpoint to fetch and generate trivia questions using Gemini.
-- **Target Files:**
-  - `server.js`
-- **Implementation Details:**
-  - Register route `POST /api/trivia` in Fastify.
-  - On request, check database cache. If missing, generate questions.
-  - In test mode, return static mock questions (specific mock trivia for "Google Gemini" to aid E2E tests, and generic mock trivia for other trends).
-  - In production mode, prompt Gemini 3.5-flash with a structured schema to produce 3 multiple-choice questions with 4 options, a correct answer index, and explanation text. Cache and return the result.
-- **ACs Mapped:** `[AC-2]`
-- **Dependencies:** `[S-1]`
+### [S-2] Database Schema and Server-Side Tracking for Limits & Referrals
+* **Files**: `db.js`
+* **Type**: Additive
+* **AC Mapping**: `[AC-3]`
+* **Test Strategy**: Additive tests verifying table/collection initialization and CRUD operations for referrals and chat counts.
+* **Independent**: No (pre-requisite for API endpoints)
 
-### [S-3] Social Share Post Generator Updates
-- **Description:** Update backend share-post generation to support trivia context.
-- **Target Files:**
-  - `server.js`
-- **Implementation Details:**
-  - Update `/api/generate-post` endpoint to handle `contextType === 'trivia'`.
-  - Accept `score` and `pattern` from the request body to generate platform-specific templates (Twitter/X, LinkedIn, Facebook, Reddit, Pinterest) containing the Wordle emoji score card and the trend URL.
-- **ACs Mapped:** `[AC-5]`
-- **Dependencies:** `[S-2]`
+### [S-3] Limit & Referral HTTP Endpoints
+* **Files**: `server.js`
+* **Type**: Additive
+* **AC Mapping**: `[AC-3]`, `[AC-4]`
+* **Test Strategy**: Integration tests validating `GET /api/chat-limit`, `POST /api/referral`, and `POST /api/chat` limit enforcement.
+* **Independent**: No
 
-### [S-4] Frontend Trivia UI Structure & CSS Styles
-- **Description:** Add the HTML structure and CSS styles for the trivia gameplay screens and Unified Share Modal.
-- **Target Files:**
-  - `public/index.html`
-  - `public/styles.css`
-- **Implementation Details:**
-  - Add `#trivia-card-container` HTML component below `.interactive-grid` in `public/index.html`.
-  - Add sub-elements for the Start Screen, Question Screen, and Results Screen.
-  - Add `<option value="trivia">Trivia Score</option>` to the share modal context select.
-  - Add styling rules in `public/styles.css` for trivia option buttons, feedback alerts, explanation box, results panel, and Wordle score card block layout matching the site's dark mode visual style.
-- **ACs Mapped:** `[AC-1]`, `[AC-3]`, `[AC-4]`, `[AC-5]`
-- **Dependencies:** None (Independent)
+### [S-4] Persistent Client ID and Referral Capture
+* **Files**: `public/app.js`
+* **Type**: Refinement
+* **AC Mapping**: `[AC-2]`, `[AC-6]`
+* **Test Strategy**: E2E verification of `localStorage` client ID retention and query parameter detection on initialization.
+* **Independent**: Yes
 
-### [S-5] Client-Side Trivia State Machine & Gameplay Logic
-- **Description:** Implement client-side gameplay, state transitions, and localization support.
-- **Target Files:**
-  - `public/app.js`
-- **Implementation Details:**
-  - Define state variables to track the active trend's trivia questions, current question index, user score, answer emoji patterns, and selected state.
-  - Implement event listener for "Start Trivia Challenge" button to fetch questions from `POST /api/trivia` and start the game.
-  - Render option buttons dynamically, wire up click handlers to disable options, check correctness, display the explanation panel, and show the next question button.
-  - Implement reset handler on "Play Again" button.
-  - Extend client-side `UI_DICTIONARY` and `translateUI` function to support localizing trivia headers, buttons, progress text, and feedback labels in English, Spanish, French, and Japanese.
-- **ACs Mapped:** `[AC-1]`, `[AC-3]`, `[AC-4]`
-- **Dependencies:** `[S-2]`, `[S-4]`
-
-### [S-6] Wordle Share Integration
-- **Description:** Connect the results screen sharing actions to the clipboard and Unified Share Modal.
-- **Target Files:**
-  - `public/app.js`
-- **Implementation Details:**
-  - Wire up the "Share Score" button on the results screen.
-  - Copy the Wordle emoji score card text to the user's clipboard and display temporary feedback text.
-  - Call `openShareModal('trivia')` to launch the Unified Share Modal, passing the user's score and emoji pattern to generate the social post.
-- **ACs Mapped:** `[AC-5]`
-- **Dependencies:** `[S-3]`, `[S-5]`
-
----
-
-## Test Strategy
-
-Since this is an **additive** feature, we will use a **tests-first** strategy.
-- Before coding, the Tester will write new Playwright tests in `tests/trivia-challenge.spec.js`.
-- The tests will verify:
-  1. Default visibility of the Trivia Card on trend load showing the Start Screen.
-  2. Clicking "Start Trivia Challenge" transitions to the first question (mocking `POST /api/trivia` response).
-  3. Interactive feedback loop (clicking options disables choices, shows explanation, updates progress indicator).
-  4. Completion of all 3 questions displays the results screen, the correct final score, and the Wordle emoji grid.
-  5. Play Again resets back to the start screen.
-  6. "Share Score" copies the score card text to the clipboard and opens the Unified Share Modal with the context set to "trivia" and the social post preloaded.
-  7. Client-side localization translates headers, options, and progress blocks when switching language.
+### [S-5] Chat Limit UI & Referral Share Actions
+* **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
+* **Type**: Refinement
+* **AC Mapping**: `[AC-5]`, `[AC-6]`
+* **Test Strategy**: E2E DOM structure assertions, button click handlers, and transition tests from locked to unlocked state.
+* **Independent**: No
