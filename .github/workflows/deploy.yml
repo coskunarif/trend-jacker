@@ -58,4 +58,4 @@ jobs:
             --project profithelm-477200 \
             --region us-central1 \
             --allow-unauthenticated \
-            --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}"
+            --set-env-vars="GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }},NODE_ENV=production"

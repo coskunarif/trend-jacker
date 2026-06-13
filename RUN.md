@@ -1,49 +1,33 @@
-task: Customize trend presentation dynamically to increase average session duration across all age brackets from 7 to 70. (Moves: Average session duration. Why now: The platform currently serves a single explanation style, failing to capture or retain younger demographics (kids/teens) or older users (seniors) who require different context types and presentation styles. Runner-up: Segment voting choices and visual timelines by demographic brackets to increase social sharing and voter engagement.) tier: T2   creativity: 0.5
-state: complete             budget: repairs 0/3
-branch: asf/20260612-dynamic-presentation checkpoint: asf/20260612-dynamic-presentation/green-1
+task: Set NODE_ENV=production in deployment configurations (README.md and deploy.yml) to enable Firestore cache in production.              tier: T1   creativity: 0.5
+state: complete                budget: repairs 0/2
+branch: asf/20260613-enable-production-firestore          checkpoint: none
 caps: agents,ui,web,human
 
 ## Log
-- 2026-06-12: Conductor starting fresh run with Scout phase.
-- 2026-06-12: Scout phase completed. Winner selected: Customize trend presentation dynamically. Conductor starting Architect phase.
-- 2026-06-12: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-12: Tester completed tests. Observed state: red. Conductor starting Builder phase.
-- 2026-06-12: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
-- 2026-06-12: Verifier started dev server on port 3005.
-- 2026-06-12: Verifier completed validation checks successfully. All checks passed. Conductor starting Shipper phase.
+- 2026-06-13: Conductor starting fresh run with T1. Starting Architect phase.
+- 2026-06-13: Architect completed SPEC.md. Conductor starting Builder phase.
+- 2026-06-13: Builder completed all slices. Conductor starting Verifier phase.
+- 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
 ## Verdict
-- [AC-1] API Extension: PASS. verified POST /api/explain accepts bracket parameter and returns success.
-- [AC-2] Backend Demographic Generation Guidelines: PASS. Verified prompt customize templates in server.js (energetic tone/emojis for kids_teens, historical/plain language for seniors).
-- [AC-3] Database Caching with Bracket Key: PASS. Verified that non-default brackets are cached in trend_explanations and localized_explanations tables using the `{trend}:{bracket}` suffix.
-- [AC-4] Interactive UI demographic selector: PASS. Verified rendering of pills "Adult (Default)", "Kids & Teens", and "Seniors" below the hero container.
-- [AC-5] Client-side Dynamic Presentation Switching: PASS. Verified dynamic styling variables for kids-teens-theme and text scaling / maximized contrast for seniors.
-- [AC-6] LocalStorage Persistence: PASS. Verified preference saved to local storage and restored on reload/navigation.
-- [AC-7] Test Mode / Mock Support: PASS. Checked mock response wording with slang/context in test mode.
-- E2E Tests: PASS. Verified Playwright test suite passes (120/120 tests passed).
-- Dogfooding: PASS. Explored the frontend features without encountering console or visual errors.
-
+- **[AC-1] Set NODE_ENV=production in Cloud Run Deploy Workflow**: PASS
+  - Evidence: Verified that `.github/workflows/deploy.yml` sets `NODE_ENV=production` in `--set-env-vars`.
+- **[AC-2] Update Example Deployment Command in README.md**: PASS
+  - Evidence: Verified that `README.md` contains the updated `gcloud run deploy` example command with `NODE_ENV=production` in `--set-env-vars`.
+- **Test Suite**: PASS
+  - Evidence: All 120 Playwright tests passed successfully.
+- **Dogfood / Visual Checks**: SKIPPED
+  - Reason: The changes are limited to CI/CD and documentation files, which cannot affect the local runtime behavior or web user interface.
 ## Done
-### What Shipped:
-- Added dynamic trend presentation options based on demographic brackets ("Kids & Teens", "Seniors", and "Adults") to increase user engagement and average session duration.
-- Integrated age-bracketed template instructions on the backend to customize explanation tone (slang and emojis for kids/teens; historical context, respectful, and plain language for seniors).
-- Sized fonts up to 1.25x and maximized contrast for the Seniors demographic theme.
-- Sourced energetic theme colors and custom layout overrides for the Kids & Teens demographic theme.
-- Cached dynamic bracket explanations in the database tables (`trend_explanations`, `localized_explanations`) using the suffix format `{trend}:{bracket}` to preserve separate demographic variants.
-- Saved user demographic choice in `localStorage` to persist layout preference upon reload and navigation.
+### Delivered Work
+- Enabled Firestore client cache in production by configuring `NODE_ENV=production`.
 
-### Acceptance Criteria Evidence
+### Verification Table
+| Acceptance Criterion | Verification Evidence |
+| :--- | :--- |
+| **[AC-1]** Set `NODE_ENV=production` in Cloud Run Deploy Workflow | `.github/workflows/deploy.yml` was successfully configured to include `NODE_ENV=production` in the `--set-env-vars` option of `gcloud run deploy`. |
+| **[AC-2]** Update Example Deployment Command in README.md | `README.md` was updated to document `NODE_ENV=production` inside the `--set-env-vars` list of the example `gcloud run deploy` command. |
 
-| Acceptance Criterion | Verification Status | Evidence / Verification Method |
-| --- | --- | --- |
-| [AC-1] API Extension | PASS | Verified `POST /api/explain` handles `bracket` payload correctly. |
-| [AC-2] Backend Demographic Guidelines | PASS | Verified Gemini guidelines customized for kids_teens (energetic/emojis) and seniors (historical context). |
-| [AC-3] Database Caching with Bracket Key | PASS | Database tables cache `{trend}:{bracket}` variations. |
-| [AC-4] Interactive UI demographic selector | PASS | Selector pills (Kids & Teens, Adults, Seniors) render in UI. |
-| [AC-5] Client-side Dynamic Presentation Switching | PASS | Dynamic styles applied (1.25x zoom for seniors; theme color overrides for kids). |
-| [AC-6] LocalStorage Persistence | PASS | Preference successfully persisted in `localStorage`. |
-| [AC-7] Test Mode / Mock Support | PASS | Deterministic mock responses returned correctly in test mode. |
+### Integration Details
+- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/26
+- **Integration Method**: Squash and merge via `gh pr merge --squash`
 
-### PR & Deploy links:
-- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/25 (Squash merge to `main`)
-- **Deployment Action**: https://github.com/coskunarif/trend-jacker/actions (GitHub Actions Run)
-- **Tag**: `asf/20260612-dynamic-presentation/green-1`
