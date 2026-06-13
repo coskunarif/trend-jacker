@@ -2427,6 +2427,20 @@ function initApp() {
     });
   }
 
+  const playTriviaCTA = document.getElementById('chat-lock-play-trivia-btn');
+  if (playTriviaCTA) {
+    playTriviaCTA.addEventListener('click', () => {
+      const triviaContainer = document.getElementById('trivia-card-container');
+      if (triviaContainer) {
+        triviaContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+      const startTriviaBtn = document.getElementById('btn-start-trivia');
+      if (startTriviaBtn) {
+        startTriviaBtn.focus();
+      }
+    });
+  }
+
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const query = chatInput.value.trim();
