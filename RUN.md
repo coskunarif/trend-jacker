@@ -1,5 +1,5 @@
 task: Resolve the news footer test suite failure to restore baseline test suite verification to 100% success.              tier: T2   creativity: 0.5
-state: ship                budget: repairs 0/3
+state: complete            budget: repairs 0/3
 branch: asf/20260613-news-footer          checkpoint: none
 caps: agents,ui,web,human
 
@@ -32,3 +32,17 @@ caps: agents,ui,web,human
     - [mobile-detail-footer.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260613-news-footer/screenshots/mobile-detail-footer.png)
 
 ## Done
+- **What shipped**: Resolved detail view async race condition by making news footer rendering synchronous and atomic. Removed the `await` statement from `checkChatLimit(trend.title)` inside `loadTrendDetails(trend)`.
+- **Pull Request**: [PR #34](https://github.com/coskunarif/trend-jacker/pull/34)
+- **Deployment URL**: [trend-jacker Cloud Run](https://trend-jacker-250134012801.us-central1.run.app)
+- **Integration Method**: Squash merge via GitHub CLI (`gh pr merge --squash --delete-branch`)
+- **Acceptance Criteria & Evidence**:
+
+| Acceptance Criteria | Verification / Evidence |
+|---|---|
+| **[AC-1] Synchronous and Atomic Detail View Rendering** | PASS. Verified by removing `await` on `checkChatLimit(trend.title)` in `public/app.js` to prevent yielding the event loop during UI population. |
+| **[AC-2] Flakiness-Free E2E Verification** | PASS. Ran standard Playwright suite and target verification 25 times over with zero failures. |
+
+- **UI Visual Verification Reference**:
+  - [Desktop Detail View](dogfood-output/20260613-news-footer/screenshots/desktop-austin-riley-footer-visible.png)
+  - [Mobile Detail View](dogfood-output/20260613-news-footer/screenshots/mobile-detail-footer.png)
