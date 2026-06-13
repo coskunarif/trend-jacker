@@ -46,6 +46,7 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
     try {
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id IN (?, ?, ?, ?)')
         .run(testClientId1, testClientId2, testClientId3, testClientIdCurrentUser);
+      db.prepare('DELETE FROM client_trivia_scores WHERE trend = ?').run(normalizedTrend);
     } catch (err) {
       // Ignore
     } finally {
@@ -169,7 +170,7 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
         `);
         // 12 scores to test limit 10 and ranking outside top 10
         for (let i = 1; i <= 12; i++) {
-          const clientId = `client-test-limit-${i}`;
+          const clientId = `client-limit-test-${i}`;
           // Score 3 for top 10, Score 2 for 11th, Score 1 for 12th (current user)
           const score = i <= 10 ? 3 : (i === 11 ? 2 : 1);
           // completed_at timestamps ordered sequentially
@@ -181,7 +182,7 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
       }
 
       // Check leaderboard for currentUser who is the 12th player
-      const data = await getTriviaLeaderboard(testTrend, 'client-test-limit-12');
+      const data = await getTriviaLeaderboard(testTrend, 'client-limit-test-12');
       expect(data.leaderboard).toHaveLength(10); // limited to 10
       expect(data.userScore).toBe(1);
       expect(data.userRank).toBe(12); // User is 12th
