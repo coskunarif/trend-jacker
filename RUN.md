@@ -18,4 +18,15 @@ caps: agents,ui,web,human
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
 ## Verdict
+- **AC-1: Case-Insensitive Cache Lookups**: PASS
+  - SQLite columns use `COLLATE NOCASE`. Lookups are normalized using `.toLowerCase()`.
+  - *Note*: Encountered a transient `database is locked` error in `should have the topic_images table created in SQLite with correct schema` during the parallel full-suite test run. Passed consistently on subsequent re-runs.
+- **AC-2: Mobile Trends List Search and Category Filtering**: PASS
+  - Real-time filtering by partial text query and platform source tags (All/Google/Reddit) works correctly.
+- **AC-3: Mobile Trends List Truncation and "Show More" Pagination**: PASS
+  - Correctly shows 6 trends on mobile by default, and expands/collapses list dynamically using the `+ Show More Trends` toggle.
+- **AC-4: Dynamic Emojis & Fluid Mobile Typography**: PASS
+  - Dynamic emojis show up based on keyword classification.
+  - Main titles scale using CSS `clamp(1.6rem, 5vw, 2.25rem)`.
+
 ## Done
