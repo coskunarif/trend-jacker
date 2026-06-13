@@ -172,7 +172,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     localDb.exec('PRAGMA busy_timeout = 5000;');
     localDb.exec('PRAGMA journal_mode = WAL;');
     try {
-      localDb.prepare('DELETE FROM chat_cache').run();
+      localDb.prepare('DELETE FROM chat_cache WHERE key LIKE ?').run(`${testTrend}:%`);
     } catch (err) {
       // Ignored if table doesn't exist yet
     } finally {
@@ -267,7 +267,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     localDb.exec('PRAGMA busy_timeout = 5000;');
     localDb.exec('PRAGMA journal_mode = WAL;');
     try {
-      localDb.prepare('DELETE FROM generated_posts').run();
+      localDb.prepare('DELETE FROM generated_posts WHERE key LIKE ?').run(`${testTitle}:%`);
     } catch (err) {
       // Ignored if table doesn't exist yet
     } finally {
