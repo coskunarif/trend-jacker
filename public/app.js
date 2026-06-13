@@ -1541,6 +1541,7 @@ function initApp() {
           Ask me any follow-up question about the viral rise of <strong>${trend.title}</strong>.
         </div>
       `;
+      await checkChatLimit(trend.title);
 
       // Populate Viral Vibe Card properties based on trend category meta
       const meta = getTrendCategoryMeta(trend.title);
@@ -2370,7 +2371,62 @@ function initApp() {
     }
   }
 
-  // Chat Follow-Up Submit
+
+
+  function showLockedUI(allowedLimit) {
+    const chatLockContainer = document.getElementById('chat-lock-container');
+    const chatForm = document.getElementById('chat-form');
+    const chatLimitDisplay = document.getElementById('chat-limit-display');
+    const referralShareLink = document.getElementById('referral-share-link');
+
+    if (chatForm) chatForm.classList.add('hidden');
+    if (chatLockContainer) {
+      chatLockContainer.classList.remove('hidden');
+      if (chatLimitDisplay) {
+        chatLimitDisplay.textContent = `${allowedLimit}/${allowedLimit} messages`;
+      }
+      if (referralShareLink) {
+        const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${localClientId}`;
+        console.log("Setting shareUrl to:", shareUrl, "localClientId:", localClientId);
+        referralShareLink.href = shareUrl;
+        referralShareLink.textContent = shareUrl;
+      }
+    }
+  }
+
+  function showUnlockedUI() {
+    const chatLockContainer = document.getElementById('chat-lock-container');
+    const chatForm = document.getElementById('chat-form');
+    if (chatForm) chatForm.classList.remove('hidden');
+    if (chatLockContainer) chatLockContainer.classList.add('hidden');
+  }
+
+  async function checkChatLimit(trendTitle) {
+    if (!trendTitle) return;
+    try {
+      const res = await fetch(`/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.limitReached) {
+          showLockedUI(data.allowedLimit);
+        } else {
+          showUnlockedUI();
+        }
+      }
+    } catch (err) {
+      console.error('Error checking chat limit:', err);
+    }
+  }
+
+  const checkStatusBtn = document.getElementById('check-status-btn');
+  if (checkStatusBtn) {
+    checkStatusBtn.addEventListener('click', async () => {
+      if (currentTrend) {
+        await checkChatLimit(currentTrend.title);
+      }
+    });
+  }
+
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const query = chatInput.value.trim();
@@ -2392,14 +2448,26 @@ function initApp() {
         body: JSON.stringify({
           trend: currentTrend.title,
           query: query,
-          history: chatMessages
+          history: chatMessages,
+          clientId: localClientId
         })
       });
       
       // Remove loading
-      loadingBubble.remove();
+      if (loadingBubble && loadingBubble.parentNode) {
+        loadingBubble.remove();
+      }
       
-      if (!res.ok) throw new Error('Chat API error');
+      if (!res.ok) {
+        if (res.status === 403) {
+          const data = await res.json();
+          if (data.error === 'limit_reached') {
+            showLockedUI(data.allowedLimit);
+            return;
+          }
+        }
+        throw new Error('Chat API error');
+      }
       const data = await res.json();
       
       // Add assistant bubble
@@ -2408,9 +2476,13 @@ function initApp() {
       // Update history reference
       chatMessages.push({ role: 'user', content: query });
       chatMessages.push({ role: 'assistant', content: data.reply });
+
+      await checkChatLimit(currentTrend.title);
       
     } catch (err) {
-      loadingBubble.remove();
+      if (loadingBubble && loadingBubble.parentNode) {
+        loadingBubble.remove();
+      }
       appendBubble('Sorry, I hit an error responding to your question. Please try again.', 'bot');
       console.error(err);
     }
