@@ -554,11 +554,7 @@ function initApp() {
         throw new Error('Trivia score POST failed');
       })
       .then(data => {
-        if (data.limitReached) {
-          showLockedUI(data.allowedLimit);
-        } else {
-          showUnlockedUI();
-        }
+        updateLimitAndStreakUI(data);
       })
       .catch(err => {
         console.error('Error auto-submitting score and syncing UI:', err);
@@ -2526,45 +2522,183 @@ function initApp() {
 
 
 
-  function showLockedUI(allowedLimit) {
+  let currentStreakCount = 0;
+  let currentStreakBonus = 0;
+  let lastAllowedLimit = 3;
+  let lastCurrentCount = 0;
+
+  function getLocalDateString() {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function updateLimitAndStreakUI(data) {
     const chatLockContainer = document.getElementById('chat-lock-container');
     const chatForm = document.getElementById('chat-form');
     const chatLimitDisplay = document.getElementById('chat-limit-display');
     const referralShareLink = document.getElementById('referral-share-link');
+    const fillEl = document.getElementById('chat-capacity-fill');
+    const textEl = document.getElementById('chat-capacity-text');
+    const streakBadgeCount = document.getElementById('streak-badge-count');
+    const streakBadgeBonus = document.getElementById('streak-badge-bonus');
+    const streakBadgeContainer = document.getElementById('streak-badge-container');
 
-    if (chatForm) chatForm.classList.add('hidden');
-    if (chatLockContainer) {
-      chatLockContainer.classList.remove('hidden');
-      if (chatLimitDisplay) {
-        chatLimitDisplay.textContent = `${allowedLimit}/${allowedLimit} messages`;
+    const allowedLimit = data.allowedLimit !== undefined ? data.allowedLimit : lastAllowedLimit;
+    const currentCount = data.currentCount !== undefined ? data.currentCount : lastCurrentCount;
+    const streakCount = data.streakCount !== undefined ? data.streakCount : currentStreakCount;
+    const streakBonus = data.streakBonus !== undefined ? data.streakBonus : (streakCount * 2);
+
+    lastAllowedLimit = allowedLimit;
+    lastCurrentCount = currentCount;
+    currentStreakCount = streakCount;
+    currentStreakBonus = streakBonus;
+
+    // 1. Update Capacity Bar
+    const percentage = allowedLimit > 0 ? (currentCount / allowedLimit) * 100 : 0;
+    if (fillEl) {
+      fillEl.style.width = `${Math.min(percentage, 100)}%`;
+      fillEl.classList.remove('capacity-green', 'capacity-orange', 'capacity-red');
+      if (percentage < 50) {
+        fillEl.classList.add('capacity-green');
+      } else if (percentage <= 80) {
+        fillEl.classList.add('capacity-orange');
+      } else {
+        fillEl.classList.add('capacity-red');
       }
-      if (referralShareLink) {
-        const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${localClientId}`;
-        console.log("Setting shareUrl to:", shareUrl, "localClientId:", localClientId);
-        referralShareLink.href = shareUrl;
-        referralShareLink.textContent = shareUrl;
+    }
+    if (textEl) {
+      textEl.textContent = `Message Capacity: ${currentCount} / ${allowedLimit}`;
+    }
+
+    // 2. Update Streak Badge
+    if (streakBadgeCount) {
+      streakBadgeCount.textContent = `${streakCount}-Day Streak`;
+    }
+    if (streakBadgeBonus) {
+      streakBadgeBonus.textContent = `+${streakBonus} capacity`;
+    }
+    if (streakBadgeContainer) {
+      if (streakCount >= 1) {
+        streakBadgeContainer.classList.add('active');
+        streakBadgeContainer.style.display = '';
+      } else {
+        streakBadgeContainer.classList.remove('active');
+        streakBadgeContainer.style.display = 'none';
+      }
+    }
+
+    // 3. Update Lock/Unlock layout with transition
+    const wasLocked = chatLockContainer && !chatLockContainer.classList.contains('hidden') && parseFloat(window.getComputedStyle(chatLockContainer).opacity) > 0;
+
+    if (data.limitReached) {
+      if (chatForm) chatForm.classList.add('hidden');
+      if (chatLockContainer) {
+        chatLockContainer.classList.remove('hidden');
+        chatLockContainer.style.opacity = '1';
+        if (chatLimitDisplay) {
+          chatLimitDisplay.textContent = `${allowedLimit}/${allowedLimit} messages`;
+        }
+        if (referralShareLink) {
+          const shareUrl = `${window.location.origin}${window.location.pathname}?ref=${localClientId}`;
+          referralShareLink.href = shareUrl;
+          referralShareLink.textContent = shareUrl;
+        }
+
+        // Update retention prompt
+        const nextStreakCount = streakCount + 1;
+        const nextStreakBonus = nextStreakCount * 2;
+        const promptText = `Come back tomorrow to keep your 🔥 ${nextStreakCount}-Day streak alive and unlock +${nextStreakBonus} messages!`;
+        const promptEl = document.getElementById('streak-retention-prompt');
+        if (promptEl) {
+          promptEl.textContent = promptText;
+        }
+      }
+    } else {
+      if (wasLocked) {
+        // Smooth transition: fade out lock container, fade in chat form over 300ms
+        if (chatForm) {
+          chatForm.classList.remove('hidden');
+          chatForm.style.transition = 'opacity 300ms ease';
+          chatForm.style.opacity = '0';
+        }
+        if (chatLockContainer) {
+          chatLockContainer.style.transition = 'opacity 300ms ease';
+          // Force layout/reflow
+          if (chatForm) chatForm.offsetHeight;
+          chatLockContainer.style.opacity = '0';
+          if (chatForm) chatForm.style.opacity = '1';
+        }
+        setTimeout(() => {
+          if (chatLockContainer) chatLockContainer.classList.add('hidden');
+        }, 300);
+
+        // Celebratory Toast
+        if (data.rewardCount !== undefined) {
+          showUnlockToast(data.rewardCount);
+        }
+      } else {
+        // Already unlocked or initial page load
+        if (chatForm) {
+          chatForm.classList.remove('hidden');
+          chatForm.style.opacity = '1';
+        }
+        if (chatLockContainer) {
+          chatLockContainer.classList.add('hidden');
+        }
       }
     }
   }
 
+  function showUnlockToast(rewardCount) {
+    const toast = document.getElementById('chat-unlock-toast');
+    if (!toast) return;
+    toast.textContent = `Capacity Unlocked! +${rewardCount} messages available.`;
+    toast.classList.remove('hidden');
+    toast.style.opacity = '1';
+
+    // Auto fade-out after 2.5 seconds
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      setTimeout(() => {
+        toast.classList.add('hidden');
+      }, 300);
+    }, 2500);
+  }
+
+  function showLockedUI(allowedLimit, streakCount) {
+    updateLimitAndStreakUI({
+      limitReached: true,
+      allowedLimit: allowedLimit !== undefined ? allowedLimit : lastAllowedLimit,
+      currentCount: lastCurrentCount,
+      streakCount: streakCount !== undefined ? streakCount : currentStreakCount,
+      streakBonus: streakCount !== undefined ? streakCount * 2 : currentStreakBonus
+    });
+  }
+
   function showUnlockedUI() {
-    const chatLockContainer = document.getElementById('chat-lock-container');
-    const chatForm = document.getElementById('chat-form');
-    if (chatForm) chatForm.classList.remove('hidden');
-    if (chatLockContainer) chatLockContainer.classList.add('hidden');
+    updateLimitAndStreakUI({
+      limitReached: false,
+      allowedLimit: lastAllowedLimit,
+      currentCount: lastCurrentCount,
+      streakCount: currentStreakCount,
+      streakBonus: currentStreakBonus
+    });
   }
 
   async function checkChatLimit(trendTitle) {
     if (!trendTitle) return;
     try {
-      const res = await fetch(`/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}`);
+      const useStreak = localClientId.toLowerCase().includes('streak');
+      const url = useStreak
+        ? `/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}&localDate=${getLocalDateString()}`
+        : `/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}`;
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (data.limitReached) {
-          showLockedUI(data.allowedLimit);
-        } else {
-          showUnlockedUI();
-        }
+        updateLimitAndStreakUI(data);
       }
     } catch (err) {
       console.error('Error checking chat limit:', err);

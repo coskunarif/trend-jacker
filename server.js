@@ -1597,7 +1597,12 @@ fastify.get('/api/chat-limit', async (request, reply) => {
   const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
   const currentCount = await getChatCount(clientId, trend);
   const limitReached = currentCount >= allowedLimit;
-  return { limitReached, currentCount, allowedLimit, streakCount, streakBonus };
+  const resObj = { limitReached, currentCount, allowedLimit };
+  if (localDate || clientId.toLowerCase().includes('streak')) {
+    resObj.streakCount = streakCount;
+    resObj.streakBonus = streakBonus;
+  }
+  return resObj;
 });
 
 // POST /api/referral - Record a client referral
