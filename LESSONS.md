@@ -16,3 +16,4 @@
 - **Firestore Cache and NODE_ENV**: Set `NODE_ENV=production` in deploy workflows and documentation examples (like GCP Cloud Run configs) to ensure Firestore client caching behaves as intended in production environments.
 - **Grid Layout Simplification**: When refactoring dashboard sidebars, replacing complex twin-blade flex configurations with a single responsive CSS grid template (e.g. `320px 1fr`) reduces mobile-desktop layout leaks and simplifies element removal.
 - **Case-Insensitive Cache Lookups**: Normalize database cache lookup keys to lowercase (e.g. in db.js and server.js) to avoid redundant generation costs and cache misses due to casing mismatches.
+- **Clipboard E2E Testing**: When testing clipboard copy actions in Playwright, explicitly grant permissions via `context.grantPermissions(['clipboard-read', 'clipboard-write'])` before evaluating `navigator.clipboard.readText()` to prevent security access denials in headless browser execution.

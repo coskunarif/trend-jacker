@@ -1,77 +1,131 @@
-# SPEC.md - Topic Image Generation & Caching
+# Specification: Interactive AI-Generated Trivia Challenge
 
-This specification details the implementation plan for resolving missing/broken trend/topic images by dynamically generating and caching a topic-themed SVG image using the Gemini API.
-
-## Problem Statement
-Some trends retrieved from RSS feeds do not have an OpenGraph image (`ogImage`), or the images are broken on the client side (e.g. returning 404, blocked due to hotlinking restrictions). This results in empty dark purple boxes in the list view (thumbnails) and the detail view (hero banner), as observed in the screenshot:
-
-![Broken Topic Images and Empty Placeholder Boxes](/home/ubuntuadmin/.gemini/antigravity-cli/brain/4e9a0665-21dc-4070-a3f0-e8ff0cd6dcf7/s_20260613_014947.png)
+This document defines the functional requirements, acceptance criteria, vertical development slices, and test strategy for implementing the interactive AI-Generated Trivia Challenge in TrendJacker.
 
 ## Acceptance Criteria
 
-### `[AC-1] Database Caching Schema & Helpers`
-- **Criterion**: The SQLite database must contain a `topic_images` table (and a corresponding `topic_images` collection in Firestore for production) to cache generated SVGs.
-- **Verification**:
-  - The SQLite table schema must contain `trend` (TEXT PRIMARY KEY), `svg` (TEXT), and `created_at` (TEXT).
-  - The module `db.js` must export two async helper functions: `getCachedTopicImage(trend)` and `setCachedTopicImage(trend, svg)`.
-  - In-memory mock maps must be used when SQLite/Firestore are unavailable.
+### [AC-1] Trivia Card UI Component
+- **Description:** A new interactive Trivia Challenge card is rendered in the trend detail view below the interactive-grid.
+- **Verification:** When a trend's details load, verify that the `#trivia-card-container` element is visible, styled using the application's glassmorphism style sheet, and displays the "Start Screen" with the active trend's title and a "Start Trivia Challenge" button.
 
-### `[AC-2] Dynamic SVG Image Generation Endpoint`
-- **Criterion**: A new endpoint `GET /api/topic-image/:slug` must serve a topic-themed SVG.
-- **Verification**:
-  - The slug is matched against cached trends (or parsed into Title Case).
-  - The endpoint first queries `getCachedTopicImage(trend)`.
-  - If a cache hit occurs, it returns the cached SVG.
-  - If a cache miss occurs, in test/dev mode it returns a deterministic mock SVG, and in production mode it generates a custom topic-related SVG using `gemini-3.5-flash` with JSON schema enforcement (`responseSchema` of type `OBJECT` with required property `svg` of type `STRING`).
-  - The generated SVG is cached via `setCachedTopicImage(trend, svg)`.
-  - The HTTP response header must contain `Content-Type: image/svg+xml`.
+### [AC-2] On-Demand Trivia Generation / Loading & DB Caching
+- **Description:** Trivia questions are loaded lazily on demand when the user clicks "Start Trivia Challenge", querying the cached database first or generating via Gemini in production.
+- **Verification:** 
+  - Clicking "Start Trivia Challenge" sends a request to `POST /api/trivia` with `trend` and `lang` body parameters.
+  - The server checks SQLite database table `trend_trivia` (or Firestore collection `trend_trivia` in production) first.
+  - If a cache miss occurs in test/mock mode (`process.env.NODE_ENV === 'test'`), return mocked questions.
+  - If a cache miss occurs in production mode, generate 3 trivia questions about the trend using the `gemini-3.5-flash` model, enforcing structured JSON via `responseSchema` containing `question` (string), `options` (array of 4 strings), `correctAnswer` (0-based integer index), and `explanation` (string). Cache the generated questions in the database, and return them to the client.
 
-### `[AC-3] Client-Side Image Integration & Fallback`
-- **Criterion**: The UI must display the dynamically generated SVG when `ogImage` is absent or broken.
-- **Verification**:
-  - In `public/app.js` (list item thumbnails), if `trend.news.ogImage` is null, the `src` must be immediately set to `/api/topic-image/:slug`. If `trend.news.ogImage` is non-null but fails to load, the `onerror` event handler must swap the `src` to `/api/topic-image/:slug`.
-  - In `public/app.js` (detail view hero banner), the hero image must similarly use `/api/topic-image/:slug` directly if `ogImage` is missing, and switch to `/api/topic-image/:slug` via `onerror` if the original image fails to load.
+### [AC-3] Interactive Trivia Gameplay
+- **Description:** Users can answer the 3 trivia questions one-by-one with immediate visual correctness feedback and explanation.
+- **Verification:**
+  - The Question Screen displays a progress indicator (e.g. "Question 1 of 3"), the question text, and 4 option buttons.
+  - Clicking an option button locks the selection, disables all options, and reveals the explanation block.
+  - The explanation block shows correct/incorrect feedback (e.g. "Correct! 🟩" or "Incorrect! 🟥"), the correct option highlighted, the explanation text, and a navigation button: "Next Question" (for questions 1 & 2) or "See Results" (for question 3).
+
+### [AC-4] Wordle-style Score Card & Results Screen
+- **Description:** Upon completing all questions, users are shown their score and a visual Wordle-style score card representation.
+- **Verification:**
+  - The Results Screen displays "Challenge Completed!", the user's score (e.g. "You scored 2 out of 3"), and a block of colored emojis (e.g., `🟩🟥🟩` where green indicates correct and red indicates incorrect).
+  - A "Play Again" button resets the trivia card state machine back to the Start Screen.
+
+### [AC-5] Wordle Score Card Social Share & Unified Modal Integration
+- **Description:** Users can share their trivia scores via clipboard copy and the application's Unified Share Modal.
+- **Verification:**
+  - A "Share Score" button on the results screen copies the Wordle score card text representation to the user's clipboard (containing the emoji grid, score, and trend link) and triggers the Unified Share Modal.
+  - The Unified Share Modal context select element dropdown includes a new "Trivia Score" option. When opened from the trivia screen, the modal opens with the "trivia" context active, pre-loading the post textarea with the Wordle-style score card text.
+  - The server-side `POST /api/generate-post` endpoint is updated to support `contextType: 'trivia'` and reads optional `score` and `pattern` body parameters to construct platform-specific post text templates.
 
 ---
 
 ## Out of Scope
-- Localizing the generated SVGs or translating text elements within the generated SVG (a single generic topic-related image is sufficient).
-- Replacing working/valid external `ogImage` URLs (only missing or broken images fall back to the generated SVGs).
+- Multi-user global leaderboards, user authentication, or database persistence of individual user gameplay histories.
+- Custom trivia settings such as choosing custom number of questions, setting a game timer, or selecting difficulty categories.
 
 ---
 
 ## Slices
 
-### `[S-1] Database Schema & Caching Layer`
-- **Goal**: Implement SQLite schema initialization and caching helpers.
-- **ACs Mapped**: `[AC-1]`
-- **Files Modified**: `db.js`
-- **Details**:
-  - Initialize the `topic_images` table.
-  - Implement `getCachedTopicImage` and `setCachedTopicImage`.
-  - Implement in-memory map backup `inMemoryTopicImages`.
+### [S-1] Database Schema Migration & Caching Helpers
+- **Description:** Set up the database table and helpers for caching generated trivia questions.
+- **Target Files:**
+  - `db.js`
+- **Implementation Details:**
+  - Add SQL migration to initialize the SQLite `trend_trivia` table: `CREATE TABLE IF NOT EXISTS trend_trivia (trend TEXT, lang TEXT, trivia TEXT, created_at TEXT, PRIMARY KEY (trend, lang))`.
+  - Implement and export helper functions `getTrendTrivia(trend, lang)` and `setTrendTrivia(trend, lang, trivia)` supporting SQLite, Firestore (in production), and in-memory mock map.
+- **ACs Mapped:** `[AC-2]`
+- **Dependencies:** None (Independent)
 
-### `[S-2] API Endpoint & Gemini Logic`
-- **Goal**: Implement the endpoint `/api/topic-image/:slug` with cache lookup and Gemini generation logic.
-- **ACs Mapped**: `[AC-2]`
-- **Files Modified**: `server.js`
-- **Details**:
-  - Register `GET /api/topic-image/:slug`.
-  - Implement caching check and LLM generation with JSON schema enforcement for SVG output.
-  - Add test environment mock branch returning a static valid SVG.
+### [S-2] Backend API for Trivia Generation
+- **Description:** Create the API endpoint to fetch and generate trivia questions using Gemini.
+- **Target Files:**
+  - `server.js`
+- **Implementation Details:**
+  - Register route `POST /api/trivia` in Fastify.
+  - On request, check database cache. If missing, generate questions.
+  - In test mode, return static mock questions (specific mock trivia for "Google Gemini" to aid E2E tests, and generic mock trivia for other trends).
+  - In production mode, prompt Gemini 3.5-flash with a structured schema to produce 3 multiple-choice questions with 4 options, a correct answer index, and explanation text. Cache and return the result.
+- **ACs Mapped:** `[AC-2]`
+- **Dependencies:** `[S-1]`
 
-### `[S-3] Frontend Integration & Fallback`
-- **Goal**: Update client-side thumbnail and hero banner loading and `onerror` fallback behavior.
-- **ACs Mapped**: `[AC-3]`
-- **Files Modified**: `public/app.js`
-- **Details**:
-  - Update `thumbnailHtml` logic to default to or fallback to `/api/topic-image/:slug`.
-  - Update `#detail-hero-image` src logic to default to or fallback to `/api/topic-image/:slug`.
+### [S-3] Social Share Post Generator Updates
+- **Description:** Update backend share-post generation to support trivia context.
+- **Target Files:**
+  - `server.js`
+- **Implementation Details:**
+  - Update `/api/generate-post` endpoint to handle `contextType === 'trivia'`.
+  - Accept `score` and `pattern` from the request body to generate platform-specific templates (Twitter/X, LinkedIn, Facebook, Reddit, Pinterest) containing the Wordle emoji score card and the trend URL.
+- **ACs Mapped:** `[AC-5]`
+- **Dependencies:** `[S-2]`
+
+### [S-4] Frontend Trivia UI Structure & CSS Styles
+- **Description:** Add the HTML structure and CSS styles for the trivia gameplay screens and Unified Share Modal.
+- **Target Files:**
+  - `public/index.html`
+  - `public/styles.css`
+- **Implementation Details:**
+  - Add `#trivia-card-container` HTML component below `.interactive-grid` in `public/index.html`.
+  - Add sub-elements for the Start Screen, Question Screen, and Results Screen.
+  - Add `<option value="trivia">Trivia Score</option>` to the share modal context select.
+  - Add styling rules in `public/styles.css` for trivia option buttons, feedback alerts, explanation box, results panel, and Wordle score card block layout matching the site's dark mode visual style.
+- **ACs Mapped:** `[AC-1]`, `[AC-3]`, `[AC-4]`, `[AC-5]`
+- **Dependencies:** None (Independent)
+
+### [S-5] Client-Side Trivia State Machine & Gameplay Logic
+- **Description:** Implement client-side gameplay, state transitions, and localization support.
+- **Target Files:**
+  - `public/app.js`
+- **Implementation Details:**
+  - Define state variables to track the active trend's trivia questions, current question index, user score, answer emoji patterns, and selected state.
+  - Implement event listener for "Start Trivia Challenge" button to fetch questions from `POST /api/trivia` and start the game.
+  - Render option buttons dynamically, wire up click handlers to disable options, check correctness, display the explanation panel, and show the next question button.
+  - Implement reset handler on "Play Again" button.
+  - Extend client-side `UI_DICTIONARY` and `translateUI` function to support localizing trivia headers, buttons, progress text, and feedback labels in English, Spanish, French, and Japanese.
+- **ACs Mapped:** `[AC-1]`, `[AC-3]`, `[AC-4]`
+- **Dependencies:** `[S-2]`, `[S-4]`
+
+### [S-6] Wordle Share Integration
+- **Description:** Connect the results screen sharing actions to the clipboard and Unified Share Modal.
+- **Target Files:**
+  - `public/app.js`
+- **Implementation Details:**
+  - Wire up the "Share Score" button on the results screen.
+  - Copy the Wordle emoji score card text to the user's clipboard and display temporary feedback text.
+  - Call `openShareModal('trivia')` to launch the Unified Share Modal, passing the user's score and emoji pattern to generate the social post.
+- **ACs Mapped:** `[AC-5]`
+- **Dependencies:** `[S-3]`, `[S-5]`
 
 ---
 
-## Test Strategy (Refinement)
-- Since this is a refinement task, we will add new assertions/tests to existing test files (specifically `tests/og-favicon.spec.js` and `tests/llm-caching-optimization.spec.js`) to verify:
-  1. The new SQLite schema table exists and retrieves values correctly.
-  2. The `/api/topic-image/:slug` endpoint is responsive and serves correct headers and SVGs.
-  3. The frontend properly uses fallback images on 404/onerror.
+## Test Strategy
+
+Since this is an **additive** feature, we will use a **tests-first** strategy.
+- Before coding, the Tester will write new Playwright tests in `tests/trivia-challenge.spec.js`.
+- The tests will verify:
+  1. Default visibility of the Trivia Card on trend load showing the Start Screen.
+  2. Clicking "Start Trivia Challenge" transitions to the first question (mocking `POST /api/trivia` response).
+  3. Interactive feedback loop (clicking options disables choices, shows explanation, updates progress indicator).
+  4. Completion of all 3 questions displays the results screen, the correct final score, and the Wordle emoji grid.
+  5. Play Again resets back to the start screen.
+  6. "Share Score" copies the score card text to the clipboard and opens the Unified Share Modal with the context set to "trivia" and the social post preloaded.
+  7. Client-side localization translates headers, options, and progress blocks when switching language.

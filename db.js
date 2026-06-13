@@ -29,6 +29,7 @@ const inMemoryLocalizedExplanations = new Map();
 const inMemoryChatCache = new Map();
 const inMemoryGeneratedPosts = new Map();
 const inMemoryTopicImages = new Map();
+const inMemoryTrendTrivia = new Map();
 let sqliteDb = null;
 
 if (!firestore) {
@@ -108,6 +109,15 @@ if (!firestore) {
         trend TEXT PRIMARY KEY COLLATE NOCASE,
         svg TEXT,
         created_at TEXT
+      )
+    `);
+    sqliteDb.exec(`
+      CREATE TABLE IF NOT EXISTS trend_trivia (
+        trend TEXT,
+        lang TEXT,
+        trivia TEXT,
+        created_at TEXT,
+        PRIMARY KEY (trend, lang)
       )
     `);
     console.log('Local SQLite database initialized successfully at', dbPath);
@@ -835,6 +845,91 @@ export async function setCachedTopicImage(trend, svg) {
   inMemoryTopicImages.set(normalizedTrend, svg);
 }
 
+/**
+ * Retrieves the cached trivia for a trend if it exists.
+ * @param {string} trend 
+ * @param {string} lang 
+ * @returns {Promise<Array | null>}
+ */
+export async function getTrendTrivia(trend, lang) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedLang = lang ? lang.trim().toLowerCase() : '';
 
+  if (firestore) {
+    try {
+      const docId = `${normalizedTrend}_${normalizedLang}`;
+      const docRef = firestore.collection('trend_trivia').doc(docId);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data();
+        return typeof data.trivia === 'string' ? JSON.parse(data.trivia) : data.trivia;
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getTrendTrivia for "${trend}" "${lang}":`, err.message);
+      return null;
+    }
+  }
 
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT trivia FROM trend_trivia WHERE trend = ? AND lang = ?');
+      const row = stmt.get(normalizedTrend, normalizedLang);
+      if (row) {
+        return JSON.parse(row.trivia);
+      }
+      return null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getTrendTrivia "${trend}" "${lang}":`, err.message);
+      return null;
+    }
+  }
 
+  return inMemoryTrendTrivia.get(`${normalizedTrend}_${normalizedLang}`) || null;
+}
+
+/**
+ * Stores the trend trivia in the cache.
+ * @param {string} trend 
+ * @param {string} lang 
+ * @param {Array} trivia 
+ * @returns {Promise<void>}
+ */
+export async function setTrendTrivia(trend, lang, trivia) {
+  const createdAt = new Date().toISOString();
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const normalizedLang = lang ? lang.trim().toLowerCase() : '';
+  const triviaStr = JSON.stringify(trivia);
+
+  if (firestore) {
+    try {
+      const docId = `${normalizedTrend}_${normalizedLang}`;
+      const docRef = firestore.collection('trend_trivia').doc(docId);
+      await docRef.set({
+        trend: normalizedTrend,
+        lang: normalizedLang,
+        trivia: trivia,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in setTrendTrivia for "${trend}" "${lang}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO trend_trivia (trend, lang, trivia, created_at)
+        VALUES (?, ?, ?, ?)
+      `).run(normalizedTrend, normalizedLang, triviaStr, createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for setTrendTrivia "${trend}" "${lang}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryTrendTrivia.set(`${normalizedTrend}_${normalizedLang}`, trivia);
+}

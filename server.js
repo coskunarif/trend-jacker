@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1124,6 +1124,118 @@ fastify.post('/api/explain', async (request, reply) => {
   }
 });
 
+// POST /api/trivia - Fetches or generates trivia questions for a trend
+fastify.post('/api/trivia', async (request, reply) => {
+  const { trend, lang } = request.body || {};
+  if (!trend || !lang) {
+    return reply.status(400).send({ error: 'Missing trend or lang parameters.' });
+  }
+
+  try {
+    const cached = await getTrendTrivia(trend, lang);
+    if (cached) {
+      return reply.send(cached);
+    }
+
+    let trivia;
+    if (process.env.NODE_ENV === 'test') {
+      const isGemini = trend.trim().toLowerCase() === 'google gemini';
+      if (isGemini) {
+        trivia = [
+          {
+            question: "What is Gemini?",
+            options: ["A search engine", "An AI model family", "A database", "A web server"],
+            correctAnswer: 1,
+            explanation: "Gemini is Google's multimodal AI model family."
+          },
+          {
+            question: "Who developed Gemini?",
+            options: ["Meta", "OpenAI", "Google", "Microsoft"],
+            correctAnswer: 2,
+            explanation: "Google announced and developed the Gemini family of models."
+          },
+          {
+            question: "Is Gemini multimodal?",
+            options: ["No", "Yes", "Only in labs", "Never"],
+            correctAnswer: 1,
+            explanation: "Yes, Gemini was built from the ground up to be multimodal."
+          }
+        ];
+      } else {
+        trivia = [
+          {
+            question: `What is primarily driving the popularity of ${trend}?`,
+            options: ["Global economic shifts", "Social media virality and online engagement", "New government regulations", "Traditional print media"],
+            correctAnswer: 1,
+            explanation: `The conversation around ${trend} has been heavily driven by online engagement.`
+          },
+          {
+            question: `Which category does ${trend} best fit into?`,
+            options: ["Public health", "Technology and modern trends", "Ancient history", "Geological formations"],
+            correctAnswer: 1,
+            explanation: `${trend} is widely discussed as a modern trending topic.`
+          },
+          {
+            question: `Where are conversations about ${trend} most active?`,
+            options: ["Radio talk shows", "Online platforms and social media feeds", "Local libraries", "Classified ads"],
+            correctAnswer: 1,
+            explanation: `Most digital trends, including ${trend}, thrive in online forums and social channels.`
+          }
+        ];
+      }
+      await setTrendTrivia(trend, lang, trivia);
+    } else {
+      if (!genAI) {
+        return reply.status(500).send({ error: 'Gemini API not configured.' });
+      }
+
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+        generationConfig: {
+          thinkingConfig: { thinkingLevel: 'LOW' },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: "ARRAY",
+            items: {
+              type: "OBJECT",
+              properties: {
+                question: { type: "STRING" },
+                options: {
+                  type: "ARRAY",
+                  items: { type: "STRING" }
+                },
+                correctAnswer: { type: "INTEGER" },
+                explanation: { type: "STRING" }
+              },
+              required: ["question", "options", "correctAnswer", "explanation"]
+            }
+          }
+        }
+      });
+
+      const prompt = `You are a trivia generator. Generate exactly 3 trivia multiple-choice questions about the trend "${trend}" in the language "${lang}".
+Each question must have exactly 4 options, a correctAnswer (0-based index of the correct option in the options array), and a brief explanation why it is correct.
+The output must be a JSON array of 3 objects containing question, options, correctAnswer, and explanation.`;
+
+      const result = await model.generateContent(prompt);
+      const textResponse = result.response.text();
+
+      let cleanedText = textResponse.trim();
+      if (cleanedText.startsWith('```')) {
+        cleanedText = cleanedText.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim();
+      }
+
+      trivia = JSON.parse(cleanedText);
+      await setTrendTrivia(trend, lang, trivia);
+    }
+
+    return reply.send(trivia);
+  } catch (err) {
+    fastify.log.error('Trivia generation failed: ' + err.message);
+    return reply.status(500).send({ error: 'Failed to generate trivia.' });
+  }
+});
+
 // GET /api/topic-image/:slug
 fastify.get('/api/topic-image/:slug', async (request, reply) => {
   const { slug } = request.params;
@@ -1612,12 +1724,13 @@ fastify.post('/api/log', async (request, reply) => {
 
 // POST /api/generate-post - Generates a viral social media post using Gemini
 fastify.post('/api/generate-post', async (request, reply) => {
-  const { trendTitle, platform, contextType } = request.body || {};
+  const { trendTitle: bodyTrendTitle, trend: bodyTrend, platform, contextType, score, pattern } = request.body || {};
+  const trendTitle = bodyTrendTitle || bodyTrend;
   if (!trendTitle) {
     return reply.status(400).send({ error: 'Trend title is required.' });
   }
   try {
-    const postText = await generatePostText(trendTitle, platform, contextType);
+    const postText = await generatePostText(trendTitle, platform, contextType, score, pattern);
     return { postText };
   } catch (err) {
     fastify.log.error(err);
@@ -1625,9 +1738,9 @@ fastify.post('/api/generate-post', async (request, reply) => {
   }
 });
 
-async function generatePostText(trendTitle, platform, contextType) {
+async function generatePostText(trendTitle, platform, contextType, score, pattern) {
   const targetPlatform = platform || 'x';
-  const targetContext = contextType || 'general';
+  const targetContext = contextType === 'trivia' ? `trivia:${score !== undefined ? score : ''}:${pattern || ''}` : (contextType || 'general');
   const slug = titleToSlug(trendTitle);
   const targetUrl = `https://viraljacker.com/t/${slug}`;
 
@@ -1639,23 +1752,42 @@ async function generatePostText(trendTitle, platform, contextType) {
 
   let postText = '';
   if (process.env.NODE_ENV === 'test' || !genAI) {
-    if (targetPlatform === 'x' || targetPlatform === 'twitter') {
-      postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
-      if (postText.length > 280) {
-        postText = postText.substring(0, 277) + '...';
+    if (contextType === 'trivia') {
+      if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+        postText = `Trivia Challenge completed for ${trendTitle}! Score: ${score}/3\n${pattern}\nCheck it out here: ${targetUrl} #Trivia #${trendTitle.replace(/\s+/g, '')}`;
+        if (postText.length > 280) {
+          postText = postText.substring(0, 277) + '...';
+        }
+      } else if (targetPlatform === 'pinterest') {
+        postText = `Pin Title: ${trendTitle} Trivia Challenge\n\nPin Description: I scored ${score}/3 on this challenge! ${pattern} Play here: ${targetUrl} #Trivia`;
+      } else if (targetPlatform === 'linkedin') {
+        postText = `I just completed the ${trendTitle} Trivia Challenge!\n\nScore: ${score}/3\nPattern: ${pattern}\n\nCan you beat my score? Try it here: ${targetUrl}\n\n#AI #Innovation #Trivia`;
+      } else if (targetPlatform === 'facebook') {
+        postText = `I scored ${score}/3 on the ${trendTitle} Trivia Challenge! ${pattern} Think you can do better? Play here: ${targetUrl} #Trivia`;
+      } else if (targetPlatform === 'reddit') {
+        postText = `Trivia Challenge completed for ${trendTitle}! Score: ${score}/3\n\nPattern: ${pattern}\n\nTry it here: ${targetUrl}`;
+      } else {
+        postText = `I scored ${score}/3 on the ${trendTitle} Trivia Challenge! ${pattern}\n${targetUrl}`;
       }
-    } else if (targetPlatform === 'pinterest') {
-      const trend = latestTrends.find(t => titleToSlug(t.title) === titleToSlug(trendTitle) || t.title === trendTitle);
-      const snippet = trend ? (trend.description || (trend.news && trend.news.snippet) || '') : '';
-      postText = `Pin Title: ${trendTitle}\n\nPin Description: ${snippet}. Explore live sentiment: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
-    } else if (targetPlatform === 'linkedin') {
-      postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
-    } else if (targetPlatform === 'facebook') {
-      postText = `What do you think about ${trendTitle}? It's viral right now under ${targetContext}. Read here: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Viral`;
-    } else if (targetPlatform === 'reddit') {
-      postText = `Why is ${trendTitle} trending? (${targetContext})\n\nHere is a quick summary of the trend. Check out the full breakdown and vote here: ${targetUrl}`;
     } else {
-      postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
+      if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+        postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
+        if (postText.length > 280) {
+          postText = postText.substring(0, 277) + '...';
+        }
+      } else if (targetPlatform === 'pinterest') {
+        const trend = latestTrends.find(t => titleToSlug(t.title) === titleToSlug(trendTitle) || t.title === trendTitle);
+        const snippet = trend ? (trend.description || (trend.news && trend.news.snippet) || '') : '';
+        postText = `Pin Title: ${trendTitle}\n\nPin Description: ${snippet}. Explore live sentiment: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
+      } else if (targetPlatform === 'linkedin') {
+        postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
+      } else if (targetPlatform === 'facebook') {
+        postText = `What do you think about ${trendTitle}? It's viral right now under ${targetContext}. Read here: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Viral`;
+      } else if (targetPlatform === 'reddit') {
+        postText = `Why is ${trendTitle} trending? (${targetContext})\n\nHere is a quick summary of the trend. Check out the full breakdown and vote here: ${targetUrl}`;
+      } else {
+        postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
+      }
     }
     await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
     return postText;
@@ -1695,9 +1827,14 @@ async function generatePostText(trendTitle, platform, contextType) {
       platformInstructions = `- Platform: ${targetPlatform}`;
     }
 
+    let triviaInstructions = '';
+    if (contextType === 'trivia') {
+      triviaInstructions = `\nYou must explicitly feature the trivia score "${score}/3" and the Wordle-style score emoji pattern "${pattern}" in the post text. Encourage followers to test their own knowledge and beat this score.`;
+    }
+
     const prompt = `You are a world-class viral social media marketer. Generate a highly engaging, professional yet catchy social media post about the trending topic "${trendTitle}".
 
-The angle/context for the post is: "${targetContext}".
+The angle/context for the post is: "${contextType || 'general'}".${triviaInstructions}
 You MUST explicitly include the following target URL in the post: "${targetUrl}"
 
 Platform-Specific Constraints:

@@ -295,6 +295,57 @@
           </div>
         </div>
 
+        <!-- Trivia Challenge Section [AC-1] -->
+        <div id="trivia-card-container" class="glass-card trivia-card">
+          <!-- Start Screen -->
+          <div class="trivia-start-screen">
+            <h3 class="card-heading">
+              <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><circle cx="12" cy="17" r=".01"/></svg>
+              <span id="trivia-header-label">Trivia Challenge</span>
+            </h3>
+            <p class="trivia-intro">Test your knowledge about this trend!</p>
+            <h4 class="trivia-title"></h4>
+            <button id="btn-start-trivia" class="start-trivia-btn">Start Trivia Challenge</button>
+          </div>
+
+          <!-- Gameplay Screen (Hidden initially) -->
+          <div class="trivia-gameplay-screen hidden">
+            <div class="trivia-progress-bar-container">
+              <div class="trivia-progress-bar-fill" style="width: 0%;"></div>
+            </div>
+            <div class="trivia-progress-header">
+              <span class="trivia-progress">Question 1 of 3</span>
+            </div>
+            <h4 class="trivia-question-text"></h4>
+            <div class="trivia-options-container">
+              <!-- Dynamically populated with 4 buttons with class "trivia-option-btn" -->
+            </div>
+            <!-- Explanation Block (Hidden until answer chosen) -->
+            <div class="trivia-explanation-block hidden">
+              <div class="trivia-feedback-wrap">
+                <span class="trivia-feedback"></span>
+                <span class="trivia-correct-answer"></span>
+              </div>
+              <p class="trivia-explanation-text"></p>
+              <button class="trivia-nav-btn"></button>
+            </div>
+          </div>
+
+          <!-- Results Screen (Hidden initially) -->
+          <div class="trivia-results-screen hidden">
+            <h3 class="trivia-results-title">Challenge Completed!</h3>
+            <p class="trivia-results-score"></p>
+            <div class="trivia-emoji-pattern"></div>
+            <div class="trivia-results-actions">
+              <button id="btn-play-again" class="play-again-btn">Play Again</button>
+              <button id="btn-share-score" class="share-score-btn">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Share Score
+              </button>
+            </div>
+          </div>
+        </div>
+
         <!-- Catchy Visual Cards Grid (TJ-29) -->
         <div class="visual-cards-grid">
           <!-- Card 1: Viral Vibe -->
@@ -425,6 +476,7 @@
           <select id="share-context-select" class="modal-select">
             <option value="general">General Explainer</option>
             <option value="poll">Poll Verdict</option>
+            <option value="trivia">Trivia Score</option>
           </select>
         </div>
         <div class="form-group">
