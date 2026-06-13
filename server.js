@@ -1724,12 +1724,13 @@ fastify.post('/api/log', async (request, reply) => {
 
 // POST /api/generate-post - Generates a viral social media post using Gemini
 fastify.post('/api/generate-post', async (request, reply) => {
-  const { trendTitle, platform, contextType } = request.body || {};
+  const { trendTitle: bodyTrendTitle, trend: bodyTrend, platform, contextType, score, pattern } = request.body || {};
+  const trendTitle = bodyTrendTitle || bodyTrend;
   if (!trendTitle) {
     return reply.status(400).send({ error: 'Trend title is required.' });
   }
   try {
-    const postText = await generatePostText(trendTitle, platform, contextType);
+    const postText = await generatePostText(trendTitle, platform, contextType, score, pattern);
     return { postText };
   } catch (err) {
     fastify.log.error(err);
@@ -1737,9 +1738,9 @@ fastify.post('/api/generate-post', async (request, reply) => {
   }
 });
 
-async function generatePostText(trendTitle, platform, contextType) {
+async function generatePostText(trendTitle, platform, contextType, score, pattern) {
   const targetPlatform = platform || 'x';
-  const targetContext = contextType || 'general';
+  const targetContext = contextType === 'trivia' ? `trivia:${score !== undefined ? score : ''}:${pattern || ''}` : (contextType || 'general');
   const slug = titleToSlug(trendTitle);
   const targetUrl = `https://viraljacker.com/t/${slug}`;
 
@@ -1751,23 +1752,42 @@ async function generatePostText(trendTitle, platform, contextType) {
 
   let postText = '';
   if (process.env.NODE_ENV === 'test' || !genAI) {
-    if (targetPlatform === 'x' || targetPlatform === 'twitter') {
-      postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
-      if (postText.length > 280) {
-        postText = postText.substring(0, 277) + '...';
+    if (contextType === 'trivia') {
+      if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+        postText = `Trivia Challenge completed for ${trendTitle}! Score: ${score}/3\n${pattern}\nCheck it out here: ${targetUrl} #Trivia #${trendTitle.replace(/\s+/g, '')}`;
+        if (postText.length > 280) {
+          postText = postText.substring(0, 277) + '...';
+        }
+      } else if (targetPlatform === 'pinterest') {
+        postText = `Pin Title: ${trendTitle} Trivia Challenge\n\nPin Description: I scored ${score}/3 on this challenge! ${pattern} Play here: ${targetUrl} #Trivia`;
+      } else if (targetPlatform === 'linkedin') {
+        postText = `I just completed the ${trendTitle} Trivia Challenge!\n\nScore: ${score}/3\nPattern: ${pattern}\n\nCan you beat my score? Try it here: ${targetUrl}\n\n#AI #Innovation #Trivia`;
+      } else if (targetPlatform === 'facebook') {
+        postText = `I scored ${score}/3 on the ${trendTitle} Trivia Challenge! ${pattern} Think you can do better? Play here: ${targetUrl} #Trivia`;
+      } else if (targetPlatform === 'reddit') {
+        postText = `Trivia Challenge completed for ${trendTitle}! Score: ${score}/3\n\nPattern: ${pattern}\n\nTry it here: ${targetUrl}`;
+      } else {
+        postText = `I scored ${score}/3 on the ${trendTitle} Trivia Challenge! ${pattern}\n${targetUrl}`;
       }
-    } else if (targetPlatform === 'pinterest') {
-      const trend = latestTrends.find(t => titleToSlug(t.title) === titleToSlug(trendTitle) || t.title === trendTitle);
-      const snippet = trend ? (trend.description || (trend.news && trend.news.snippet) || '') : '';
-      postText = `Pin Title: ${trendTitle}\n\nPin Description: ${snippet}. Explore live sentiment: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
-    } else if (targetPlatform === 'linkedin') {
-      postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
-    } else if (targetPlatform === 'facebook') {
-      postText = `What do you think about ${trendTitle}? It's viral right now under ${targetContext}. Read here: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Viral`;
-    } else if (targetPlatform === 'reddit') {
-      postText = `Why is ${trendTitle} trending? (${targetContext})\n\nHere is a quick summary of the trend. Check out the full breakdown and vote here: ${targetUrl}`;
     } else {
-      postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
+      if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+        postText = `Breaking: ${trendTitle} is trending! Angle: ${targetContext}. Check out: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
+        if (postText.length > 280) {
+          postText = postText.substring(0, 277) + '...';
+        }
+      } else if (targetPlatform === 'pinterest') {
+        const trend = latestTrends.find(t => titleToSlug(t.title) === titleToSlug(trendTitle) || t.title === trendTitle);
+        const snippet = trend ? (trend.description || (trend.news && trend.news.snippet) || '') : '';
+        postText = `Pin Title: ${trendTitle}\n\nPin Description: ${snippet}. Explore live sentiment: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Tech`;
+      } else if (targetPlatform === 'linkedin') {
+        postText = `Exciting update on ${trendTitle}!\n\nWe are seeing major interest in this topic with angle: ${targetContext}.\nRead full analysis here: ${targetUrl}\n\n#AI #Innovation #Technology`;
+      } else if (targetPlatform === 'facebook') {
+        postText = `What do you think about ${trendTitle}? It's viral right now under ${targetContext}. Read here: ${targetUrl} #${trendTitle.replace(/\s+/g, '')} #Viral`;
+      } else if (targetPlatform === 'reddit') {
+        postText = `Why is ${trendTitle} trending? (${targetContext})\n\nHere is a quick summary of the trend. Check out the full breakdown and vote here: ${targetUrl}`;
+      } else {
+        postText = `Mock post for ${targetPlatform} with context ${targetContext} about ${trendTitle}!\n${targetUrl}`;
+      }
     }
     await setCachedGeneratedPost(trendTitle, targetPlatform, targetContext, postText);
     return postText;
@@ -1807,9 +1827,14 @@ async function generatePostText(trendTitle, platform, contextType) {
       platformInstructions = `- Platform: ${targetPlatform}`;
     }
 
+    let triviaInstructions = '';
+    if (contextType === 'trivia') {
+      triviaInstructions = `\nYou must explicitly feature the trivia score "${score}/3" and the Wordle-style score emoji pattern "${pattern}" in the post text. Encourage followers to test their own knowledge and beat this score.`;
+    }
+
     const prompt = `You are a world-class viral social media marketer. Generate a highly engaging, professional yet catchy social media post about the trending topic "${trendTitle}".
 
-The angle/context for the post is: "${targetContext}".
+The angle/context for the post is: "${contextType || 'general'}".${triviaInstructions}
 You MUST explicitly include the following target URL in the post: "${targetUrl}"
 
 Platform-Specific Constraints:
