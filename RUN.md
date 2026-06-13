@@ -1,5 +1,5 @@
-task: still some images are not shown/broken regarding topic. and make sure we generate one image per topic, and cache it to avoid llm costs.              tier: T2   creativity: 0.5
-state: verifier                 budget: repairs 0/3
+task: still some images are not shown/broken regarding topic. and make sure we generate one image per topic, and cache it to avoid llm costs.              tier: T2   creativity: 0.3
+state: builder                  budget: repairs 1/3
 branch: asf/20260613-cache-images          checkpoint: none
 caps: agents,ui,web,human
 
@@ -8,6 +8,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-13: Verifier reported failing cache hit due to case-sensitive slug mismatch. Conductor ruled code wrong, reduced budget (repairs 1/3), decreased creativity to 0.3. Dispatching hypothesis to Builder: Normalize all topic-image cache trend lookup keys to lowercase in db.js and server.js.
 ## Verdict
 ### Check 1: Database Caching Schema & Helpers [AC-1] - PASS
 - Table `topic_images` exists in SQLite with correct schema. Caching helpers are exported and function properly.
