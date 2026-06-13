@@ -20,7 +20,7 @@ function getPngDimensions(filePath) {
 }
 
 test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
-  const clientId = `test-client-milestones-${Date.now()}`;
+  const clientId = `test-client-milestones-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
 
   test.beforeEach(async () => {
@@ -289,7 +289,7 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
   // [AC-5] Caching, Case-Insensitive Normalization & Robustness
   // ==========================================
   test('[AC-5] should verify client ID and Trend casing normalization handles mixed-case without duplicates', async ({ request }) => {
-    const uniqueSuffix = Date.now();
+    const uniqueSuffix = Date.now() + '-' + Math.floor(Math.random() * 1000000);
     const mixedTrend = `GoOgLe GeMiNi-${uniqueSuffix}`;
     const lowerTrend = `google gemini-${uniqueSuffix}`;
 

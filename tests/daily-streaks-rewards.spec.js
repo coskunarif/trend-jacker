@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
-  const clientId = `test-client-streaks-${Date.now()}`;
+  const clientId = `test-client-streaks-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
 
   test.beforeEach(async () => {
@@ -64,7 +64,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
 
       const { updateClientStreak, getClientStreak } = dbModule;
 
-      const messyClientId = `  Client-Streak-Test-${Date.now()}  `;
+      const messyClientId = `  Client-Streak-Test-${Date.now()}-${Math.floor(Math.random() * 1000000)}  `;
       const normalizedClientId = messyClientId.trim().toLowerCase();
 
       // Initially no record
@@ -147,7 +147,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
     test('should handle malformed or out-of-order date strings gracefully', async () => {
       const dbModule = await import('../db.js');
       const { updateClientStreak, getClientStreak } = dbModule;
-      const tempClientId = `temp-date-test-${Date.now()}`;
+      const tempClientId = `temp-date-test-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
       await updateClientStreak(tempClientId, '2026-06-13');
       let streak = await getClientStreak(tempClientId);

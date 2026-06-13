@@ -39,7 +39,7 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
       throw new Error('getLocalizedExplanation/setLocalizedExplanation is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testExpl = {
       hook: 'Test Hook',
       whatIsIt: 'Test What Is It',

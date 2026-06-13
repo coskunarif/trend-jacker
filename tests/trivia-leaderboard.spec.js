@@ -13,11 +13,11 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
   let getTriviaLeaderboard;
   let recordTriviaScore;
 
-  const testClientId1 = `client-test-1-${Date.now()}`;
-  const testClientId2 = `client-test-2-${Date.now()}`;
-  const testClientId3 = `client-test-3-${Date.now()}`;
-  const testClientIdCurrentUser = `client-current-${Date.now()}`;
-  const testTrend = `test-trend-leaderboard-${Date.now()}`;
+  const testClientId1 = `client-test-1-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  const testClientId2 = `client-test-2-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  const testClientId3 = `client-test-3-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  const testClientIdCurrentUser = `client-current-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+  const testTrend = `test-trend-leaderboard-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const normalizedTrend = testTrend.toLowerCase();
 
   test.beforeAll(async () => {

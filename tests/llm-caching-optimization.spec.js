@@ -73,7 +73,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-1] API Integration: Case-Insensitive Cache Lookups for POST /api/explain
   test('should serve case-insensitive explanation from cache (verified via DB modification)', async ({ request }) => {
-    const uppercaseTrend = `CASE-TEST-${Date.now()}`;
+    const uppercaseTrend = `CASE-TEST-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const lowercaseTrend = uppercaseTrend.toLowerCase();
     const mixedcaseTrend = uppercaseTrend.charAt(0).toUpperCase() + uppercaseTrend.slice(1).toLowerCase();
 
@@ -89,7 +89,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const db = new DatabaseSync(dbPath);
     db.exec('PRAGMA busy_timeout = 5000;');
     db.exec('PRAGMA journal_mode = WAL;');
-    const customHook = `Unique Hook for case-insensitive check ${Date.now()}`;
+    const customHook = `Unique Hook for case-insensitive check ${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     try {
       // Find row in database. The row key in DB should be lowercased "case-test-..."
       const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
@@ -148,8 +148,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedChatResponse or setCachedChatResponse is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
-    const testQuery = `test-query-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const testQuery = `test-query-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testHistory = [{ role: 'user', content: 'hello' }];
     const testReply = 'This is a cached chat reply.';
 
@@ -163,8 +163,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-1] API Integration: /api/chat caching verified via DB mutation
   test('should serve chat response from cache on subsequent API calls (verified via DB modification)', async ({ request }) => {
-    const testTrend = `chat-api-trend-${Date.now()}`;
-    const testQuery = `chat-api-query-${Date.now()}`;
+    const testTrend = `chat-api-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const testQuery = `chat-api-query-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testHistory = [{ role: 'user', content: 'tell me more' }];
 
     // Clean existing database records just in case to ensure starting clean
@@ -243,7 +243,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedGeneratedPost or setCachedGeneratedPost is not exported from db.js');
     }
 
-    const testTitle = `trend-title-${Date.now()}`;
+    const testTitle = `trend-title-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testPlatform = 'linkedin';
     const testContext = 'developer';
     const testPostText = 'This is a cached social post text.';
@@ -258,7 +258,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] API Integration: /api/generate-post caching verified via DB mutation
   test('should serve generated post from cache on subsequent API calls (verified via DB modification)', async ({ request }) => {
-    const testTitle = `post-api-title-${Date.now()}`;
+    const testTitle = `post-api-title-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testPlatform = 'x';
     const testContext = 'funny';
 
@@ -405,7 +405,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedTopicImage or setCachedTopicImage is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testSvg = '<svg>test</svg>';
 
     // Store in cache
@@ -420,7 +420,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] API Integration: GET /api/topic-image/:slug
   test('should return a generated SVG image with correct headers', async ({ request }) => {
-    const testSlug = `test-trend-${Date.now()}`;
+    const testSlug = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const res = await request.get(`/api/topic-image/${testSlug}`);
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toContain('image/svg+xml');
@@ -432,7 +432,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] Cache validation on endpoint (verified via direct DB modification)
   test('should cache the generated SVG and serve from cache on subsequent calls', async ({ request }) => {
-    const testSlug = `image-api-trend-${Date.now()}`;
+    const testSlug = `image-api-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     
     // Clean database records if needed
     let localDb = new DatabaseSync(dbPath);

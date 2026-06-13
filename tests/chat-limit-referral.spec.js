@@ -150,7 +150,7 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
   // Requirement: Expose GET /api/chat-limit and POST /api/referral.
   // =========================================================================
   test('should expose GET /api/chat-limit and POST /api/referral endpoints', async ({ request }) => {
-    const clientId = `test-client-ac3-${Date.now()}`;
+    const clientId = `test-client-ac3-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const trend = 'Test Trend AC3';
 
     // Verify initial chat limit state
@@ -162,7 +162,7 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
     expect(limitData.allowedLimit).toBe(3);
 
     // Record a referral
-    const refereeId = `referee-ac3-${Date.now()}`;
+    const refereeId = `referee-ac3-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const refRes = await request.post('/api/referral', {
       data: { client_id: clientId, referee_id: refereeId }
     });
@@ -184,7 +184,7 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
   // count against computed limit. Return 403 Forbidden on limit reach.
   // =========================================================================
   test('should enforce chat limit on POST /api/chat when x-enforce-limits is set', async ({ request }) => {
-    const clientId = `test-client-ac4-${Date.now()}`;
+    const clientId = `test-client-ac4-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const trend = 'Test Trend AC4';
     const query = 'Hello AI';
     const history = [];
@@ -315,9 +315,18 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
     const contextB = await page.context().browser().newContext();
     const pageB = await contextB.newPage();
     
+    // Set up response listener to prevent timing race
+    const referralPromise = pageB.waitForResponse(
+      response => response.url().includes('/api/referral') && response.status() === 200,
+      { timeout: 10000 }
+    ).catch(() => null);
+
     // Visit with ref parameter
     await pageB.goto(`/?ref=${clientIdA}`);
     
+    // Wait for the async referral record database operation to complete
+    await referralPromise;
+
     // Check Client B's client ID is different from Client A's
     const clientIdB = await pageB.evaluate(() => localStorage.getItem('clientId'));
     expect(clientIdB).not.toBe(clientIdA);

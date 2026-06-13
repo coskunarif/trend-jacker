@@ -54,7 +54,7 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
         throw new Error('getLocalizedExplanation or setLocalizedExplanation is not exported from db.js');
       }
 
-      const testTrend = `local-trend-${Date.now()}`;
+      const testTrend = `local-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const testLang = 'es';
       const testTitle = 'Spanish Title';
       const testMeta = 'Spanish Meta Description';

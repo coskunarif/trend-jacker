@@ -8,7 +8,7 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Trivia Challenge Chat Capacity Rewards', () => {
-  const clientId = `test-client-rewards-${Date.now()}`;
+  const clientId = `test-client-rewards-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
   const lowercaseTrend = 'google gemini';
 
@@ -88,7 +88,7 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       const dbModule = await import('../db.js');
       // If we temporarily disable sqliteDb or test the fallback, it should work.
       // We can assert that the helpers can run without throwing errors and save to a fallback store.
-      const testClientMemory = `client-mem-${Date.now()}`;
+      const testClientMemory = `client-mem-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       await dbModule.recordTriviaScore(testClientMemory, 'Memory Trend', 3);
       const score = await dbModule.getTriviaScore(testClientMemory, 'Memory Trend');
       expect(score).toBe(3);
@@ -154,7 +154,7 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // 2. Add one referral to DB directly or via API
       await request.post('/api/referral', {
-        data: { client_id: clientId, referee_id: `ref-${Date.now()}` }
+        data: { client_id: clientId, referee_id: `ref-${Date.now()}-${Math.floor(Math.random() * 1000000)}` }
       });
 
       // GET again: referralCount = 1 => allowedLimit = 3 + 5*1 + 0 = 8

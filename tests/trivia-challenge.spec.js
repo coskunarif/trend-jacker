@@ -55,7 +55,7 @@ test.describe('Interactive AI-Generated Trivia Challenge', () => {
         throw new Error('getTrendTrivia or setTrendTrivia is not exported from db.js');
       }
 
-      const testTrend = `trivia-trend-${Date.now()}`;
+      const testTrend = `trivia-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const testLang = 'en';
       const testTriviaData = [
         {

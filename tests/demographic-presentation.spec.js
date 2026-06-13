@@ -89,7 +89,7 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
         throw new Error('Database functions not loaded');
       }
 
-      const baseTrend = `test-cache-trend-${Date.now()}`;
+      const baseTrend = `test-cache-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const testExpl = {
         hook: 'Dynamic Hook',
         whatIsIt: 'Dynamic explanation text',
@@ -152,7 +152,7 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
         throw new Error('Database functions not loaded');
       }
 
-      const baseTrendMixed = `Test-Cache-Trend-Case-${Date.now()}`;
+      const baseTrendMixed = `Test-Cache-Trend-Case-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const bracketMixed = `Kids_Teens`;
       const testExpl = {
         hook: 'Dynamic Hook',

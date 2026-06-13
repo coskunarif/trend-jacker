@@ -51,7 +51,7 @@ test.describe('Database Explanation Caching [AC-2]', () => {
       throw new Error('getCachedExplanation or setCachedExplanation is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testExpl = {
       hook: 'Test Hook text',
       whatIsIt: 'Test WhatIsIt text',
@@ -91,7 +91,7 @@ test.describe('Database Explanation Caching [AC-2]', () => {
     if (typeof getCachedExplanation !== 'function') {
       throw new Error('getCachedExplanation is not exported from db.js');
     }
-    const nonExistentTrend = `non-cached-${Date.now()}`;
+    const nonExistentTrend = `non-cached-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const result = await getCachedExplanation(nonExistentTrend);
     expect(result).toBeFalsy();
   });
@@ -100,7 +100,7 @@ test.describe('Database Explanation Caching [AC-2]', () => {
 test.describe('Trend Explanation API Caching [AC-1]', () => {
   // [AC-1] Caching of Trend Explanations
   test('should serve explanation from cache on subsequent API calls (verified via DB modification)', async ({ request }) => {
-    const testTrend = `api-test-trend-${Date.now()}`;
+    const testTrend = `api-test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     
     // 1. First request: should trigger initial generation (storing in cache database)
     const res1 = await request.post('/api/explain', {
@@ -149,7 +149,7 @@ test.describe('Trend Explanation API Caching [AC-1]', () => {
 test.describe('Live Dynamic Sentiment Poll Integration [AC-3]', () => {
   // [AC-3] Live Dynamic Sentiment Poll Integration
   test('should merge dynamic poll/vote counts with the cached explanation', async ({ request }) => {
-    const testTrend = `poll-test-trend-${Date.now()}`;
+    const testTrend = `poll-test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
     // 1. Manually seed SQLite table with a cached explanation to bypass Gemini API call
     const db = new DatabaseSync(dbPath);
