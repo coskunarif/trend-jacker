@@ -1,90 +1,127 @@
-# Specification — Case-Insensitive Cache Lookups & Mobile-First Engagement Redesign
+# Specification — Gamifying Chat Limits with Daily Streaks & Trivia Rewards
 
-This document outlines the detailed system design, acceptance criteria, vertical implementation slices, and verification guidelines to address case-sensitivity caching inefficiencies and enhance mobile user engagement.
+This document specifies the design, requirements, and vertical slices to gamify chat limits with daily streaks and trivia rewards, boosting user session duration and retention through engaging visual feedback loops.
 
 ---
 
-## 🎯 Target Objectives
+## 🎨 UI/UX Design & Behaviors
 
-1. **LLM Cost Reduction**: Normalize all DB cache lookup keys to lowercase/trimmed values to eliminate duplicate LLM generation requests from casing mismatches.
-2. **Engagement & Retention**: Redesign the trending list sidebar for mobile viewports to replace a flat, long list of text with an interactive layout featuring filtering, search, collapsible truncation, and visual category badges.
+### 1. Active Chat Capacity Progress Bar
+* **Element**: A styled progress bar (`#chat-capacity-bar` with inner track `#chat-capacity-fill`) placed inside the "Dig Deeper with AI" card, just above the message history container (`#chat-history`).
+* **Visuals**:
+  * Progress Fill is color-coded based on percentage of messages used:
+    * **< 50%**: Emerald Green (`#10b981`)
+    * **50% - 80%**: Amber/Orange (`#f59e0b`)
+    * **> 80%**: Rose/Red (`#ef4444`)
+  * Displays a text indicator next to it: `Message Capacity: {currentCount} / {allowedLimit}`.
+  * Transitions smoothly when capacity updates or messages are sent.
+
+### 2. Daily Streak Pulse Badge
+* **Element**: A beautiful animated badge (`#streak-badge-container`) positioned next to the capacity indicator.
+* **Visuals**:
+  * Shows a fire emoji (`🔥`), the current streak count (e.g. `3-Day Streak`), and the added message bonus (e.g. `+6 capacity`).
+  * If the streak is active (count >= 1), the badge executes a CSS pulse keyframe animation (`pulse-streak`) simulating a glowing fire aura using a violet-to-primary shadow/text glow.
+  * Updates instantly when the status is retrieved or refreshed.
+
+### 3. Gamified Lock Screen Streak CTA
+* **Element**: Inside the `#chat-lock-container`, add a specialized section detailing the daily streak bonus.
+* **Visuals**:
+  * Explains that return visits tomorrow preserve/extend the daily streak and reward more capacity.
+  * Text template: `Come back tomorrow to keep your 🔥 {nextStreakCount}-Day streak alive and unlock +{nextStreakBonus} messages!`
+
+### 4. Dynamic Unlocking Animations & Toast Overlay
+* **Unlocking Transition**: When chat limit transitions from locked to unlocked:
+  * `#chat-lock-container` fades out smoothly (`opacity` 1 -> 0) and `#chat-form` fades in (`opacity` 0 -> 1) over `300ms`.
+  * Avoid raw style replacement; use CSS transition classes.
+* **Celebration Toast**:
+  * Renders a temporary toast notification (`#chat-unlock-toast`) at the top of the chat panel.
+  * Displays: `Capacity Unlocked! +{rewardCount} messages available.`
+  * Automatically fades out and is removed after `2.5` seconds.
 
 ---
 
 ## 🎯 Acceptance Criteria
 
-### `[AC-1] Case-Insensitive Cache Lookups`
-* **Requirement**: Storing and retrieving trend explanations and localized translations in SQLite, Firestore, and memory caches must be case-insensitive.
-* **Verification**:
-  1. Call POST `/api/explain` with trend `"GOOGLE GEMINI"`. The server will fetch and cache it.
-  2. Modify the cached entry in the database directly to have a unique text string.
-  3. Call POST `/api/explain` with trend `"google gemini"` and `"Google Gemini"`. Verify both return the custom modified text, confirming a cache hit.
-  4. Verify that the SQLite columns for `trend` (and `lang`) in both `trend_explanations` and `localized_explanations` are defined with `COLLATE NOCASE`. On server startup, if these tables exist but lack `COLLATE NOCASE`, they must be programmatically dropped and recreated with the correct case-insensitive collation to ensure raw SQL test assertions match.
+### `[AC-1]` SQLite/Firestore Streak Persistence & Helpers
+- **SQLite Table**: `client_streaks` must be created automatically during db initialization with columns:
+  - `client_id TEXT PRIMARY KEY`
+  - `streak_count INTEGER DEFAULT 1`
+  - `last_active_date TEXT` (stored as `YYYY-MM-DD` string).
+- **Firestore Schema**: A collection named `client_streaks` with documents named after normalized client IDs, containing `client_id`, `streak_count` (number), and `last_active_date` (string).
+- **Helpers**: `updateClientStreak(clientId, localDate)` and `getClientStreak(clientId)` must be implemented and exported from `db.js`.
+  - Normalization: Normalize `clientId` to lowercase and trim.
+  - If no record exists: Insert record with `streak_count = 1` and `last_active_date = localDate`.
+  - Let `diff` be calendar day difference between `localDate` and the stored `last_active_date`:
+    - **diff == 0**: Keep `streak_count` unchanged. Update `last_active_date = localDate`.
+    - **diff == 1**: Increment `streak_count = streak_count + 1`. Update `last_active_date = localDate`.
+    - **diff > 1 or diff < 0**: Reset `streak_count = 1`. Update `last_active_date = localDate`.
+- **Fallback**: Implement in-memory Map fallback `inMemoryClientStreaks` if both SQLite and Firestore are unavailable.
 
-### `[AC-2] Mobile Trends List Search and Category Filtering`
-* **Requirement**: The trends sidebar panel must support a real-time search box and source-platform filter tabs (All, Google, Reddit).
-* **Verification**:
-  1. Load the application. Type a partial query (e.g. `"gemini"`) into the `#trends-search` input. Verify the trends list filters in real-time to only show items containing that text (case-insensitive).
-  2. Click the `"Google"` filter tab; verify only Google trends are displayed. Click `"Reddit"`; verify only Reddit trends are displayed. Click `"All"`; verify the list resets to show both sources.
+### `[AC-2]` Backend API & Chat Limit Logic Integration
+- **GET `/api/chat-limit`**:
+  - Accept optional `localDate` query parameter (format `YYYY-MM-DD`, e.g. `2026-06-13`).
+  - If `clientId` and `localDate` are provided, execute `updateClientStreak(clientId, localDate)` before returning counts.
+  - JSON payload must return: `{ limitReached, currentCount, allowedLimit, streakCount, streakBonus }`.
+- **Capacity Formula**: Streak bonus is `2 * streakCount` messages.
+  - `allowedLimit = 3 + 5 * referralCount + triviaBonus + (streakCount * 2)`.
+- **Integrations**: Both `POST `/api/trivia/score`` and `POST `/api/chat`` must use the identical capacity formula to decide limit locks and calculate available capacity.
 
-### `[AC-3] Mobile Trends List Truncation and "Show More" Pagination`
-* **Requirement**: On mobile viewports (width <= 768px), the trends list must be truncated to show only the top 6 trends by default, followed by a "+ Show More Trends" toggle button.
-* **Verification**:
-  1. Load the page on a mobile viewport (e.g., width 390px). Confirm that exactly 6 trend items are visible in the trends list.
-  2. Confirm the `+ Show More Trends` button is visible.
-  3. Click `+ Show More Trends`. Verify the list expands to show all trends, and the button changes text to `- Show Less Trends`. Click it again; verify the list collapses back to 6.
+### `[AC-3]` Chat Capacity Progress Bar UI
+- **HTML Element**: Insert `#chat-capacity-bar` containing `#chat-capacity-fill` and text label `#chat-capacity-text` inside the Dig Deeper with AI card in `public/index.html`.
+- **Visual Color-coding**:
+  - CSS rule updates fill background-color:
+    - `< 50%` used: `#10b981` (green)
+    - `50% - 80%` used: `#f59e0b` (orange)
+    - `> 80%` used: `#ef4444` (red)
+- **State Update**: Updates dynamically when the active trend loads, after a message is sent successfully, or when status is checked/unlocked.
 
-### `[AC-4] Dynamic Emojis & Fluid Mobile Typography`
-* **Requirement**: Each trend item card must show a dynamic emoji category icon based on its content, and main titles must scale fluidly using CSS `clamp()`.
-* **Verification**:
-  1. Verify each trend card has a category emoji (e.g., 🤖 for tech/AI, 📈 for business/finance, 🎮 for gaming, 🔥 for other trends).
-  2. Resize the viewport from 1280px to 375px. Verify that the `.trend-title` font-size fluidly scales using `clamp(1.6rem, 5vw, 2.25rem)` without wrapping problems or horizontal layout leaks.
+### `[AC-4]` Dynamic Daily Streak UI Badge
+- **HTML Element**: Place `#streak-badge-container` inside the Q&A card in `public/index.html`.
+- **Visuals**:
+  - Renders a fire icon (`🔥`), streak count (e.g. `3-Day Streak`), and bonus (e.g. `+6 capacity`).
+  - Pulsing fire glow effect via keyframes `pulse-streak` on active streaks.
+  - Must remain hidden or styled as inactive (e.g., translucent grey) if streak count is 0.
+
+### `[AC-5]` Lock Screen Streak Retention CTA
+- **Text & Math**: `#chat-lock-container` displays:
+  - The current active streak & bonus message capacity.
+  - A retention prompt: `Come back tomorrow to keep your 🔥 {nextStreakCount}-Day streak alive and unlock +{nextStreakBonus} messages!`
+  - Next streak count is `streakCount + 1`. Next streak bonus is `(streakCount + 1) * 2`.
+
+### `[AC-6]` Smooth Unlock Transition & Celebratory Toast
+- **Unlock Animation**:
+  - Transition chat container: Fade-out `#chat-lock-container` (`opacity` 1 -> 0) and fade-in `#chat-form` (`opacity` 0 -> 1) over `300ms` when unlocked.
+- **Celebration Toast**:
+  - Display `#chat-unlock-toast` at the top of the chat layout with text `Capacity Unlocked! +{rewardCount} messages available.`.
+  - Dismiss/fade out automatically after `2.5` seconds.
 
 ---
 
 ## 🚫 Out of Scope
 
-* **Third-Party Frameworks**: Do not pull in React, Vue, Tailwind, or other runtime frameworks. Keep modifications within vanilla HTML, CSS, and JS.
-* **Other SQLite tables**: Avoid modifying non-caching tables like `votes` or `vote_events` unless schema migrations are explicitly required for cache compatibility.
-* **New Translation Languages**: Do not add new languages beyond the existing es, fr, ja support.
+- Real user authentication, session-duration tracking, or persistence across multiple physical devices.
+- Direct push notifications, email alerts, or SMS marketing for retention.
 
 ---
 
-## 🛠️ Vertical Slices
+## 📅 Vertical Slices
 
-Slices are ordered by dependency. Independent slices can be parallelized.
+### `[S-1] DB Streak Schema & Logic Helpers` (Independent)
+* **ACs Mapped**: `[AC-1]`
+* **Files**: `db.js`
+* **Description**: Create SQLite `client_streaks` schema block and write helper functions `updateClientStreak` and `getClientStreak` (including Firestore + in-memory fallback mappings).
 
-### `[S-1] Case-Insensitive Cache Normalization (Backend)`
-* **Files**: `db.js`, `server.js`
-* **Description**:
-  - Implement dynamic SQLite schema checks in `db.js` on startup: inspect `trend_explanations` and `localized_explanations` schemas. If they don't contain `COLLATE NOCASE` on the `trend` (and `lang`) columns, drop and recreate them with `COLLATE NOCASE` enabled.
-  - Normalize keys in `db.js` helper functions (`getCachedExplanation`, `setCachedExplanation`, `getLocalizedExplanation`, `setLocalizedExplanation`) by trimming and lowercasing the `trend` (and `lang`) inputs.
-  - Suffix localized demographic keys using `{trend}:{bracket}` normalized to lowercase.
-  - Normalize cache keys in `server.js` functions `getTrendExplanation` and `getLocalizedTrendExplanation` before retrieving/storing entries. Maintain original casing in prompts sent to the LLM to avoid semantic degradation.
+### `[S-2] Server Endpoint Integration` (Depends on S-1)
+* **ACs Mapped**: `[AC-2]`
+* **Files**: `server.js`
+* **Description**: Integrate streak calculations into `/api/chat-limit` (accepting `localDate`), `/api/trivia/score`, and `/api/chat` limit checks. Update the allowed limit equation.
 
-### `[S-2] Search & Category Filter UI and Logic (Frontend)`
-* **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
-* **Description**:
-  - Insert search input `#trends-search` and platform filter tabs `.trends-filter-tabs` inside `.trends-section` in `public/index.html`.
-  - In `public/app.js`, add state variables for search query and platform selection. Update `renderTrends` to apply filters before drawing cards. Add input/click event listeners to update state and trigger re-rendering.
-  - In `public/styles.css`, style the controls wrapper with glassmorphism overlays and hover effects.
+### `[S-3] Frontend Capacity Progress & Streak Badge UI` (Independent)
+* **ACs Mapped**: `[AC-3]`, `[AC-4]`, `[AC-5]`
+* **Files**: `public/index.html`, `public/styles.css`
+* **Description**: Structure the DOM elements for progress bar, streak badge, and toast. Add css rules, color-coding transitions, and pulsing animations.
 
-### `[S-3] Collapsible Trend List on Mobile (Frontend)`
-* **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
-* **Description**:
-  - Insert `#btn-show-more-trends` below `#trends-list` in `public/index.html`.
-  - In `public/app.js`, implement mobile viewport detection. Modify `renderTrends` to slice the list at index 6 when on mobile and `showAllTrendsMobile` is false. Show the toggle button and bind its click event to toggle expansion.
-  - Add transition rules and responsive margins in `public/styles.css` to make list expansion smooth.
-
-### `[S-4] Visual Accent Emojis & Fluid Typography (Frontend)`
-* **Files**: `public/app.js`, `public/styles.css`
-* **Description**:
-  - Implement keyword-based classification in `public/app.js` (mapping tech, AI, gaming, finance keywords to specific emojis). Inject the resolved emoji class/text inside the trend item HTML template.
-  - Refactor `.trend-title` in `public/styles.css` to use `clamp()` for fluid responsive font scaling.
-
----
-
-## 🚦 Testing Strategy
-
-* **Refinement Approach**: The Tester will update existing unit and integration tests (such as `tests/llm-caching-optimization.spec.js` and `tests/responsive.spec.js`) to assert case-insensitivity on cache lookups, search/filter behaviors, and mobile viewport truncation.
-* **Auto-Execution**: All tests must run successfully via `npx playwright test` under SQLite WAL mode with a single worker.
+### `[S-4] Reactive UI Synchronization & Unlock Transitions` (Depends on S-2, S-3)
+* **ACs Mapped**: `[AC-6]`
+* **Files**: `public/app.js`
+* **Description**: Implement javascript logic to calculate local date client-side, pass it to APIs, render the progress bar and streak badge dynamically, trigger lock-to-unlock animations, and display celebratory toast notifications.
