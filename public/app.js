@@ -904,13 +904,17 @@ function initApp() {
       const sourceBadge = `<span class="source-badge ${badgeClass}">${badgeLabel}</span>`;
 
       let thumbnailHtml = '';
+      const slug = titleToSlug(trend.title);
       if (trend.news && trend.news.ogImage) {
         thumbnailHtml = `
-          <img class="trend-thumbnail" src="${trend.news.ogImage}" alt="${trend.title}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <img class="trend-thumbnail" src="${trend.news.ogImage}" alt="${trend.title}" loading="lazy" onerror="if(!this.src.includes('/api/topic-image/')) { this.src = '/api/topic-image/${slug}'; } else { this.style.display='none'; this.nextElementSibling.style.display='block'; }" />
           <div class="trend-thumbnail-placeholder" style="display: none;"></div>
         `;
       } else {
-        thumbnailHtml = `<div class="trend-thumbnail-placeholder"></div>`;
+        thumbnailHtml = `
+          <img class="trend-thumbnail" src="/api/topic-image/${slug}" alt="${trend.title}" loading="lazy" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+          <div class="trend-thumbnail-placeholder" style="display: none;"></div>
+        `;
       }
 
       let faviconUrl = '';
@@ -1080,20 +1084,29 @@ function initApp() {
       const heroContainer = document.getElementById('detail-hero-container');
       const heroGradient = heroContainer ? heroContainer.querySelector('.detail-hero-gradient') : null;
       if (heroImg) {
+        const slug = titleToSlug(trend.title);
         if (trend.news && trend.news.ogImage) {
           heroImg.src = trend.news.ogImage;
+          heroImg.style.display = 'block';
+          if (heroGradient) heroGradient.style.display = 'none';
+          heroImg.onerror = () => {
+            if (!heroImg.src.includes('/api/topic-image/')) {
+              heroImg.src = `/api/topic-image/${slug}`;
+              heroImg.style.display = 'block';
+              if (heroGradient) heroGradient.style.display = 'none';
+            } else {
+              heroImg.style.display = 'none';
+              if (heroGradient) heroGradient.style.display = 'block';
+            }
+          };
+        } else {
+          heroImg.src = `/api/topic-image/${slug}`;
           heroImg.style.display = 'block';
           if (heroGradient) heroGradient.style.display = 'none';
           heroImg.onerror = () => {
             heroImg.style.display = 'none';
             if (heroGradient) heroGradient.style.display = 'block';
           };
-        } else {
-          heroImg.src = '';
-          heroImg.removeAttribute('src');
-          heroImg.style.display = 'none';
-          if (heroGradient) heroGradient.style.display = 'block';
-          heroImg.onerror = null;
         }
       }
 
