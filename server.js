@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1565,10 +1565,23 @@ fastify.get('/sitemap.xml', async (request, reply) => {
 
 // GET /api/chat-limit - Check chat limit and current counts
 fastify.get('/api/chat-limit', async (request, reply) => {
-  const { clientId, trend } = request.query || {};
+  const { clientId, trend, localDate } = request.query || {};
   if (!clientId || !trend) {
     return reply.status(400).send({ error: 'clientId and trend query parameters are required.' });
   }
+
+  if (localDate) {
+    await updateClientStreak(clientId, localDate);
+  }
+
+  let streakCount = 0;
+  let streakBonus = 0;
+  const streakInfo = await getClientStreak(clientId);
+  if (streakInfo) {
+    streakCount = streakInfo.streak_count;
+    streakBonus = streakCount * 2;
+  }
+
   const referralCount = await getReferralCount(clientId);
   const triviaScore = await getTriviaScore(clientId, trend);
   let triviaBonus = 0;
@@ -1581,10 +1594,10 @@ fastify.get('/api/chat-limit', async (request, reply) => {
       triviaBonus = 1;
     }
   }
-  const allowedLimit = 3 + 5 * referralCount + triviaBonus;
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
   const currentCount = await getChatCount(clientId, trend);
   const limitReached = currentCount >= allowedLimit;
-  return { limitReached, currentCount, allowedLimit };
+  return { limitReached, currentCount, allowedLimit, streakCount, streakBonus };
 });
 
 // POST /api/referral - Record a client referral
@@ -1609,6 +1622,14 @@ fastify.post('/api/trivia/score', async (request, reply) => {
   const numericScore = Number(score);
   await recordTriviaScore(clientId, trend, numericScore);
 
+  let streakCount = 0;
+  let streakBonus = 0;
+  const streakInfo = await getClientStreak(clientId);
+  if (streakInfo) {
+    streakCount = streakInfo.streak_count;
+    streakBonus = streakCount * 2;
+  }
+
   const referralCount = await getReferralCount(clientId);
   const triviaScore = await getTriviaScore(clientId, trend);
   let triviaBonus = 0;
@@ -1621,11 +1642,20 @@ fastify.post('/api/trivia/score', async (request, reply) => {
       triviaBonus = 1;
     }
   }
-  const allowedLimit = 3 + 5 * referralCount + triviaBonus;
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
   const currentCount = await getChatCount(clientId, trend);
   const limitReached = currentCount >= allowedLimit;
 
-  return { success: true, allowedLimit, currentCount, limitReached };
+  let rewardCount = 0;
+  if (numericScore === 3) {
+    rewardCount = 5;
+  } else if (numericScore === 2) {
+    rewardCount = 3;
+  } else if (numericScore === 0 || numericScore === 1) {
+    rewardCount = 1;
+  }
+
+  return { success: true, allowedLimit, currentCount, limitReached, rewardCount };
 });
 
 // POST /api/chat - Follow-up Q&A chat using Gemini
@@ -1637,6 +1667,14 @@ fastify.post('/api/chat', async (request, reply) => {
 
   const enforceLimits = (process.env.NODE_ENV !== 'test') || (request.headers['x-enforce-limits'] === 'true');
   if (enforceLimits && clientId) {
+    let streakCount = 0;
+    let streakBonus = 0;
+    const streakInfo = await getClientStreak(clientId);
+    if (streakInfo) {
+      streakCount = streakInfo.streak_count;
+      streakBonus = streakCount * 2;
+    }
+
     const referralCount = await getReferralCount(clientId);
     const triviaScore = await getTriviaScore(clientId, trend);
     let triviaBonus = 0;
@@ -1649,7 +1687,7 @@ fastify.post('/api/chat', async (request, reply) => {
         triviaBonus = 1;
       }
     }
-    const allowedLimit = 3 + 5 * referralCount + triviaBonus;
+    const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
     const currentCount = await getChatCount(clientId, trend);
     if (currentCount >= allowedLimit) {
       return reply.status(403).send({ error: 'limit_reached', allowedLimit });
