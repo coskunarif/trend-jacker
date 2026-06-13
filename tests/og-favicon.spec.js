@@ -150,11 +150,11 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     await expect(firstBadge).toBeVisible();
     await expect(firstBadge).toHaveText('Google Search Spike');
 
-    // Verify Trend 2 (missing OG image & favicon, testing fallbacks/placeholders)
+    // [AC-3] Verify Trend 2 (missing OG image, immediate fallback to /api/topic-image/:slug)
     const secondItem = trendItems.nth(1);
-    // Should render a clean gradient placeholder when no image is available
-    const secondPlaceholder = secondItem.locator('.trend-thumbnail-placeholder, .gradient-placeholder, div.trend-thumbnail');
-    await expect(secondPlaceholder).toBeVisible();
+    const secondThumbnail = secondItem.locator('img.trend-thumbnail');
+    await expect(secondThumbnail).toBeVisible();
+    await expect(secondThumbnail).toHaveAttribute('src', '/api/topic-image/fastify-framework');
     
     // Should render fallback domain-based favicon
     const secondFavicon = secondItem.locator('.publisher-favicon, img.publisher-favicon');
@@ -219,21 +219,13 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     const genericSvg = footerIconContainer.locator('svg.lucide-newspaper');
     await expect(genericSvg).not.toBeVisible();
 
-    // Select the second trend (no OG image, fallback favicon)
+    // [AC-3] Select the second trend (no OG image, fallback to /api/topic-image/:slug)
     const secondItem = page.locator('.trend-item').nth(1);
     await secondItem.click();
 
-    // Hero block should hide gracefully or render a CSS gradient fallback
-    // Either the image is hidden or it's a gradient block
-    const heroImageSecond = page.locator('#detail-hero-image, .detail-hero-image, img.detail-hero');
-    const heroGradientFallback = page.locator('.detail-hero-gradient, .hero-placeholder');
-    
-    // We use a robust assertion that either the hero image is hidden/removed or the gradient is visible
-    await expect(async () => {
-      const isHeroImageVisible = await heroImageSecond.isVisible();
-      const isGradientVisible = await heroGradientFallback.isVisible();
-      expect(!isHeroImageVisible || isGradientVisible).toBe(true);
-    }).toPass();
+    const heroImageSecond = page.locator('#detail-hero-image');
+    await expect(heroImageSecond).toBeVisible();
+    await expect(heroImageSecond).toHaveAttribute('src', '/api/topic-image/fastify-framework');
 
     // Check footer card favicon for Trend 2 (which uses fallback)
     const footerFaviconSecond = footerIconContainer.locator('img');
@@ -242,8 +234,8 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     expect(secondFooterSrc).toContain('google.com/s2/favicons?domain=fastify.io');
   });
 
-  // [AC-1] List Item Thumbnail Fallback
-  // [AC-2] List Item Publisher Favicon Fallback
+  // [AC-3] List Item Thumbnail Fallback on Error
+  // [AC-2] List Item Publisher Favicon Fallback (from previous specs, kept for regression)
   test('should handle loading failures for list item thumbnails and publisher favicons', async ({ page }) => {
     // Intercept trends API to return mock metadata
     await page.route('**/api/trends', async (route) => {
@@ -269,17 +261,16 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
 
     const firstItem = trendItems.nth(0);
     const thumbnailImg = firstItem.locator('img.trend-thumbnail');
-    const thumbnailPlaceholder = firstItem.locator('.trend-thumbnail-placeholder');
     const publisherFavicon = firstItem.locator('img.publisher-favicon');
 
     // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
     await expect(async () => {
-      // AC-1: thumbnail image is hidden (display: none)
-      const imgDisplay = await thumbnailImg.evaluate(el => window.getComputedStyle(el).display);
-      expect(imgDisplay).toBe('none');
+      // AC-3: thumbnail image onerror swaps src to /api/topic-image/:slug
+      const imgSrc = await thumbnailImg.getAttribute('src');
+      expect(imgSrc).toBe('/api/topic-image/google-gemini');
 
-      // and the .trend-thumbnail-placeholder is visible
-      await expect(thumbnailPlaceholder).toBeVisible();
+      // and the thumbnail is visible
+      await expect(thumbnailImg).toBeVisible();
 
       // AC-2: publisher favicon image is hidden/removed (display: none or removed from DOM)
       const faviconCount = await publisherFavicon.count();
@@ -289,8 +280,8 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     }).toPass();
   });
 
-  // [AC-3] Detail View Hero Image Fallback
-  // [AC-4] News Footer Favicon Fallback
+  // [AC-3] Detail View Hero Image Fallback on Error
+  // [AC-4] News Footer Favicon Fallback (from previous specs, kept for regression)
   test('should handle loading failures for detail view hero image and news footer favicon', async ({ page }) => {
     // Intercept trends API to return mock metadata
     await page.route('**/api/trends', async (route) => {
@@ -324,19 +315,17 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     await firstItem.click();
 
     const heroImage = page.locator('#detail-hero-image');
-    const heroGradient = page.locator('.detail-hero-gradient');
     const footerFavicon = page.locator('#footer-favicon-img');
     const genericSvg = page.locator('.news-icon svg.lucide-newspaper');
 
     // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
     await expect(async () => {
-      // AC-3: detail hero image is hidden (display: none)
-      const heroDisplay = await heroImage.evaluate(el => window.getComputedStyle(el).display);
-      expect(heroDisplay).toBe('none');
+      // AC-3: detail hero image onerror swaps src to /api/topic-image/:slug
+      const heroSrc = await heroImage.getAttribute('src');
+      expect(heroSrc).toBe('/api/topic-image/google-gemini');
 
-      // and the CSS gradient fallback (.detail-hero-gradient) is displayed (display: block)
-      const gradientDisplay = await heroGradient.evaluate(el => window.getComputedStyle(el).display);
-      expect(gradientDisplay).toBe('block');
+      // and the hero image is visible
+      await expect(heroImage).toBeVisible();
 
       // AC-4: news footer favicon image is hidden (display: none)
       const footerFaviconDisplay = await footerFavicon.evaluate(el => window.getComputedStyle(el).display);
