@@ -1,5 +1,5 @@
 task: still some images are not shown/broken regarding topic. and make sure we generate one image per topic, and cache it to avoid llm costs.              tier: T2   creativity: 0.18
-state: tester                   budget: repairs 2/3
+state: verifier                 budget: repairs 2/3
 branch: asf/20260613-cache-images          checkpoint: none
 caps: agents,ui,web,human
 
@@ -11,6 +11,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Verifier reported failing cache hit due to case-sensitive slug mismatch. Conductor ruled code wrong, reduced budget (repairs 1/3), decreased creativity to 0.3. Dispatching hypothesis to Builder: Normalize all topic-image cache trend lookup keys to lowercase in db.js and server.js.
 - 2026-06-13: Builder completed repair. Observed state: green. Conductor starting Verifier phase.
 - 2026-06-13: Verifier reported failing welcome-view test. Conductor ruled test wrong, reduced budget (repairs 2/3), decreased creativity to 0.18. Dispatching hypothesis to Tester: Mock/remove preloaded-trend-data block in tests/dashboard-redesign.spec.js using addInitScript to prevent hydration from hiding welcome-view.
+- 2026-06-13: Tester completed test amendment. Conductor starting Verifier phase.
 ## Verdict
 ### Check 1: Database Caching Schema & Helpers [AC-1] - PASS
 - Table `topic_images` exists in SQLite with correct COLLATE NOCASE schema. Caching helpers in `db.js` successfully normalize lookup keys to lowercase and function properly.
