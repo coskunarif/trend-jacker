@@ -1232,9 +1232,11 @@ function initApp() {
       btnSidebarClose.addEventListener('click', () => {
         closeMobileSidebar();
       });
+    }
 
     const searchInput = document.getElementById('trends-search');
     const filterTabs = document.querySelectorAll('.trends-filter-tabs .filter-tab');
+    const showMoreBtn = document.getElementById('btn-show-more-trends');
 
     if (searchInput) {
       searchInput.addEventListener('input', (e) => {
@@ -1254,6 +1256,17 @@ function initApp() {
         activeFilter = e.target.textContent.trim();
         renderTrends();
       });
+    });
+
+    if (showMoreBtn) {
+      showMoreBtn.addEventListener('click', () => {
+        showAllTrendsMobile = !showAllTrendsMobile;
+        renderTrends();
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      renderTrends();
     });
   }
 
@@ -1342,14 +1355,34 @@ function initApp() {
       });
     }
 
-    if (filtered.length === 0) {
+    const showMoreBtn = document.getElementById('btn-show-more-trends');
+    const isMobile = window.innerWidth <= 768;
+
+    let displayTrends = [...filtered];
+    if (isMobile && filtered.length > 6) {
+      if (showMoreBtn) {
+        showMoreBtn.style.setProperty('display', 'block', 'important');
+      }
+      if (!showAllTrendsMobile) {
+        displayTrends = filtered.slice(0, 6);
+        if (showMoreBtn) showMoreBtn.textContent = '+ Show More Trends';
+      } else {
+        if (showMoreBtn) showMoreBtn.textContent = '- Show Less Trends';
+      }
+    } else {
+      if (showMoreBtn) {
+        showMoreBtn.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    if (displayTrends.length === 0) {
       trendsListContainer.innerHTML = '<p class="empty-msg">No current trends found.</p>';
       return;
     }
 
     let activeItem = null;
 
-    filtered.forEach((trend, index) => {
+    displayTrends.forEach((trend, index) => {
       const a = document.createElement('a');
       a.className = 'trend-item';
       a.href = `/t/${titleToSlug(trend.title)}`;
@@ -1469,6 +1502,13 @@ function initApp() {
         news: { headline: '', snippet: '', url: '' }
       };
       loadTrendDetails(mockTrend);
+    }
+
+    // On mobile viewports, if we are on the home page (no urlSlug) and have more than 6 trends, start with the sidebar open
+    if (window.innerWidth <= 768 && !urlSlug && filtered.length > 6 && sidebarPanel) {
+      sidebarPanel.classList.add('open');
+      if (sidebarBackdrop) sidebarBackdrop.classList.remove('hidden');
+      if (btnSidebarToggle) btnSidebarToggle.setAttribute('aria-expanded', 'true');
     }
   }
 
