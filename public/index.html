@@ -293,10 +293,26 @@
               <div id="streak-badge-container">
                 🔥 <span id="streak-badge-count">0-Day Streak</span> <span id="streak-badge-bonus">+0 capacity</span>
               </div>
+              <button id="btn-download-streak-reward" class="btn hidden" style="margin-left: 8px; padding: 2px 8px; font-size: 0.7rem;">Download Card</button>
             </h3>
             <div id="chat-capacity-bar">
               <div id="chat-capacity-fill"></div>
               <span id="chat-capacity-text">Message Capacity: 0 / 3</span>
+            </div>
+            <div id="streak-progress-track">
+              <div class="streak-days-container">
+                <span class="streak-day" title="Day 1"></span>
+                <span class="streak-day" title="Day 2"></span>
+                <span class="streak-day" title="Day 3"></span>
+                <span class="streak-day" title="Day 4"></span>
+                <span class="streak-day" title="Day 5"></span>
+                <span class="streak-day" title="Day 6"></span>
+                <span class="streak-day" title="Day 7"></span>
+              </div>
+              <div class="streak-milestones">
+                <div class="streak-milestone">Day 3: Consistent 🔥 (+6 capacity)</div>
+                <div class="streak-milestone">Day 7: Weekly Legend 👑 (+14 capacity)</div>
+              </div>
             </div>
             <div id="chat-history" class="chat-history-container" role="log" aria-live="polite">
               <div class="chat-bubble bot">
@@ -376,6 +392,8 @@
           <div class="trivia-results-screen hidden">
             <h3 class="trivia-results-title">Challenge Completed!</h3>
             <p class="trivia-results-score"></p>
+            <div id="trivia-milestone-title"></div>
+            <div id="trivia-milestone-badge"></div>
             <div id="trivia-reward-display" style="display: none; margin-bottom: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 600; font-size: 0.9rem;"></div>
             <div class="trivia-emoji-pattern"></div>
 
@@ -402,6 +420,10 @@
               <button id="btn-share-score" class="share-score-btn">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 Share Score
+              </button>
+              <button id="btn-download-trivia-reward" class="share-score-btn" style="margin-left: 8px;">
+                <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Download Card
               </button>
             </div>
           </div>

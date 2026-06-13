@@ -1570,20 +1570,23 @@ fastify.get('/api/chat-limit', async (request, reply) => {
     return reply.status(400).send({ error: 'clientId and trend query parameters are required.' });
   }
 
+  const normalizedClientId = clientId.trim().toLowerCase();
+  const normalizedTrend = trend.trim().toLowerCase();
+
   if (localDate) {
-    await updateClientStreak(clientId, localDate);
+    await updateClientStreak(normalizedClientId, localDate);
   }
 
   let streakCount = 0;
   let streakBonus = 0;
-  const streakInfo = await getClientStreak(clientId);
+  const streakInfo = await getClientStreak(normalizedClientId);
   if (streakInfo) {
     streakCount = streakInfo.streak_count;
     streakBonus = streakCount * 2;
   }
 
-  const referralCount = await getReferralCount(clientId);
-  const triviaScore = await getTriviaScore(clientId, trend);
+  const referralCount = await getReferralCount(normalizedClientId);
+  const triviaScore = await getTriviaScore(normalizedClientId, normalizedTrend);
   let triviaBonus = 0;
   if (triviaScore !== null && triviaScore !== undefined) {
     if (triviaScore === 3) {
@@ -1595,7 +1598,7 @@ fastify.get('/api/chat-limit', async (request, reply) => {
     }
   }
   const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
-  const currentCount = await getChatCount(clientId, trend);
+  const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
   const limitReached = currentCount >= allowedLimit;
   return { limitReached, currentCount, allowedLimit, streakCount, streakBonus };
 });
@@ -1606,10 +1609,12 @@ fastify.post('/api/referral', async (request, reply) => {
   if (!client_id || !referee_id) {
     return reply.status(400).send({ error: 'client_id and referee_id are required.' });
   }
-  if (client_id === referee_id) {
+  const normalizedClientId = client_id.trim().toLowerCase();
+  const normalizedRefereeId = referee_id.trim().toLowerCase();
+  if (normalizedClientId === normalizedRefereeId) {
     return { success: false, error: 'Self-referral is not allowed.' };
   }
-  await recordReferral(client_id, referee_id);
+  await recordReferral(normalizedClientId, normalizedRefereeId);
   return { success: true };
 });
 
@@ -1619,19 +1624,21 @@ fastify.post('/api/trivia/score', async (request, reply) => {
   if (!clientId || !trend || score === undefined) {
     return reply.status(400).send({ error: 'clientId, trend, and score are required.' });
   }
+  const normalizedClientId = clientId.trim().toLowerCase();
+  const normalizedTrend = trend.trim().toLowerCase();
   const numericScore = Number(score);
-  await recordTriviaScore(clientId, trend, numericScore);
+  await recordTriviaScore(normalizedClientId, normalizedTrend, numericScore);
 
   let streakCount = 0;
   let streakBonus = 0;
-  const streakInfo = await getClientStreak(clientId);
+  const streakInfo = await getClientStreak(normalizedClientId);
   if (streakInfo) {
     streakCount = streakInfo.streak_count;
     streakBonus = streakCount * 2;
   }
 
-  const referralCount = await getReferralCount(clientId);
-  const triviaScore = await getTriviaScore(clientId, trend);
+  const referralCount = await getReferralCount(normalizedClientId);
+  const triviaScore = await getTriviaScore(normalizedClientId, normalizedTrend);
   let triviaBonus = 0;
   if (triviaScore !== null && triviaScore !== undefined) {
     if (triviaScore === 3) {
@@ -1643,7 +1650,7 @@ fastify.post('/api/trivia/score', async (request, reply) => {
     }
   }
   const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
-  const currentCount = await getChatCount(clientId, trend);
+  const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
   const limitReached = currentCount >= allowedLimit;
 
   let rewardCount = 0;
@@ -1664,7 +1671,9 @@ fastify.get('/api/trivia/leaderboard', async (request, reply) => {
   if (!trend) {
     return reply.status(400).send({ error: 'trend is required.' });
   }
-  const result = await getTriviaLeaderboard(trend, clientId);
+  const normalizedTrend = trend.trim().toLowerCase();
+  const normalizedClientId = clientId ? clientId.trim().toLowerCase() : clientId;
+  const result = await getTriviaLeaderboard(normalizedTrend, normalizedClientId);
   return reply.send(result);
 });
 
@@ -1674,11 +1683,12 @@ fastify.post('/api/trivia/nickname', async (request, reply) => {
   if (typeof clientId !== 'string' || typeof nickname !== 'string') {
     return reply.status(400).send({ error: 'clientId and nickname must be strings.' });
   }
+  const normalizedClientId = clientId.trim().toLowerCase();
   const trimmed = nickname.trim();
   if (trimmed.length === 0 || trimmed.length > 15) {
     return reply.status(400).send({ error: 'nickname must be non-empty and max 15 characters.' });
   }
-  await saveClientNickname(clientId, trimmed);
+  await saveClientNickname(normalizedClientId, trimmed);
   return reply.send({ success: true, nickname: trimmed });
 });
 
@@ -1688,19 +1698,21 @@ fastify.post('/api/chat', async (request, reply) => {
   if (!trend || !query) {
     return reply.status(400).send({ error: 'Trend and query are required.' });
   }
+  const normalizedTrend = trend.trim().toLowerCase();
+  const normalizedClientId = clientId ? clientId.trim().toLowerCase() : clientId;
 
   const enforceLimits = (process.env.NODE_ENV !== 'test') || (request.headers['x-enforce-limits'] === 'true');
-  if (enforceLimits && clientId) {
+  if (enforceLimits && normalizedClientId) {
     let streakCount = 0;
     let streakBonus = 0;
-    const streakInfo = await getClientStreak(clientId);
+    const streakInfo = await getClientStreak(normalizedClientId);
     if (streakInfo) {
       streakCount = streakInfo.streak_count;
       streakBonus = streakCount * 2;
     }
 
-    const referralCount = await getReferralCount(clientId);
-    const triviaScore = await getTriviaScore(clientId, trend);
+    const referralCount = await getReferralCount(normalizedClientId);
+    const triviaScore = await getTriviaScore(normalizedClientId, normalizedTrend);
     let triviaBonus = 0;
     if (triviaScore !== null && triviaScore !== undefined) {
       if (triviaScore === 3) {
@@ -1712,22 +1724,22 @@ fastify.post('/api/chat', async (request, reply) => {
       }
     }
     const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
-    const currentCount = await getChatCount(clientId, trend);
+    const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
     if (currentCount >= allowedLimit) {
       return reply.status(403).send({ error: 'limit_reached', allowedLimit });
     }
-    await incrementChatCount(clientId, trend);
+    await incrementChatCount(normalizedClientId, normalizedTrend);
   }
 
   // Check cache first
-  const cachedResponse = await getCachedChatResponse(trend, query, history);
+  const cachedResponse = await getCachedChatResponse(normalizedTrend, query, history);
   if (cachedResponse !== null) {
     return { reply: cachedResponse };
   }
 
   if (process.env.NODE_ENV === 'test') {
     const mockReply = 'This is a mock reply for: ' + query;
-    await setCachedChatResponse(trend, query, history, mockReply);
+    await setCachedChatResponse(normalizedTrend, query, history, mockReply);
     return { reply: mockReply };
   }
 
@@ -1748,7 +1760,7 @@ fastify.post('/api/chat', async (request, reply) => {
       .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
       .join('\n');
 
-    const prompt = `You are a sharp, conversational AI trend analyst. The user is asking a follow-up question about the trending topic "${trend}".
+    const prompt = `You are a sharp, conversational AI trend analyst. The user is asking a follow-up question about the trending topic "${normalizedTrend}".
 Keep your response under 3 sentences, make it engaging, and focus on delivering direct answers.
 
 Style guidelines:
@@ -1765,7 +1777,7 @@ Response:`;
     const result = await model.generateContent(prompt);
     const replyText = result.response.text();
     const finalReply = replyText.trim();
-    await setCachedChatResponse(trend, query, history, finalReply);
+    await setCachedChatResponse(normalizedTrend, query, history, finalReply);
     return { reply: finalReply };
   } catch (err) {
     fastify.log.error(err);

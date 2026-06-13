@@ -275,6 +275,8 @@ function initApp() {
   const pctGenius = document.getElementById('pct-genius');
   const pctOverrated = document.getElementById('pct-overrated');
   const btnDownloadCard = document.getElementById('btn-download-card');
+  const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
+  const btnDownloadTriviaReward = document.getElementById('btn-download-trivia-reward');
   
   // Chat elements
   const chatForm = document.getElementById('chat-form');
@@ -339,6 +341,11 @@ function initApp() {
       rewardDisplay.textContent = '';
       rewardDisplay.style.display = 'none';
     }
+
+    const milestoneTitleEl = document.getElementById('trivia-milestone-title');
+    const milestoneBadgeEl = document.getElementById('trivia-milestone-badge');
+    if (milestoneTitleEl) milestoneTitleEl.textContent = '';
+    if (milestoneBadgeEl) milestoneBadgeEl.textContent = '';
 
     if (trend && triviaTitle) {
       triviaTitle.textContent = trend.title;
@@ -582,6 +589,27 @@ function initApp() {
     }
   }
 
+  function updateTriviaMilestone(score) {
+    const milestoneTitleEl = document.getElementById('trivia-milestone-title');
+    const milestoneBadgeEl = document.getElementById('trivia-milestone-badge');
+    if (milestoneTitleEl && milestoneBadgeEl) {
+      let title = '';
+      let badge = '';
+      if (score === 3) {
+        title = "Brainiac Mastermind";
+        badge = "🏆";
+      } else if (score === 2) {
+        title = "Sharp Challenger";
+        badge = "🥈";
+      } else {
+        title = "Curious Mind";
+        badge = "🥉";
+      }
+      milestoneTitleEl.textContent = title;
+      milestoneBadgeEl.textContent = badge;
+    }
+  }
+
   function showResults() {
     if (triviaGameplayScreen) triviaGameplayScreen.classList.add('hidden');
     if (triviaResultsScreen) triviaResultsScreen.classList.remove('hidden');
@@ -601,6 +629,8 @@ function initApp() {
         triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
       }
     }
+
+    updateTriviaMilestone(userScore);
 
     const patternStr = answerPattern.join('');
     if (triviaEmojiPattern) {
@@ -736,6 +766,12 @@ function initApp() {
     }
     if (btnDownloadInfographic) {
       updateButtonForSharing(btnDownloadInfographic, 'Share Infographic', 'Share Infographic Card');
+    }
+    if (btnDownloadStreakReward) {
+      updateButtonForSharing(btnDownloadStreakReward, 'Share Streak Card', 'Share Streak Card');
+    }
+    if (btnDownloadTriviaReward) {
+      updateButtonForSharing(btnDownloadTriviaReward, 'Share Trivia Card', 'Share Trivia Card');
     }
   }
 
@@ -929,6 +965,7 @@ function initApp() {
       } else {
         triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
       }
+      updateTriviaMilestone(userScore);
     }
   }
 
@@ -1864,6 +1901,12 @@ function initApp() {
   if (btnDownloadInfographic) {
     btnDownloadInfographic.addEventListener('click', generateInfographicCard);
   }
+  if (btnDownloadStreakReward) {
+    btnDownloadStreakReward.addEventListener('click', generateStreakRewardCardImage);
+  }
+  if (btnDownloadTriviaReward) {
+    btnDownloadTriviaReward.addEventListener('click', generateTriviaRewardCardImage);
+  }
 
   // Trivia Click Listeners
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
@@ -2459,6 +2502,146 @@ function initApp() {
     await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
   }
 
+  async function generateStreakRewardCardImage() {
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1260;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const streakCount = currentStreakCount || 0;
+    const streakBonus = currentStreakBonus || (streakCount * 2);
+    const nickname = localStorage.getItem('trivia-nickname') || 'Anonymous Jacker';
+
+    let bgStart = '#f97316', bgEnd = '#ef4444';
+    let milestoneName = 'Consistent Jacker 🔥';
+
+    if (streakCount >= 15) {
+      bgStart = '#1e1b4b';
+      bgEnd = '#06b6d4';
+      milestoneName = 'Trend Overlord 🌌';
+    } else if (streakCount >= 7) {
+      bgStart = '#7c3aed';
+      bgEnd = '#db2777';
+      milestoneName = 'Weekly Legend 👑';
+    }
+
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, bgStart);
+    bgGrad.addColorStop(1, bgEnd);
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, 1160, 590);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText("TrendJacker Daily Streak Milestone", 600, 120);
+
+    ctx.font = "bold 48px 'Space Grotesk', sans-serif";
+    ctx.fillText(milestoneName, 600, 230);
+
+    ctx.font = "italic 32px 'Space Grotesk', sans-serif";
+    ctx.fillText(nickname, 600, 310);
+
+    ctx.font = "bold 56px 'Space Grotesk', sans-serif";
+    ctx.fillText(`${streakCount}-Day Streak Active!`, 600, 410);
+
+    ctx.font = "bold 32px 'Space Grotesk', sans-serif";
+    ctx.fillText(`Unlocked +${streakBonus} Message Capacity`, 600, 480);
+
+    ctx.font = "24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText("Build your streak at viraljacker.com", 600, 560);
+
+    const filename = `streak-reward-card-${streakCount}-day.png`;
+    const shareTitle = `My ${streakCount}-Day Streak on TrendJacker`;
+    const shareText = `I have a ${streakCount}-day streak on TrendJacker! Unlocked +${streakBonus} message capacity.`;
+    const fallbackUrl = window.location.origin;
+
+    await shareOrDownloadCanvas(canvas, filename, shareTitle, shareText, fallbackUrl);
+  }
+
+  async function generateTriviaRewardCardImage() {
+    if (!currentTrend) return;
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1260;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    const score = userScore || 0;
+    const total = triviaQuestions ? triviaQuestions.length : 3;
+    const nickname = localStorage.getItem('trivia-nickname') || 'Anonymous Jacker';
+    const trendTitle = currentTrend.title;
+    const emojiGrid = answerPattern.join('');
+
+    let performanceLevel = 'Trivia Challenger!';
+    let milestoneBadge = 'Curious Mind 🥉';
+    if (score === 3) {
+      performanceLevel = 'Perfect Score! 🧠';
+      milestoneBadge = 'Brainiac Mastermind 🏆';
+    } else if (score === 2) {
+      performanceLevel = 'Great Attempt!';
+      milestoneBadge = 'Sharp Challenger 🥈';
+    }
+
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, '#1e1b4b');
+    bgGrad.addColorStop(1, '#5b21b6');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(20, 20, 1160, 590);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.textAlign = "center";
+    ctx.fillText("TrendJacker Trivia Milestone", 600, 100);
+
+    ctx.font = "italic 32px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText(trendTitle, 600, 160);
+
+    ctx.font = "bold 44px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#f59e0b";
+    ctx.fillText(performanceLevel, 600, 230);
+
+    ctx.font = "bold 48px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(milestoneBadge, 600, 310);
+
+    ctx.font = "bold 36px 'Space Grotesk', sans-serif";
+    ctx.fillText(`Score: ${score} out of ${total}`, 600, 390);
+
+    ctx.font = "32px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillText(nickname, 600, 450);
+
+    ctx.font = "40px sans-serif";
+    ctx.fillText(emojiGrid, 600, 510);
+
+    ctx.font = "24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.8)";
+    ctx.fillText("Test your intelligence at viraljacker.com", 600, 570);
+
+    const filename = `trivia-reward-card-${titleToSlug(trendTitle)}.png`;
+    const shareTitle = `My Trivia Score for ${trendTitle} on TrendJacker`;
+    const shareText = `I scored ${score}/${total} on TrendJacker trivia for ${trendTitle}!`;
+    const fallbackUrl = window.location.origin;
+
+    await shareOrDownloadCanvas(canvas, filename, shareTitle, shareText, fallbackUrl);
+  }
+
   function wrapText(ctx, text, x, y, maxWidth, lineHeight, dryRun = false) {
     const words = text.split(' ');
     let line = '';
@@ -2734,6 +2917,28 @@ function initApp() {
       } else {
         streakBadgeContainer.classList.remove('active');
         streakBadgeContainer.style.display = 'none';
+      }
+    }
+
+    // Update Daily Streak Tracker UI
+    const trackEl = document.getElementById('streak-progress-track');
+    if (trackEl) {
+      const days = trackEl.querySelectorAll('.streak-day');
+      days.forEach((day, index) => {
+        if (index < streakCount) {
+          day.classList.add('active');
+        } else {
+          day.classList.remove('active');
+        }
+      });
+    }
+
+    const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
+    if (btnDownloadStreakReward) {
+      if (streakCount >= 3) {
+        btnDownloadStreakReward.classList.remove('hidden');
+      } else {
+        btnDownloadStreakReward.classList.add('hidden');
       }
     }
 
