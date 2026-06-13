@@ -1,5 +1,5 @@
-task: Improve test suite reliability to achieve a 100% pass rate under concurrent execution. Metric: test pass rate. Why now: baseline test suite has database locking failures. Runner-up: Reduce LLM API request volume and user latency via client-side response caching.              tier: T2   creativity: 0.5
-state: verify              budget: repairs 0/3
+task: Improve test suite reliability to achieve a 100% pass rate under concurrent execution. Metric: test pass rate. Why now: baseline test suite has database locking failures. Runner-up: Reduce LLM API request volume and user latency via client-side response caching.              tier: T2   creativity: 0.3
+state: test                budget: repairs 1/3
 branch: asf/20260613-test-reliability          checkpoint: none
 caps: agents,ui,web,human
 
@@ -8,6 +8,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Scout completed. Selected task: Improve test suite reliability. Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Verifier phase.
+- 2026-06-13: Verifier failed. Hypothesis: Tests running concurrently on the same database interfere via global DELETEs, and direct connections are not fully isolated or closed before server requests. Conductor restarting Tester phase.
 
 ## Verdict
 
