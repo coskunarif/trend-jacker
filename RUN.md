@@ -1,6 +1,6 @@
 task: Focus on UI/UX, LLM optimized cost, caching, SEO, chat limiting, make the site more enjoying people love and want to stay.              tier: T2   creativity: 0.18
 state: complete                  budget: repairs 2/3
-branch: asf/20260613-trivia-rewards          checkpoint: none
+branch: asf/20260613-trivia-rewards          checkpoint: asf/20260613-trivia-rewards/green-1
 caps: agents,ui,web,human
 server: localhost:3005
 
