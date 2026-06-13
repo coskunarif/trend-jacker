@@ -15,18 +15,21 @@ caps: agents,ui,web,human
 
 ### Check 1: Playwright Test Concurrency & SQLite WAL Mode
 - **Status**: FAIL
-- **Acceptance Criteria Broken**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-5]`
+- **Acceptance Criteria Broken**: `[AC-5]`
 - **Evidence**:
-  1. `tests/daily-streaks-rewards.spec.js` failed at line 133 with `TypeError: Cannot read properties of null (reading 'client_id')`. Log contains: `Local SQLite query failed for getClientStreak "my-weird-client-123": database is locked`.
-  2. `tests/llm-caching-optimization.spec.js` failed at line 198 with `Expected: 1, Received: 0` (found 0 cached rows).
-  3. `tests/share-preview.spec.js` failed at line 162 with `Expected: "14", Received: "44"`.
+  1. `tests/seo-visibility.spec.js` failed at line 71 with `TypeError: Cannot read properties of null (reading 'created_at')`. Log contains: `Local SQLite insert failed for setLocalizedExplanation: database is locked`.
+  2. `tests/trivia-challenge.spec.js` failed at line 102 (and line 91 on retry) with `dbRow` undefined. Log contains: `Local SQLite query failed for getTrendTrivia: database is locked`.
+  3. `tests/trivia-leaderboard.spec.js` failed at line 241 with `Expected length: 1, Received length: 0`. The database rows were deleted by a concurrent test's `beforeEach` hook.
+  4. `tests/caching.spec.js` failed with `expect(data1.hook).toBe('Static Cached Hook')`. Log contains: `Local SQLite query failed for getCachedExplanation: database is locked`.
+  5. `tests/chat-limit-referral.spec.js` failed at line 19 with key mismatch. Log contains: `Local SQLite query failed for getCachedChatResponse: database is locked`.
 - **Suspected Cause**:
-  - **Test**: `tests/llm-caching-optimization.spec.js` executes global `DELETE FROM chat_cache` and `DELETE FROM generated_posts` which interfere with concurrently running tests in other workers.
-  - **Code**: The backend SQLite connection pool/wrapper still encounters transaction lockups during concurrent load.
-  - **Code/Test**: The frontend sharing modal triggers asynchronous `/api/generate-post` requests that race with Playwright `fill` inputs under CPU load.
+  - **Code**: Write transactions in `db.js` (e.g. `incrementVote`, `seedVoteEvents`, `incrementChatCount`, `resolvePredictions`) use deferred transactions (`BEGIN TRANSACTION;`) instead of immediate transactions (`BEGIN IMMEDIATE TRANSACTION;`). This causes concurrent writers to deadlock and SQLite to abort immediately with `database is locked`, bypassing the 5000ms `busy_timeout`.
+  - **Test**: Spec files (like `tests/trivia-leaderboard.spec.js`) utilize file-level variables initialized via `Date.now()`. When run with `fullyParallel: true`, parallel workers spawned at the same millisecond load the file with identical variables, causing their `beforeEach` cleanups to delete each other's test data.
+  - **Test**: Timing races occur in tests like `tests/chat-limit-referral.spec.js` where database assertions are executed immediately after `page.goto` without waiting for the backend's async operation to persist the referral.
 
 ### Check 2: Behavioral / Dogfooding
 - **Status**: skipped
-- **Reason**: Halted at the first real failure cluster (automated tests failing under concurrency) to avoid burning execution budget.
+- **Reason**: Halted at the first real failure cluster (automated test suite reliability failures under concurrent execution) to avoid burning execution budget.
 
 ## Done
+
