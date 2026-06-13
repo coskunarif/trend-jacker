@@ -52,6 +52,11 @@ function initApp() {
   let hasWebShare = false;
   let hasFileShare = false;
 
+  let allTrends = [];
+  let searchQuery = '';
+  let activeFilter = 'All';
+  let showAllTrendsMobile = false;
+
   // --- Interactive Sentiment Timeline Dashboard ---
   let prevTimelinePoints = [];
   let currentTimelinePoints = [];
@@ -1227,9 +1232,29 @@ function initApp() {
       btnSidebarClose.addEventListener('click', () => {
         closeMobileSidebar();
       });
+
+    const searchInput = document.getElementById('trends-search');
+    const filterTabs = document.querySelectorAll('.trends-filter-tabs .filter-tab');
+
+    if (searchInput) {
+      searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        renderTrends();
+      });
     }
 
-
+    filterTabs.forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        filterTabs.forEach(t => {
+          t.classList.remove('active');
+          t.style.background = 'rgba(255, 255, 255, 0.05)';
+        });
+        e.target.classList.add('active');
+        e.target.style.background = 'var(--primary, #6366f1)';
+        activeFilter = e.target.textContent.trim();
+        renderTrends();
+      });
+    });
   }
 
   // Initialize: Load Trends
@@ -1280,34 +1305,51 @@ function initApp() {
       if (!res.ok) throw new Error('Failed to fetch trends');
       const trends = await res.json();
       
-      renderTrends(trends);
+      allTrends = trends;
+      
+      // Hydrate trends list with preloaded item if not already present
+      if (preloadedData && !allTrends.some(t => titleToSlug(t.title) === preloadedData.slug)) {
+        allTrends.unshift({
+          title: preloadedData.trend,
+          traffic: 'Breakout',
+          description: preloadedData.explanation.hook,
+          news: { headline: '', snippet: '', url: '' }
+        });
+      }
+
+      renderTrends();
     } catch (err) {
       console.error(err);
       trendsListContainer.innerHTML = `<p class="error-msg">Error loading live feeds. Please refresh.</p>`;
     }
   }
 
-  function renderTrends(trends) {
+  function renderTrends(trends = allTrends) {
     trendsListContainer.innerHTML = '';
     
-    // Hydrate trends list with preloaded item if not already present
-    if (preloadedData && !trends.some(t => titleToSlug(t.title) === preloadedData.slug)) {
-      trends.unshift({
-        title: preloadedData.trend,
-        traffic: 'Breakout',
-        description: preloadedData.explanation.hook,
-        news: { headline: '', snippet: '', url: '' }
+    // Apply filtering
+    let filtered = [...trends];
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(t => t.title.toLowerCase().includes(q) || (t.description && t.description.toLowerCase().includes(q)));
+    }
+
+    if (activeFilter.toLowerCase() !== 'all') {
+      const filterLower = activeFilter.toLowerCase();
+      filtered = filtered.filter(t => {
+        const source = (t.source || 'google').toLowerCase();
+        return source === filterLower;
       });
     }
 
-    if (trends.length === 0) {
+    if (filtered.length === 0) {
       trendsListContainer.innerHTML = '<p class="empty-msg">No current trends found.</p>';
       return;
     }
 
     let activeItem = null;
 
-    trends.forEach((trend, index) => {
+    filtered.forEach((trend, index) => {
       const a = document.createElement('a');
       a.className = 'trend-item';
       a.href = `/t/${titleToSlug(trend.title)}`;

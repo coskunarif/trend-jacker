@@ -66,6 +66,14 @@
           </div>
 
         </div>
+        <div class="trends-controls-wrapper" style="padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: 1px solid var(--border-color);">
+          <input type="text" id="trends-search" placeholder="Search trends..." class="search-input" style="width: 100%; padding: var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); outline: none; font-size: 0.9rem;" />
+          <div class="trends-filter-tabs" style="display: flex; gap: var(--space-2);">
+            <button class="filter-tab active" style="flex: 1; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); cursor: pointer; font-size: 0.8rem; text-align: center;">All</button>
+            <button class="filter-tab" style="flex: 1; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); cursor: pointer; font-size: 0.8rem; text-align: center;">Google</button>
+            <button class="filter-tab" style="flex: 1; padding: var(--space-1) var(--space-2); border-radius: var(--radius-sm); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); cursor: pointer; font-size: 0.8rem; text-align: center;">Reddit</button>
+          </div>
+        </div>
         <div id="trends-list" class="scroll-container">
           <!-- Skeleton Loaders -->
           <div class="skeleton-item"></div>
