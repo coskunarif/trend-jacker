@@ -22,15 +22,7 @@ caps: agents,ui,web,human
 ### Check 3: Client-Side Image Integration & Fallback [AC-3] - PASS
 - Client-side code in `public/app.js` correctly falls back to `/api/topic-image/:slug` for both thumbnails and detail view hero image when the primary `ogImage` is absent or fails to load.
 
-### Check 4: Full Test Suite Execution - FAIL
-- **Failure**: Playwright test `tests/dashboard-redesign.spec.js:187:3 › Dashboard Redesign Verification › should verify welcome view is modern and styled with glassmorphism` fails.
-- **Evidence**:
-  ```
-  Error: expect(locator).toBeVisible() failed
-  Locator:  locator('#welcome-view')
-  Expected: visible
-  Received: hidden
-  ```
-- **Suspected Cause**: Test setup bug. The test intercepts `/api/trends` with an empty array `[]` expecting the welcome screen to remain visible. However, the server renders the home page with a preloaded-trend-data block (`Google Gemini` by default). The client-side hydration logic in `public/app.js` unshifts this preloaded trend into the list, selects it, and automatically hides `#welcome-view`. The test must mock or remove this preloaded data script (using `addInitScript` similar to `tests/e2e.spec.js`) to prevent hydration.
+### Check 4: Full Test Suite Execution - PASS
+- All 125 tests executed successfully via Playwright with no failures. The preloaded data hydration bypass in `tests/dashboard-redesign.spec.js` resolved the welcome view test issue.
 
 ## Done
