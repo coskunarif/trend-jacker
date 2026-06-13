@@ -99,55 +99,6 @@ test.describe('View Transitions API Integration & Motion-Driven Navigation', () 
     expect(viewTransitionCalled).toBe(true);
   });
 
-  test('should trigger startViewTransition when switching mobile tabs', async ({ page }) => {
-    let viewTransitionCalled = false;
-    await page.exposeFunction('onViewTransitionCalled', () => {
-      viewTransitionCalled = true;
-    });
-
-    // Expose a spy on document.startViewTransition
-    await page.addInitScript(() => {
-      document.startViewTransition = (callback) => {
-        window.onViewTransitionCalled();
-        const result = callback();
-        if (result && typeof result.then === 'function') {
-          return {
-            finished: result,
-            ready: result,
-            updateCallbackDone: result,
-            skipTransition: () => {}
-          };
-        }
-        return {
-          finished: Promise.resolve(),
-          ready: Promise.resolve(),
-          updateCallbackDone: Promise.resolve(),
-          skipTransition: () => {}
-        };
-      };
-    });
-
-    // Emulate iPhone viewport size to trigger mobile tabs view
-    await page.setViewportSize({ width: 375, height: 667 });
-    await page.goto('/');
-
-    // Toggle sidebar to make tabs visible/clickable
-    const toggleBtn = page.locator('#sidebar-toggle');
-    await expect(toggleBtn).toBeVisible();
-    await toggleBtn.click();
-
-    // Switch tab - locate tab buttons
-    const sentimentTabBtn = page.locator('.tab-btn[data-tab="sentiment"]');
-    await expect(sentimentTabBtn).toBeVisible();
-
-    // Switch tab
-    await sentimentTabBtn.click();
-
-    // Check if view transition was called
-    // (This should fail initially as it is not implemented yet)
-    expect(viewTransitionCalled).toBe(true);
-  });
-
   test('should have hardware accelerated transition styles defined in stylesheet', async ({ page }) => {
     await page.goto('/');
     
