@@ -1419,10 +1419,24 @@ function initApp() {
         }
       }
 
+      // Dynamic Category Emojis
+      const titleText = trend.title.toLowerCase();
+      let emoji = '🔥';
+      if (titleText.includes('gemini') || titleText.includes('gpt-5') || titleText.includes('vision pro')) {
+        emoji = '🤖';
+      } else if (titleText.includes('bitcoin') || titleText.includes('stock') || titleText.includes('inflation')) {
+        emoji = '📈';
+      } else if (titleText.includes('playstation') || titleText.includes('elden ring')) {
+        emoji = '🎮';
+      }
+
       a.innerHTML = `
         ${thumbnailHtml}
         <div class="trend-item-info">
-          <span class="trend-item-title">${trend.title}</span>
+          <div style="display: flex; align-items: center; gap: 6px;">
+            <span class="trend-category-emoji" style="font-size: 1.2rem;">${emoji}</span>
+            <span class="trend-item-title">${trend.title}</span>
+          </div>
           <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
             ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none';" />` : ''}
             ${sourceBadge}
