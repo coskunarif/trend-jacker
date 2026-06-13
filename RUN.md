@@ -1,5 +1,5 @@
 task: Increase user retention and sharing virality via daily streak recovery mechanics and social achievements.              tier: T2   creativity: 0.5
-state: BUILDER                budget: repairs 0/3
+state: VERIFIER                budget: repairs 0/3
 branch: asf/20260613-streak-achievements          checkpoint: none
 caps: agents,ui,web,human
 
@@ -15,6 +15,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite. Observed state: green. Conductor starting Builder phase.
+- 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
 ## Verdict
 ## Done
 
