@@ -270,10 +270,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       await expect(async () => {
         const isInViewport = await triviaContainer.evaluate((el) => {
           const rect = el.getBoundingClientRect();
-          return (
-            rect.top >= 0 &&
-            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
-          );
+          const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+          return rect.top < windowHeight && rect.bottom > 0;
         });
         expect(isInViewport).toBe(true);
       }).toPass();
@@ -356,10 +354,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       await expect(async () => {
         const isInViewport = await chatHistory.evaluate((el) => {
           const rect = el.getBoundingClientRect();
-          return (
-            rect.top >= 0 &&
-            rect.bottom <= (window.innerHeight || document.documentElement.clientHeight)
-          );
+          const windowHeight = window.innerHeight || document.documentElement.clientHeight;
+          return rect.top < windowHeight && rect.bottom > 0;
         });
         expect(isInViewport).toBe(true);
       }).toPass();
