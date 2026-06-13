@@ -32,6 +32,7 @@ const inMemoryTopicImages = new Map();
 const inMemoryTrendTrivia = new Map();
 const inMemoryClientReferrals = new Map();
 const inMemoryClientChatCounts = new Map();
+const inMemoryClientTriviaScores = new Map();
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -103,6 +104,15 @@ if (!firestore) {
           client_id TEXT,
           trend TEXT,
           count INTEGER DEFAULT 0,
+          PRIMARY KEY (client_id, trend)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS client_trivia_scores (
+          client_id TEXT,
+          trend TEXT,
+          score INTEGER,
+          completed_at TEXT,
           PRIMARY KEY (client_id, trend)
         )
       `);
@@ -1104,9 +1114,10 @@ export async function getReferralCount(clientId) {
  * @returns {Promise<number>}
  */
 export async function getChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const doc = await firestore.collection('client_chat_counts').doc(`${clientId}_${trend}`).get();
+      const doc = await firestore.collection('client_chat_counts').doc(`${clientId}_${normalizedTrend}`).get();
       return doc.exists ? (doc.data().count || 0) : 0;
     } catch (err) {
       console.error(`Firestore error in getChatCount:`, err.message);
@@ -1116,7 +1127,7 @@ export async function getChatCount(clientId, trend) {
 
   if (sqliteDb) {
     try {
-      const row = sqliteDb.prepare('SELECT count FROM client_chat_counts WHERE client_id = ? AND trend = ?').get(clientId, trend);
+      const row = sqliteDb.prepare('SELECT count FROM client_chat_counts WHERE client_id = ? AND trend = ?').get(clientId, normalizedTrend);
       return row ? row.count : 0;
     } catch (err) {
       console.error(`Local SQLite query failed for getChatCount:`, err.message);
@@ -1124,7 +1135,7 @@ export async function getChatCount(clientId, trend) {
     }
   }
 
-  return inMemoryClientChatCounts.get(`${clientId}:${trend}`) || 0;
+  return inMemoryClientChatCounts.get(`${clientId}:${normalizedTrend}`) || 0;
 }
 
 /**
@@ -1134,12 +1145,13 @@ export async function getChatCount(clientId, trend) {
  * @returns {Promise<void>}
  */
 export async function incrementChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const docRef = firestore.collection('client_chat_counts').doc(`${clientId}_${trend}`);
+      const docRef = firestore.collection('client_chat_counts').doc(`${clientId}_${normalizedTrend}`);
       await docRef.set({
         client_id: clientId,
-        trend: trend,
+        trend: normalizedTrend,
         count: FieldValue.increment(1)
       }, { merge: true });
       return;
@@ -1155,8 +1167,8 @@ export async function incrementChatCount(clientId, trend) {
     db.exec('PRAGMA busy_timeout = 5000;');
     try {
       db.exec('BEGIN TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(clientId, trend);
-      db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(clientId, trend);
+      db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(clientId, normalizedTrend);
+      db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(clientId, normalizedTrend);
       db.exec('COMMIT;');
       return;
     } catch (err) {
@@ -1170,7 +1182,99 @@ export async function incrementChatCount(clientId, trend) {
     }
   }
 
-  const key = `${clientId}:${trend}`;
+  const key = `${clientId}:${normalizedTrend}`;
   const current = inMemoryClientChatCounts.get(key) || 0;
   inMemoryClientChatCounts.set(key, current + 1);
+}
+
+/**
+ * Records a trivia score for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @param {number} score
+ * @returns {Promise<void>}
+ */
+export async function recordTriviaScore(clientId, trend, score) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${clientId}_${normalizedTrend}`;
+      const docRef = firestore.collection('client_trivia_scores').doc(docId);
+      const doc = await docRef.get();
+      const existingScore = doc.exists ? (doc.data().score || 0) : null;
+      if (existingScore === null || score > existingScore) {
+        await docRef.set({
+          client_id: clientId,
+          trend: normalizedTrend,
+          score: score,
+          completed_at: new Date().toISOString()
+        });
+      }
+      return;
+    } catch (err) {
+      console.error(`Firestore error in recordTriviaScore:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const existing = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(clientId, normalizedTrend);
+      const existingScore = existing ? existing.score : null;
+      if (existingScore === null || score > existingScore) {
+        sqliteDb.prepare(`
+          INSERT OR REPLACE INTO client_trivia_scores (client_id, trend, score, completed_at)
+          VALUES (?, ?, ?, ?)
+        `).run(clientId, normalizedTrend, score, new Date().toISOString());
+      }
+      return;
+    } catch (err) {
+      console.error(`Local SQLite recordTriviaScore failed:`, err.message);
+      return;
+    }
+  }
+
+  const key = `${clientId}:${normalizedTrend}`;
+  const existing = inMemoryClientTriviaScores.get(key);
+  const existingScore = existing ? existing.score : null;
+  if (existingScore === null || score > existingScore) {
+    inMemoryClientTriviaScores.set(key, {
+      score,
+      completed_at: new Date().toISOString()
+    });
+  }
+}
+
+/**
+ * Gets the trivia score for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<number>}
+ */
+export async function getTriviaScore(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${clientId}_${normalizedTrend}`;
+      const doc = await firestore.collection('client_trivia_scores').doc(docId).get();
+      return doc.exists ? (doc.data().score !== undefined ? doc.data().score : null) : null;
+    } catch (err) {
+      console.error(`Firestore error in getTriviaScore:`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(clientId, normalizedTrend);
+      return row ? row.score : null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getTriviaScore:`, err.message);
+      return null;
+    }
+  }
+
+  const key = `${clientId}:${normalizedTrend}`;
+  const record = inMemoryClientTriviaScores.get(key);
+  return record ? record.score : null;
 }

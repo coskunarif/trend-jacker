@@ -329,6 +329,12 @@ function initApp() {
     if (triviaGameplayScreen) triviaGameplayScreen.classList.add('hidden');
     if (triviaResultsScreen) triviaResultsScreen.classList.add('hidden');
 
+    const rewardDisplay = document.getElementById('trivia-reward-display');
+    if (rewardDisplay) {
+      rewardDisplay.textContent = '';
+      rewardDisplay.style.display = 'none';
+    }
+
     if (trend && triviaTitle) {
       triviaTitle.textContent = trend.title;
     }
@@ -510,6 +516,48 @@ function initApp() {
     const patternStr = answerPattern.join('');
     if (triviaEmojiPattern) {
       triviaEmojiPattern.textContent = patternStr;
+    }
+
+    // AC-5: Display capacity reward display success badge
+    const rewardDisplay = document.getElementById('trivia-reward-display');
+    if (rewardDisplay) {
+      let rewardBonus = 0;
+      if (userScore === 3) {
+        rewardBonus = 5;
+      } else if (userScore === 2) {
+        rewardBonus = 3;
+      } else if (userScore === 0 || userScore === 1) {
+        rewardBonus = 1;
+      }
+      rewardDisplay.textContent = `+${rewardBonus} bonus messages unlocked`;
+      rewardDisplay.style.display = 'block';
+    }
+
+    // AC-6: Submit score to API and update limits/UI
+    if (currentTrend) {
+      fetch('/api/trivia/score', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: localClientId,
+          trend: currentTrend.title,
+          score: userScore
+        })
+      })
+      .then(res => {
+        if (res.ok) return res.json();
+        throw new Error('Trivia score POST failed');
+      })
+      .then(data => {
+        if (data.limitReached) {
+          showLockedUI(data.allowedLimit);
+        } else {
+          showUnlockedUI();
+        }
+      })
+      .catch(err => {
+        console.error('Error auto-submitting score and syncing UI:', err);
+      });
     }
   }
 
@@ -1632,6 +1680,15 @@ function initApp() {
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
   if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
   if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
+  const btnReturnToChat = document.getElementById('btn-return-to-chat');
+  if (btnReturnToChat) {
+    btnReturnToChat.addEventListener('click', () => {
+      const chatHistory = document.getElementById('chat-history');
+      if (chatHistory) {
+        chatHistory.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  }
   if (btnShareScore) {
     btnShareScore.addEventListener('click', async () => {
       if (!currentTrend || triviaQuestions.length === 0) return;
@@ -2423,6 +2480,20 @@ function initApp() {
     checkStatusBtn.addEventListener('click', async () => {
       if (currentTrend) {
         await checkChatLimit(currentTrend.title);
+      }
+    });
+  }
+
+  const playTriviaCTA = document.getElementById('chat-lock-play-trivia-btn');
+  if (playTriviaCTA) {
+    playTriviaCTA.addEventListener('click', () => {
+      const triviaContainer = document.getElementById('trivia-card-container');
+      if (triviaContainer) {
+        triviaContainer.scrollIntoView({ behavior: 'smooth' });
+      }
+      const startTriviaBtn = document.getElementById('btn-start-trivia');
+      if (startTriviaBtn) {
+        startTriviaBtn.focus();
       }
     });
   }

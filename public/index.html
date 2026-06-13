@@ -297,6 +297,10 @@
               <p class="lock-instructions" style="margin: 0 0 15px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6);">Invite friends to unlock 5 more messages! Share your link:</p>
               <a id="referral-share-link" href="#" target="_blank" class="share-link-btn" style="display: inline-block; padding: 6px 12px; margin-right: 10px; border-radius: 4px; background: var(--primary-color, #3b82f6); color: white; text-decoration: none; font-size: 0.85rem; font-weight: 500;">Share Link</a>
               <button id="check-status-btn" class="check-status-btn" style="display: inline-block; padding: 6px 12px; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 4px; background: transparent; color: white; font-size: 0.85rem; font-weight: 500; cursor: pointer;">Check Status</button>
+              <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+                <p class="trivia-lock-instructions" style="margin: 0 0 10px; font-size: 0.85rem; color: rgba(255, 255, 255, 0.6);">Complete the Trivia Challenge to earn up to +5 bonus messages!</p>
+                <button id="chat-lock-play-trivia-btn" class="play-trivia-btn" style="display: inline-block; padding: 6px 12px; border: 1px solid var(--primary-color, #3b82f6); border-radius: 4px; background: var(--primary-color, #3b82f6); color: white; font-size: 0.85rem; font-weight: 500; cursor: pointer;">Play Trivia Challenge</button>
+              </div>
             </div>
           </div>
         </div>
@@ -341,9 +345,11 @@
           <div class="trivia-results-screen hidden">
             <h3 class="trivia-results-title">Challenge Completed!</h3>
             <p class="trivia-results-score"></p>
+            <div id="trivia-reward-display" style="display: none; margin-bottom: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 600; font-size: 0.9rem;"></div>
             <div class="trivia-emoji-pattern"></div>
             <div class="trivia-results-actions">
               <button id="btn-play-again" class="play-again-btn">Play Again</button>
+              <button id="btn-return-to-chat" class="return-to-chat-btn" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.15); background: transparent; color: white; cursor: pointer;">Go to Chat</button>
               <button id="btn-share-score" class="share-score-btn">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 Share Score
