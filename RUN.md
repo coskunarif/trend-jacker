@@ -1,5 +1,5 @@
 task: Redesign dashboard, remove Global Sentiment Feed, make main dashboard bigger, use modern UI/UX practices              tier: T2   creativity: 0.5
-state: BUILDER                budget: repairs 0/3
+state: TESTER                budget: repairs 0/3
 branch: asf/20260613-expand-dashboard          checkpoint: none
 caps: agents,ui,web,human
 
@@ -15,6 +15,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Scout completed task selection. Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
+- 2026-06-13: Builder disputed obsolete tab transition test. Conductor ruled in favor. Conductor recalling Tester to amend.
 ## Verdict
 - **Disputed Test**: `tests/view-transitions.spec.js:102:3` ("should trigger startViewTransition when switching mobile tabs") contradicts **[AC-2] Sidebar Tab Bar Removal** and **[AC-1] Global Sentiment Feed Removal**, as mobile tab switcher elements are removed.
 
