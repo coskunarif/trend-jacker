@@ -1,80 +1,90 @@
-# SPEC.md - Chat Limiting & Referral Loop Architect Spec
+# SPEC.md - Trivia Challenge Chat Capacity Rewards
 
-## 1. Acceptance Criteria
-
-### [AC-1] Lowercase Caching Keys
-* **Requirement**: Database cache lookup and insertion keys for chat responses (`chat_cache`) and generated social posts (`generated_posts`) must be normalized to lowercase.
-* **Verification**: In test and dev environments, check that querying the cache with mixed-casing trends or query text retrieves the cached data (avoiding redundant LLM generation).
-
-### [AC-2] Persistent Client ID
-* **Requirement**: The frontend client ID (`localClientId`) must be persisted in `localStorage` so that page reloads do not reset the identifier (which would bypass the message limits).
-* **Verification**: Verify that `localStorage.getItem('clientId')` remains the same across browser reloads.
-
-### [AC-3] Chat message Tracking & Referral Storage (Backend)
-* **Requirement**: Support server-side storage of client chat counts and referrals.
-  * SQLite schema should declare:
-    * `client_referrals` (Primary Key: `client_id`, `referee_id`)
-    * `client_chat_counts` (Primary Key: `client_id`, `trend`, `count` INTEGER)
-  * Firestore schema must handle corresponding models using equivalent documents and sub-collections.
-* **Verification**: Expose `POST /api/referral` to record referral relationships and `GET /api/chat-limit` to return `{ limitReached, currentCount, allowedLimit }` for a client and trend.
-
-### [AC-4] Enforcing Chat Limits on Chat Endpoint
-* **Requirement**: Intercept `POST /api/chat` calls to verify the client's message count against their computed limit (`3 + 5 * referral_count`).
-  * If limit is reached, return `403 Forbidden` with `{ error: 'limit_reached', allowedLimit }`.
-  * If below limit, increment the count in `client_chat_counts` and return the chat answer.
-  * Limit checks must be bypassed if `process.env.NODE_ENV === 'test'`.
-* **Verification**: Mock a client ID, trigger `POST /api/chat` 4 times, and assert that the 4th request returns a `403 Forbidden` status.
-
-### [AC-5] Chat Limit UI & Locked State (Frontend)
-* **Requirement**: Hide the chat input form `#chat-form` and display a styled `#chat-lock-container` inside the AI Q&A card when the user hits their limit.
-  * The locked interface must clearly state the current limit (e.g. `3/3 messages`), supply share links containing the client's `?ref=clientId` parameter, and display a "Check Status" button.
-* **Verification**: Click on a trend, query the chat 3 times, verify the form is hidden, and verify that the lock overlay/message block is visible.
-
-### [AC-6] Referral Visit Loop Execution
-* **Requirement**: On page load, if a `ref` parameter exists in the URL query string and does not match the current visitor's `localClientId`, send `POST /api/referral` to record the referral.
-* **Verification**: Load `/?ref=client-xyz` in a new window/session, check that a database entry records client-xyz as the referrer, and clicking "Check Status" on Client XYZ's screen unlocks their chat.
+This specification defines the additions and refinements required to connect user chat limits to trivia milestone rewards, driving user session retention and referral-driven sharing loops.
 
 ---
 
-## 2. Out of Scope
-* IP-based rate limiting or CAPTCHA validation.
-* Multi-device client ID syncing (profiles/accounts).
+## Acceptance Criteria
+
+### `[AC-1]` Client Trivia Score Database Cache & Helpers
+- **Description:** A database table/collection must store each client's highest trivia score per trend to allow persistence across page reloads.
+- **Verification:**
+  - Verify `client_trivia_scores` table exists in SQLite with columns `client_id` (TEXT), `trend` (TEXT), `score` (INTEGER), and `completed_at` (TEXT), with primary key `(client_id, trend)`.
+  - Import `db.js` and verify exported helpers `recordTriviaScore(clientId, trend, score)` and `getTriviaScore(clientId, trend)` store and retrieve values correctly.
+  - Assert that `recordTriviaScore` only updates the score in the database if the newly submitted score is greater than the existing record for the client and trend.
+  - Verify that a Firestore mock implementation or in-memory map handles these functions when local SQLite is bypassed.
+
+### `[AC-2]` Case-Insensitive Key Normalization
+- **Description:** Trend parameters in chat counting and trivia score tracking must be normalized to lowercase and trimmed to avoid duplicate storage, double queries, and casing mismatch.
+- **Verification:**
+  - Verify that `recordTriviaScore` and `getTriviaScore` normalize the `trend` string to lowercase before executing queries/updates.
+  - Verify that `getChatCount` and `incrementChatCount` in `db.js` are updated to normalize the `trend` string to lowercase.
+  - Assert that calling chat counting or trivia score operations with different casings (e.g. "Google Gemini", "google gemini", "GOOGLE GEMINI") retrieves and updates the exact same record.
+
+### `[AC-3]` Gamified Chat Limit API
+- **Description:** The chat limit checks must use a combined formula incorporating both referrals and trivia milestones, and expose an endpoint to submit scores.
+- **Verification:**
+  - The endpoint `GET /api/chat-limit` and chat message limit enforcement in `POST /api/chat` must calculate `allowedLimit` using:
+    `allowedLimit = 3 + 5 * referralCount + triviaBonus`
+    where `triviaBonus` is:
+      - `+5` if `triviaScore` is `3` (perfect score)
+      - `+3` if `triviaScore` is `2`
+      - `+1` if `triviaScore` is `0` or `1` (participation/completion reward)
+      - `+0` if `triviaScore` is not found/null (trivia not played)
+  - Verify that `POST /api/trivia/score` accepts JSON containing `clientId`, `trend`, and `score`, records the score, and returns `{ success: true, allowedLimit, currentCount, limitReached }`.
+
+### `[AC-4]` Chat Lock Screen CTA for Trivia Challenge
+- **Description:** The UI block shown when a user reaches their chat limit must invite them to play the trivia challenge to increase their chat limit.
+- **Verification:**
+  - Lock container `#chat-lock-container` displays text inviting users to play the trivia challenge (e.g. "Complete the Trivia Challenge to earn up to +5 bonus messages!").
+  - Lock container contains a "Play Trivia Challenge" button (`#chat-lock-play-trivia-btn`).
+  - Clicking this button smoothly scrolls the page to `#trivia-card-container` and focuses `#btn-start-trivia`.
+
+### `[AC-5]` Trivia Results Celebration & Go to Chat Button
+- **Description:** The trivia results screen must celebrate the unlocked chat capacity and provide a quick action to return to the Q&A chat.
+- **Verification:**
+  - Results screen `.trivia-results-screen` displays a success message badge `#trivia-reward-display` showing the earned chat capacity reward (e.g., "+5 bonus messages unlocked").
+  - Results screen contains a "Go to Chat" button (`#btn-return-to-chat`). Clicking this button smoothly scrolls the viewport back up to the Dig Deeper chat component (`#chat-history`).
+
+### `[AC-6]` Automatic UI Sync and Unlocking
+- **Description:** Submitting a trivia score must automatically update the chat limits and unlock the chat interface in real-time.
+- **Verification:**
+  - Completing the trivia gameplay triggers an asynchronous `POST /api/trivia/score` request with the user's score.
+  - Upon success, the frontend immediately requests updated limit status and refreshes the chat limit UI.
+  - If the new limit exceeds the message count, the lock overlay `#chat-lock-container` is hidden, and the chat form `#chat-form` is restored without requiring a page reload or "Check Status" click.
 
 ---
 
-## 3. Slices
+## Out of Scope
 
-### [S-1] Case-Insensitive Caching Keys
-* **Files**: `db.js`
-* **Type**: Refinement
-* **AC Mapping**: `[AC-1]`
-* **Test Strategy**: Update/snapshot tests ensuring keys are converted to lowercase prior to DB insert or query.
-* **Independent**: Yes
+- Redesigning the core responsive layout or the visual grids.
+- Altering the LLM generation prompt for trivia questions or chat responses.
+- User registration, authentication, or session management beyond `localClientId` in `localStorage`.
 
-### [S-2] Database Schema and Server-Side Tracking for Limits & Referrals
-* **Files**: `db.js`
-* **Type**: Additive
-* **AC Mapping**: `[AC-3]`
-* **Test Strategy**: Additive tests verifying table/collection initialization and CRUD operations for referrals and chat counts.
-* **Independent**: No (pre-requisite for API endpoints)
+---
 
-### [S-3] Limit & Referral HTTP Endpoints
-* **Files**: `server.js`
-* **Type**: Additive
-* **AC Mapping**: `[AC-3]`, `[AC-4]`
-* **Test Strategy**: Integration tests validating `GET /api/chat-limit`, `POST /api/referral`, and `POST /api/chat` limit enforcement.
-* **Independent**: No
+## Implementation Slices
 
-### [S-4] Persistent Client ID and Referral Capture
-* **Files**: `public/app.js`
-* **Type**: Refinement
-* **AC Mapping**: `[AC-2]`, `[AC-6]`
-* **Test Strategy**: E2E verification of `localStorage` client ID retention and query parameter detection on initialization.
-* **Independent**: Yes
+### `[S-1]` Database Schema & Case-Insensitive Helpers
+- **Description:** Add the new schema for client trivia score cache and update helper functions with lowercase trend normalization.
+- **ACs Mapped:** `[AC-1]`, `[AC-2]`
+- **Files:** `db.js`
+- **Dependencies:** None (Independent)
 
-### [S-5] Chat Limit UI & Referral Share Actions
-* **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
-* **Type**: Refinement
-* **AC Mapping**: `[AC-5]`, `[AC-6]`
-* **Test Strategy**: E2E DOM structure assertions, button click handlers, and transition tests from locked to unlocked state.
-* **Independent**: No
+### `[S-2]` Backend API Routes & Limit Logic
+- **Description:** Add `POST /api/trivia/score` and update the allowed chat limit calculation in existing routes.
+- **ACs Mapped:** `[AC-3]`
+- **Files:** `server.js`
+- **Dependencies:** `[S-1]`
+
+### `[S-3]` Chat Lock CTA & Smooth Scroll Behavior
+- **Description:** Refine the chat lock container markup and implement the play trivia scroll behavior.
+- **ACs Mapped:** `[AC-4]`
+- **Files:** `public/index.html`, `public/app.js`
+- **Dependencies:** None (Independent)
+
+### `[S-4]` Trivia Results Celebration, Score Submission, and Auto-Unlock
+- **Description:** Connect trivia completion to frontend score submission, show the earned rewards, and auto-restore the chat interface.
+- **ACs Mapped:** `[AC-5]`, `[AC-6]`
+- **Files:** `public/index.html`, `public/app.js`
+- **Dependencies:** `[S-2]`, `[S-3]`
