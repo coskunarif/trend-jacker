@@ -1,69 +1,77 @@
-# Specification: Dashboard Redesign & Global Sentiment Feed Removal
+# SPEC.md - Topic Image Generation & Caching
 
-This specification outlines the redesign of the TrendJacker dashboard to remove the Global Sentiment Feed, expand the main workspace area, and implement modern UI/UX design practices.
+This specification details the implementation plan for resolving missing/broken trend/topic images by dynamically generating and caching a topic-themed SVG image using the Gemini API.
 
-## Test Strategy
-* **Task Type**: Subtractive (removing Global Sentiment Feed) & Refinement (restyling layout and elements).
-* **Test Flow**: 
-  1. Delete/modify obsolete E2E assertions and visual tests (such as `.sidebar-tabs`, `#live-sentiment-feed`, and tab switching behavior) to avoid failing on deleted elements.
-  2. Update viewport and layout tests to assert the new desktop grid dimensions (`320px 1fr` columns) and verify the absence of tabs.
-  3. Run the tests to ensure clean compilation/failures on missing layout elements, then execute the implementation slices.
+## Problem Statement
+Some trends retrieved from RSS feeds do not have an OpenGraph image (`ogImage`), or the images are broken on the client side (e.g. returning 404, blocked due to hotlinking restrictions). This results in empty dark purple boxes in the list view (thumbnails) and the detail view (hero banner), as observed in the screenshot:
+
+![Broken Topic Images and Empty Placeholder Boxes](/home/ubuntuadmin/.gemini/antigravity-cli/brain/4e9a0665-21dc-4070-a3f0-e8ff0cd6dcf7/s_20260613_014947.png)
 
 ## Acceptance Criteria
 
-### [AC-1] Global Sentiment Feed Removal (Subtractive)
-* **Description**: The Global Sentiment Feed section must be completely removed from the left sidebar panel in the DOM.
-* **Verification**: Verify that `#live-sentiment-feed` is absent from the DOM, and that the title/banner/indicators for the Global Sentiment Feed are gone.
+### `[AC-1] Database Caching Schema & Helpers`
+- **Criterion**: The SQLite database must contain a `topic_images` table (and a corresponding `topic_images` collection in Firestore for production) to cache generated SVGs.
+- **Verification**:
+  - The SQLite table schema must contain `trend` (TEXT PRIMARY KEY), `svg` (TEXT), and `created_at` (TEXT).
+  - The module `db.js` must export two async helper functions: `getCachedTopicImage(trend)` and `setCachedTopicImage(trend, svg)`.
+  - In-memory mock maps must be used when SQLite/Firestore are unavailable.
 
-### [AC-2] Sidebar Tab Bar Removal
-* **Description**: The mobile/tablet sidebar tab-switcher must be completely removed from the DOM.
-* **Verification**: Verify that `.sidebar-tabs` and its tab buttons (`Trending`, `Sentiment Feed`) are absent from the DOM, and only the "Trending Searches" content is displayed.
+### `[AC-2] Dynamic SVG Image Generation Endpoint`
+- **Criterion**: A new endpoint `GET /api/topic-image/:slug` must serve a topic-themed SVG.
+- **Verification**:
+  - The slug is matched against cached trends (or parsed into Title Case).
+  - The endpoint first queries `getCachedTopicImage(trend)`.
+  - If a cache hit occurs, it returns the cached SVG.
+  - If a cache miss occurs, in test/dev mode it returns a deterministic mock SVG, and in production mode it generates a custom topic-related SVG using `gemini-3.5-flash` with JSON schema enforcement (`responseSchema` of type `OBJECT` with required property `svg` of type `STRING`).
+  - The generated SVG is cached via `setCachedTopicImage(trend, svg)`.
+  - The HTTP response header must contain `Content-Type: image/svg+xml`.
 
-### [AC-3] Expanded Desktop Grid Layout
-* **Description**: On screen widths >= 769px, the dashboard layout columns are configured to `320px 1fr`, reducing the left sidebar's desktop width to 320px and expanding the main explainer panel.
-* **Verification**: Using a viewport width of 1280px, assert that the `.dashboard-grid` has `grid-template-columns` matching `320px 1fr`. Verify the main panel occupies the remaining space and is significantly wider than before.
+### `[AC-3] Client-Side Image Integration & Fallback`
+- **Criterion**: The UI must display the dynamically generated SVG when `ogImage` is absent or broken.
+- **Verification**:
+  - In `public/app.js` (list item thumbnails), if `trend.news.ogImage` is null, the `src` must be immediately set to `/api/topic-image/:slug`. If `trend.news.ogImage` is non-null but fails to load, the `onerror` event handler must swap the `src` to `/api/topic-image/:slug`.
+  - In `public/app.js` (detail view hero banner), the hero image must similarly use `/api/topic-image/:slug` directly if `ogImage` is missing, and switch to `/api/topic-image/:slug` via `onerror` if the original image fails to load.
 
-### [AC-4] Sidebar Mobile Drawer Width Preservation
-* **Description**: On mobile viewports (<= 768px), the slide-out `.sidebar-panel` width remains at `290px` when open, but displays no tabs.
-* **Verification**: Set viewport to 375px wide, click `#sidebar-toggle`, assert `.sidebar-panel` is visible and its width is `290px`, with no `.sidebar-tabs` or `#live-sentiment-feed` elements inside.
-
-### [AC-5] SSE Stream Resilience
-* **Description**: The EventSource listener for `/api/sentiment-stream` in `app.js` must handle the missing `#live-sentiment-feed` gracefully without throwing JavaScript errors, while still updating active trend poll statistics and timeline drawings.
-* **Verification**: Verify that background votes for the currently selected trend still dynamically update the community poll percentages and trigger timeline redraws, without console errors.
-
-### [AC-6] Redesigned Welcome Screen
-* **Description**: The empty welcome screen (`#welcome-view`) must be styled as a clean, modern dashboard landing state.
-* **Verification**: Verify the welcome view uses refined glassmorphism container formatting, high-quality typography, and structured info elements for a polished first impression.
-
-### [AC-7] Modern Card & Border Aesthetics
-* **Description**: Card styling (`.glass-card`) is modernized by using fine, low-opacity borders (`rgba(255, 255, 255, 0.08)`), improved spacing, subtle backdrop saturations, and smooth micro-glowing translation animations on hover.
-* **Verification**: Inspect CSS styles for `.glass-card` and verify clean borders, micro-animations, and lack of visual noise.
+---
 
 ## Out of Scope
-* Modifying backend database schemas or fastify server APIs (e.g., leaving `/api/sentiment-stream` SSE endpoint fully operational).
-* Adding new social media integrations beyond what is currently supported in the share modal.
+- Localizing the generated SVGs or translating text elements within the generated SVG (a single generic topic-related image is sufficient).
+- Replacing working/valid external `ogImage` URLs (only missing or broken images fall back to the generated SVGs).
+
+---
 
 ## Slices
 
-### [S-1] Remove Global Sentiment Feed and Tab Switcher from markup and client scripts
-* **Files**:
-  - `public/index.html`
-  - `public/app.js`
-* **Description**: Delete the sidebar tabs and Global Sentiment Feed DOM nodes. Simplify `initSentimentFeed` in `app.js` to run in the background (updating active trend polls/timeline) without referencing the deleted feed elements. Remove the `switchTab` helper and click listeners for the tabs.
-* **ACs Mapped**: `[AC-1]`, `[AC-2]`, `[AC-5]`
-* **Dependency**: None (Independent)
+### `[S-1] Database Schema & Caching Layer`
+- **Goal**: Implement SQLite schema initialization and caching helpers.
+- **ACs Mapped**: `[AC-1]`
+- **Files Modified**: `db.js`
+- **Details**:
+  - Initialize the `topic_images` table.
+  - Implement `getCachedTopicImage` and `setCachedTopicImage`.
+  - Implement in-memory map backup `inMemoryTopicImages`.
 
-### [S-2] Refactor Grid Columns & Sidebar Width in CSS
-* **Files**:
-  - `public/styles.css`
-* **Description**: Modify media queries so that the `.dashboard-grid` columns are defined as `320px 1fr` on screens >= 769px. Ensure `.sidebar-panel` has a width of 320px on desktop and that the layout handles overflow isolation properly. Adjust mobile media overrides to remove tab-toggled rules.
-* **ACs Mapped**: `[AC-3]`, `[AC-4]`
-* **Dependency**: `[S-1]`
+### `[S-2] API Endpoint & Gemini Logic`
+- **Goal**: Implement the endpoint `/api/topic-image/:slug` with cache lookup and Gemini generation logic.
+- **ACs Mapped**: `[AC-2]`
+- **Files Modified**: `server.js`
+- **Details**:
+  - Register `GET /api/topic-image/:slug`.
+  - Implement caching check and LLM generation with JSON schema enforcement for SVG output.
+  - Add test environment mock branch returning a static valid SVG.
 
-### [S-3] Redesign Cards and Welcome Screen with modern UI/UX principles
-* **Files**:
-  - `public/styles.css`
-  - `public/index.html`
-* **Description**: Improve the welcome state design by utilizing structured info grids and subtle border highlights. Refine `.glass-card` CSS styling to use modern translucent gradients, minimal border contrast, and micro-interactions on hover.
-* **ACs Mapped**: `[AC-6]`, `[AC-7]`
-* **Dependency**: `[S-2]`
+### `[S-3] Frontend Integration & Fallback`
+- **Goal**: Update client-side thumbnail and hero banner loading and `onerror` fallback behavior.
+- **ACs Mapped**: `[AC-3]`
+- **Files Modified**: `public/app.js`
+- **Details**:
+  - Update `thumbnailHtml` logic to default to or fallback to `/api/topic-image/:slug`.
+  - Update `#detail-hero-image` src logic to default to or fallback to `/api/topic-image/:slug`.
+
+---
+
+## Test Strategy (Refinement)
+- Since this is a refinement task, we will add new assertions/tests to existing test files (specifically `tests/og-favicon.spec.js` and `tests/llm-caching-optimization.spec.js`) to verify:
+  1. The new SQLite schema table exists and retrieves values correctly.
+  2. The `/api/topic-image/:slug` endpoint is responsive and serves correct headers and SVGs.
+  3. The frontend properly uses fallback images on 404/onerror.
