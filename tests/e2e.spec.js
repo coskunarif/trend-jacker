@@ -561,8 +561,12 @@ test.describe('TrendJacker E2E tests', () => {
 
       await page.locator('#btn-download-card').click();
 
+      await expect(async () => {
+        const shareCalls = await page.evaluate(() => window.shareCalls);
+        expect(shareCalls.length).toBe(1);
+      }).toPass();
+
       const shareCalls = await page.evaluate(() => window.shareCalls);
-      expect(shareCalls.length).toBe(1);
       expect(shareCalls[0].files).toBeDefined();
       expect(shareCalls[0].files.length).toBe(1);
       expect(shareCalls[0].files[0].type).toBe('image/png');
@@ -616,8 +620,12 @@ test.describe('TrendJacker E2E tests', () => {
 
       await page.locator('#btn-download-card').click();
 
+      await expect(async () => {
+        const shareCalls = await page.evaluate(() => window.shareCalls);
+        expect(shareCalls.length).toBe(1);
+      }).toPass();
+
       const shareCalls = await page.evaluate(() => window.shareCalls);
-      expect(shareCalls.length).toBe(1);
       expect(shareCalls[0].files).toBeUndefined();
       expect(shareCalls[0].title).toContain('Google Gemini');
       expect(shareCalls[0].url).toContain('/t/google-gemini');
@@ -673,8 +681,10 @@ test.describe('TrendJacker E2E tests', () => {
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toContain('trend-card-');
 
-      const shareCalls = await page.evaluate(() => window.shareCalls);
-      expect(shareCalls.length).toBe(1);
+      await expect(async () => {
+        const shareCalls = await page.evaluate(() => window.shareCalls);
+        expect(shareCalls.length).toBe(1);
+      }).toPass();
     });
 
     test('should fail silently and not download when Web Share is aborted (AbortError)', async ({ page }) => {
@@ -731,11 +741,11 @@ test.describe('TrendJacker E2E tests', () => {
 
       await page.locator('#btn-download-card').click();
 
-      // Wait a brief moment to ensure no download is triggered
-      await page.waitForTimeout(1000);
+      await expect(async () => {
+        const shareCalls = await page.evaluate(() => window.shareCalls);
+        expect(shareCalls.length).toBe(1);
+      }).toPass();
 
-      const shareCalls = await page.evaluate(() => window.shareCalls);
-      expect(shareCalls.length).toBe(1);
       expect(downloadTriggered).toBe(false);
     });
   });

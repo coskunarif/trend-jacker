@@ -2881,3 +2881,139 @@ body {
   display: none;
   opacity: 0;
 }
+
+
+/* Global Leaderboard Styles [S-3] */
+.trivia-leaderboard {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md, var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.leaderboard-header {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: var(--space-1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.leaderboard-loading, .leaderboard-empty {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-align: center;
+  padding: var(--space-2) 0;
+}
+
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.leaderboard-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px var(--space-2);
+  background: rgba(255, 255, 255, 0.01);
+  border: 1px solid rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-sm, var(--space-2));
+  font-size: 0.85rem;
+  transition: var(--transition-fast);
+}
+
+.leaderboard-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.leaderboard-row.highlight, .leaderboard-row.current-user {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.3);
+  font-weight: 600;
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.15);
+}
+
+.leaderboard-personal-rank {
+  font-size: 0.85rem;
+  color: var(--primary);
+  background: rgba(99, 102, 241, 0.05);
+  border: 1px dashed rgba(99, 102, 241, 0.3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm, var(--space-2));
+  text-align: center;
+  margin-top: var(--space-2);
+  font-weight: 600;
+}
+
+/* Nickname Form Styles [S-3] */
+.nickname-form-container {
+  margin-top: var(--space-3);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: var(--radius-md, var(--space-3));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.nickname-form-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+#nickname-input {
+  flex: 1;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-sm, var(--space-2));
+  color: var(--text-heading);
+  font-size: 0.9rem;
+  outline: none;
+  transition: var(--transition-fast);
+}
+
+#nickname-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 8px rgba(99, 102, 241, 0.2);
+}
+
+#btn-save-nickname {
+  padding: var(--space-2) var(--space-4);
+  background: var(--primary);
+  border: none;
+  border-radius: var(--radius-sm, var(--space-2));
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+#btn-save-nickname:hover {
+  background: var(--primary-hover);
+}
+
+#nickname-status {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #10b981;
+  min-height: 1.2rem;
+}

@@ -338,6 +338,15 @@
             <p class="trivia-intro">Test your knowledge about this trend!</p>
             <h4 class="trivia-title"></h4>
             <button id="btn-start-trivia" class="start-trivia-btn">Start Trivia Challenge</button>
+
+            <!-- Global Leaderboard (S-3) -->
+            <div class="trivia-leaderboard">
+              <div class="leaderboard-header">Global Leaderboard</div>
+              <div class="leaderboard-loading">Loading leaderboard...</div>
+              <div class="leaderboard-empty hidden">No scores recorded yet. Be the first!</div>
+              <div class="leaderboard-list"></div>
+              <div class="leaderboard-personal-rank hidden"></div>
+            </div>
           </div>
 
           <!-- Gameplay Screen (Hidden initially) -->
@@ -369,6 +378,24 @@
             <p class="trivia-results-score"></p>
             <div id="trivia-reward-display" style="display: none; margin-bottom: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 600; font-size: 0.9rem;"></div>
             <div class="trivia-emoji-pattern"></div>
+
+            <!-- Nickname Submission form and Leaderboard (S-3) -->
+            <div class="nickname-form-container">
+              <label for="nickname-input" style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Claim your spot on the leaderboard:</label>
+              <div class="nickname-form-row">
+                <input type="text" id="nickname-input" maxlength="15" placeholder="Enter nickname" />
+                <button id="btn-save-nickname" class="save-nickname-btn">Save</button>
+              </div>
+              <div id="nickname-status"></div>
+            </div>
+
+            <div class="trivia-leaderboard">
+              <div class="leaderboard-header">Global Leaderboard</div>
+              <div class="leaderboard-loading">Loading leaderboard...</div>
+              <div class="leaderboard-empty hidden">No scores recorded yet. Be the first!</div>
+              <div class="leaderboard-list"></div>
+              <div class="leaderboard-personal-rank hidden"></div>
+            </div>
             <div class="trivia-results-actions">
               <button id="btn-play-again" class="play-again-btn">Play Again</button>
               <button id="btn-return-to-chat" class="return-to-chat-btn" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.15); background: transparent; color: white; cursor: pointer;">Go to Chat</button>
