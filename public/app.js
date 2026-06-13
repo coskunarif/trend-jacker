@@ -2737,6 +2737,19 @@ function initApp() {
       }
     }
 
+    // Update Daily Streak Tracker UI
+    const trackEl = document.getElementById('streak-progress-track');
+    if (trackEl) {
+      const days = trackEl.querySelectorAll('.streak-day');
+      days.forEach((day, index) => {
+        if (index < streakCount) {
+          day.classList.add('active');
+        } else {
+          day.classList.remove('active');
+        }
+      });
+    }
+
     // 3. Update Lock/Unlock layout with transition
     const wasLocked = chatLockContainer && !chatLockContainer.classList.contains('hidden') && parseFloat(window.getComputedStyle(chatLockContainer).opacity) > 0;
 
