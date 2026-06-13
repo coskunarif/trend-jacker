@@ -96,29 +96,121 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
   });
 
   test('2. Verify Desktop Split-Screen Layout & Mobile Tab Switcher', async ({ page }) => {
-    // --- DESKTOP VIEWPORT TEST ---
-    // [AC-1]: Hide Mobile Tab Switcher on Desktop
-    // [AC-2]: Display Both Panels in Split-Screen Layout on Desktop
+    // --- DESKTOP VIEWPORT TEST (>= 769px) ---
+    // [AC-1] Desktop Double-Blade Sidebar Grid
+    // [AC-2] Scrollbar & Overflow Isolation
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
-    const sidebarTabs = page.locator('.sidebar-tabs');
-    // Mobile tab switcher must be hidden on desktop
-    await expect(sidebarTabs).not.toBeVisible();
+    // [AC-1] Verify the main dashboard layout container (.dashboard-grid) displays two columns: a 640px sidebar column and a flexible 1fr main panel column
+    const gridStyles = await page.locator('.dashboard-grid').evaluate(el => {
+      const style = window.getComputedStyle(el);
+      return {
+        display: style.display,
+        gridTemplateColumns: style.gridTemplateColumns
+      };
+    });
+    expect(gridStyles.display).toBe('grid');
+    // It should start with 640px
+    expect(gridStyles.gridTemplateColumns).toMatch(/^640px\b/);
 
-    const trendsList = page.locator('#trends-list');
+    // [AC-1] The left sidebar (.sidebar-panel) must layout its child components horizontally side-by-side using flex-direction: row
+    const sidebarStyles = await page.locator('.sidebar-panel').evaluate(el => {
+      const style = window.getComputedStyle(el);
+      return {
+        display: style.display,
+        flexDirection: style.flexDirection
+      };
+    });
+    expect(sidebarStyles.display).toBe('flex');
+    expect(sidebarStyles.flexDirection).toBe('row');
+
+    // [AC-1] Verification of visibility, positioning, and width of blades
+    const trendsSection = page.locator('.trends-section');
     const liveFeedSection = page.locator('.live-feed-section');
     
-    // Both panels must be visible simultaneously on desktop
-    await expect(trendsList).toBeVisible();
+    // Both blades must be visible simultaneously on desktop
+    await expect(trendsSection).toBeVisible();
     await expect(liveFeedSection).toBeVisible();
+
+    // Use expect().toPass() for layout geometry checks to avoid flakiness
+    await expect(async () => {
+      const trendsBox = await trendsSection.boundingBox();
+      const feedBox = await liveFeedSection.boundingBox();
+      
+      expect(trendsBox).not.toBeNull();
+      expect(feedBox).not.toBeNull();
+      
+      // Same vertical top position within 5px margin
+      expect(Math.abs(trendsBox.y - feedBox.y)).toBeLessThanOrEqual(5);
+      
+      // Distinct x coordinates (side-by-side)
+      expect(trendsBox.x).toBeLessThan(feedBox.x);
+      
+      // Divide space equally: each 320px wide
+      expect(Math.round(trendsBox.width)).toBe(320);
+      expect(Math.round(feedBox.width)).toBe(320);
+      
+      // Combined bounding box widths totaling 640px
+      expect(Math.round(trendsBox.width + feedBox.width)).toBe(640);
+    }).toPass();
+
+    // [AC-1] Verify vertical border of 1px solid var(--border) separates the two blades
+    const borderStyles = await page.evaluate(() => {
+      const trends = document.querySelector('.trends-section') ? window.getComputedStyle(document.querySelector('.trends-section')) : null;
+      const feed = document.querySelector('.live-feed-section') ? window.getComputedStyle(document.querySelector('.live-feed-section')) : null;
+      return {
+        trendsRightWidth: trends ? trends.borderRightWidth : '0px',
+        trendsRightStyle: trends ? trends.borderRightStyle : 'none',
+        feedLeftWidth: feed ? feed.borderLeftWidth : '0px',
+        feedLeftStyle: feed ? feed.borderLeftStyle : 'none'
+      };
+    });
+    const hasBorder = (borderStyles.trendsRightWidth === '1px' && borderStyles.trendsRightStyle === 'solid') ||
+                      (borderStyles.feedLeftWidth === '1px' && borderStyles.feedLeftStyle === 'solid');
+    expect(hasBorder).toBe(true);
+
+    // [AC-2] Scrollbar & Overflow Isolation: parent containers have overflow: hidden
+    const parentOverflows = await page.evaluate(() => {
+      const trends = document.querySelector('.trends-section') ? window.getComputedStyle(document.querySelector('.trends-section')) : null;
+      const feed = document.querySelector('.live-feed-section') ? window.getComputedStyle(document.querySelector('.live-feed-section')) : null;
+      return {
+        trendsOverflow: trends ? trends.overflow : 'visible',
+        feedOverflow: feed ? feed.overflow : 'visible'
+      };
+    });
+    expect(parentOverflows.trendsOverflow).toBe('hidden');
+    expect(parentOverflows.feedOverflow).toBe('hidden');
+
+    // [AC-2] Inner list containers should be scrollable (overflow-y: auto)
+    const innerOverflows = await page.evaluate(() => {
+      const trendsList = document.querySelector('#trends-list') ? window.getComputedStyle(document.querySelector('#trends-list')) : null;
+      const feedList = document.querySelector('#live-sentiment-feed') ? window.getComputedStyle(document.querySelector('#live-sentiment-feed')) : null;
+      return {
+        trendsListOverflowY: trendsList ? trendsList.overflowY : 'visible',
+        feedListOverflowY: feedList ? feedList.overflowY : 'visible'
+      };
+    });
+    expect(innerOverflows.trendsListOverflowY).toBe('auto');
+    expect(innerOverflows.feedListOverflowY).toBe('auto');
+
+    // [AC-2] Column headers remain static and fixed at the top of their respective columns
+    await expect(async () => {
+      const trendsHeaderBox = await page.locator('.trends-section .panel-header').boundingBox();
+      const trendsSectionBox = await trendsSection.boundingBox();
+      expect(trendsHeaderBox.y).toBeCloseTo(trendsSectionBox.y, 1);
+
+      const feedHeaderBox = await page.locator('.live-feed-section .feed-header').boundingBox();
+      const feedSectionBox = await liveFeedSection.boundingBox();
+      expect(feedHeaderBox.y).toBeCloseTo(feedSectionBox.y, 1);
+    }).toPass();
 
     // Adding interactive classes must NOT hide either panel on desktop
     await page.evaluate(() => {
       const sidebar = document.querySelector('.sidebar-panel');
       sidebar.classList.add('tabs-toggled', 'show-sentiment');
     });
-    await expect(trendsList).toBeVisible();
+    await expect(trendsSection).toBeVisible();
     await expect(liveFeedSection).toBeVisible();
 
     await page.evaluate(() => {
@@ -126,7 +218,7 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
       sidebar.classList.remove('show-sentiment');
       sidebar.classList.add('show-trending');
     });
-    await expect(trendsList).toBeVisible();
+    await expect(trendsSection).toBeVisible();
     await expect(liveFeedSection).toBeVisible();
 
     // Reset classes for sanity
@@ -135,8 +227,8 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
       sidebar.classList.remove('tabs-toggled', 'show-sentiment', 'show-trending');
     });
 
-    // --- MOBILE VIEWPORT TEST ---
-    // [AC-3]: Retain Mobile Tab Switcher Functionality on Mobile
+    // --- MOBILE VIEWPORT TEST (<= 768px) ---
+    // [AC-3] Mobile Drawer & Tab Switcher Behavior Preservation
     await page.setViewportSize({ width: 375, height: 667 });
     await page.goto('/');
 
@@ -145,25 +237,45 @@ test.describe('TJ-24: Desktop Tabbed Sidebar & Live Feed Hydration Tests', () =>
     await toggleBtn.click();
 
     // Tab switcher must be visible on mobile
+    const sidebarTabs = page.locator('.sidebar-tabs');
     await expect(sidebarTabs).toBeVisible();
 
-    // Click Sentiment Feed tab
-    const sentimentTab = page.locator('.tab-btn[data-tab="sentiment"]');
-    await sentimentTab.click();
+    // [AC-3] Sidebar drawer must remain 290px wide on mobile
+    await expect(async () => {
+      const sidebarBox = await page.locator('.sidebar-panel').boundingBox();
+      expect(sidebarBox).not.toBeNull();
+      expect(Math.round(sidebarBox.width)).toBe(290);
+    }).toPass();
 
-    // Verify trends-list is hidden and live-feed-section is visible
-    await expect(trendsList).not.toBeVisible();
-    await expect(liveFeedSection).toBeVisible();
-
-    // Click Trending Searches tab
+    // [AC-3] "Trending" Tab Active behavior check
     const trendingTab = page.locator('.tab-btn[data-tab="trending"]');
     await trendingTab.click();
-    await expect(trendsList).toBeVisible();
-    await expect(liveFeedSection).not.toBeVisible();
+    await expect(page.locator('#trends-list')).toBeVisible();
+    await expect(page.locator('.trends-section .panel-header-text')).toBeVisible();
+    await expect(liveFeedSection).toBeHidden();
+
+    // [AC-3] "Sentiment Feed" Tab Active behavior check
+    const sentimentTab = page.locator('.tab-btn[data-tab="sentiment"]');
+    await sentimentTab.click();
+    await expect(sidebarTabs).toBeVisible();
+    await expect(liveFeedSection).toBeVisible();
+    await expect(page.locator('#trends-list')).toBeHidden();
+    await expect(page.locator('.trends-section .panel-header-text')).toBeHidden();
+
+    // [AC-3] The .trends-section wrapper must shrink to fit only the tab header height
+    // and live-feed-section expand to occupy the full remaining vertical space
+    const trendsSectionStyles = await trendsSection.evaluate(el => {
+      const style = window.getComputedStyle(el);
+      return {
+        flex: style.flex,
+        height: style.height
+      };
+    });
+    expect(trendsSectionStyles.flex).toMatch(/0 0 auto/);
+    expect(trendsSectionStyles.height).toBe('auto');
 
     // --- WEBDRIVER VIEW TRANSITIONS TEST ---
-    // [AC-4]: Enable View Transitions in All Environments
-    // Verify navigator.webdriver does not cause playwright-e2e-desktop to be added to body
+    // [AC-4] View Transitions Integrity: Enable View Transitions in All Environments
     const body = page.locator('body');
     await expect(body).not.toHaveClass(/playwright-e2e-desktop/);
   });
