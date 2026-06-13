@@ -950,16 +950,21 @@ function initApp() {
     sharePreviewText.value = 'Generating post...';
     updatePreviewAndValidation();
     try {
+      const requestBody = {
+        trendTitle: currentTrend.title,
+        platform: activeSharePlatform,
+        contextType: activeShareContext
+      };
+      if (activeShareContext === 'trivia') {
+        requestBody.score = userScore;
+        requestBody.pattern = answerPattern.join('');
+      }
       const response = await fetch('/api/generate-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          trendTitle: currentTrend.title,
-          platform: activeSharePlatform,
-          contextType: activeShareContext
-        })
+        body: JSON.stringify(requestBody)
       });
       if (!response.ok) {
         throw new Error('Failed to generate post');
@@ -1605,6 +1610,38 @@ function initApp() {
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
   if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
   if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
+  if (btnShareScore) {
+    btnShareScore.addEventListener('click', async () => {
+      if (!currentTrend || triviaQuestions.length === 0) return;
+
+      const slug = titleToSlug(currentTrend.title);
+      const trendLink = `${window.location.origin}/t/${slug}`;
+      const emojiGrid = answerPattern.join('');
+      const scoreCardText = `TrendJacker Trivia Challenge: ${currentTrend.title}\nScore: ${userScore} out of ${triviaQuestions.length}\n${emojiGrid}\nPlay here: ${trendLink}`;
+
+      try {
+        await navigator.clipboard.writeText(scoreCardText);
+        const lang = document.getElementById('lang-select')?.value || 'en';
+        const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+        const originalText = dict.triviaShareScore || 'Share Score';
+        const svg = btnShareScore.querySelector('svg');
+        
+        btnShareScore.innerHTML = '';
+        if (svg) btnShareScore.appendChild(svg);
+        btnShareScore.appendChild(document.createTextNode(' Copied!'));
+        
+        setTimeout(() => {
+          btnShareScore.innerHTML = '';
+          if (svg) btnShareScore.appendChild(svg);
+          btnShareScore.appendChild(document.createTextNode(' ' + originalText.trim()));
+        }, 2000);
+      } catch (err) {
+        console.error('Failed to copy to clipboard:', err);
+      }
+
+      openShareModal('trivia');
+    });
+  }
 
   const customTextElInit = document.getElementById('info-custom-text-input');
   if (customTextElInit) {
