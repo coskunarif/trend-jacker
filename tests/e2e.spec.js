@@ -278,19 +278,6 @@ test.describe('TrendJacker E2E tests', () => {
     await expect(assistantBubble).toHaveText(mockReply);
   });
 
-  test('should display live sentiment updates from SSE feed', async ({ page }) => {
-    await page.goto('/');
-
-    // Wait for at least one item to render in the live sentiment feed
-    // Wait up to 10 seconds because SSE ticks every 4 seconds
-    const feedItem = page.locator('#live-sentiment-feed .feed-item').first();
-    await expect(feedItem).toBeVisible({ timeout: 12000 });
-
-    const feedContent = await feedItem.textContent();
-    expect(feedContent).toContain('voted');
-    expect(feedContent).toContain('on');
-  });
-
 
 
   test('should load trend details directly from slug-based route', async ({ page }) => {
@@ -329,7 +316,7 @@ test.describe('TrendJacker E2E tests', () => {
     expect(text.trim()).toBe('trendjackerkey2026');
   });
 
-  test('should support responsive layout, mobile sidebar toggling, tabs and close button', async ({ page }) => {
+  test('should support responsive layout, mobile sidebar toggling, and close button', async ({ page }) => {
     await page.route('**/api/trends', async (route) => {
       await route.fulfill({
         status: 200,
@@ -358,27 +345,9 @@ test.describe('TrendJacker E2E tests', () => {
     await toggleBtn.click();
     await expect(sidebar).toHaveClass(/open/);
 
-    // Verify mobile tabs are visible
-    const tabsContainer = page.locator('.sidebar-tabs');
-    await expect(tabsContainer).toBeVisible();
-
-    // Verify default tab is 'trending' (list is visible, feed is hidden)
+    // Verify default view is trending list (no longer has tabs)
     const trendsList = page.locator('#trends-list');
     await expect(trendsList).toBeVisible();
-    const liveFeed = page.locator('.live-feed-section');
-    await expect(liveFeed).not.toBeVisible();
-
-    // Switch to sentiment tab
-    const sentimentTabBtn = page.locator('.tab-btn[data-tab="sentiment"]');
-    await sentimentTabBtn.click();
-    await expect(trendsList).not.toBeVisible();
-    await expect(liveFeed).toBeVisible();
-
-    // Switch back to trending tab
-    const trendingTabBtn = page.locator('.tab-btn[data-tab="trending"]');
-    await trendingTabBtn.click();
-    await expect(trendsList).toBeVisible();
-    await expect(liveFeed).not.toBeVisible();
 
     // Verify close button closes the sidebar
     const closeBtn = page.locator('#sidebar-close');

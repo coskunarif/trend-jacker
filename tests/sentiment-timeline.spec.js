@@ -160,10 +160,13 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
       });
     });
 
+    // Initiate waitForResponse promise before navigating to avoid race conditions
+    const historyResponsePromise = page.waitForResponse(response => response.url().includes('/api/poll/history') && response.status() === 200);
+
     await page.goto('/');
     
     // Wait for the initial history fetch to resolve to prevent CPU race conditions
-    await page.waitForResponse(response => response.url().includes('/api/poll/history') && response.status() === 200);
+    await historyResponsePromise;
     
     const initialCalls = historyCallCount;
     expect(initialCalls).toBeGreaterThanOrEqual(1);

@@ -52,6 +52,15 @@ function initApp() {
   let hasWebShare = false;
   let hasFileShare = false;
 
+  // --- Interactive Sentiment Timeline Dashboard ---
+  let prevTimelinePoints = [];
+  let currentTimelinePoints = [];
+  let timelineTransitionProgress = 1.0;
+  let timelineTransitionActive = false;
+  let timelineHoverIndex = -1;
+
+  let activeLoadId = 0;
+
   const pageLoadTime = Date.now();
   const localClientId = 'client-' + Math.random().toString(36).substr(2, 9);
 
@@ -308,9 +317,6 @@ function initApp() {
   const sidebarBackdrop = document.getElementById('sidebar-backdrop');
   const sidebarPanel = document.querySelector('.sidebar-panel');
   const btnSidebarClose = document.getElementById('sidebar-close');
-  const tabButtons = document.querySelectorAll('.tab-btn');
-  const liveFeedSection = document.querySelector('.live-feed-section');
-  const panelHeaderText = document.querySelector('.panel-header-text');
 
   let currentTrend = null;
   let chatMessages = [];
@@ -343,39 +349,7 @@ function initApp() {
     }
   }
 
-  function switchTab(tabName) {
-    const updateDOM = () => {
-      if (!tabButtons || tabButtons.length === 0) return;
-      tabButtons.forEach(btn => {
-        if (btn.getAttribute('data-tab') === tabName) {
-          btn.classList.add('active');
-        } else {
-          btn.classList.remove('active');
-        }
-      });
 
-      if (tabName === 'trending') {
-        if (sidebarPanel) {
-          sidebarPanel.classList.add('tabs-toggled');
-          sidebarPanel.classList.remove('show-sentiment');
-          sidebarPanel.classList.add('show-trending');
-        }
-      } else {
-        if (sidebarPanel) {
-          sidebarPanel.classList.add('tabs-toggled');
-          sidebarPanel.classList.remove('show-trending');
-          sidebarPanel.classList.add('show-sentiment');
-        }
-      }
-    };
-
-    const useTransition = document.startViewTransition;
-    if (useTransition) {
-       document.startViewTransition(updateDOM);
-    } else {
-      updateDOM();
-    }
-  }
 
   // Slug generator helper
   function titleToSlug(title) {
@@ -840,15 +814,7 @@ function initApp() {
       });
     }
 
-    // Tab switching for mobile layout
-    if (tabButtons && tabButtons.length > 0) {
-      tabButtons.forEach(button => {
-        button.addEventListener('click', () => {
-          const tabName = button.getAttribute('data-tab');
-          switchTab(tabName);
-        });
-      });
-    }
+
   }
 
   // Initialize: Load Trends
@@ -973,6 +939,18 @@ function initApp() {
       `;
       
       const clickHandler = (skipPush = false) => {
+        if (!skipPush && a.classList.contains('active')) {
+          const updateDOM = () => {
+            closeMobileSidebar();
+          };
+          const useTransition = document.startViewTransition;
+          if (useTransition) {
+            document.startViewTransition(updateDOM);
+          } else {
+            updateDOM();
+          }
+          return;
+        }
         const updateDOM = () => {
           document.querySelectorAll('.trend-item').forEach(el => {
             el.classList.remove('active');
@@ -1059,6 +1037,7 @@ function initApp() {
   });
 
   async function loadTrendDetails(trend) {
+    const loadId = ++activeLoadId;
     currentTrend = trend;
     chatMessages = [];
     hasVotedCurrent = false;
@@ -1093,6 +1072,8 @@ function initApp() {
         if (!res.ok) throw new Error('API failed to explain');
         data = await res.json();
       }
+      
+      if (loadId !== activeLoadId) return;
       
       // Populate Details
       const heroImg = document.getElementById('detail-hero-image');
@@ -1249,6 +1230,7 @@ function initApp() {
         timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
       }
     } catch (err) {
+      if (loadId !== activeLoadId) return;
       console.error(err);
       if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
       welcomeView.classList.remove('hidden');
@@ -2030,9 +2012,9 @@ function initApp() {
   // Initialize Global Live Sentiment Feed
   function initSentimentFeed() {
     const feedContainer = document.getElementById('live-sentiment-feed');
-    if (!feedContainer) return;
 
     function createFeedItem(data) {
+      if (!feedContainer) return null;
       const item = document.createElement('div');
       item.className = 'feed-item';
       
@@ -2109,21 +2091,20 @@ function initApp() {
       try {
         const dataList = JSON.parse(event.data);
         
-        // Remove empty state if present
-        const emptyState = feedContainer.querySelector('.feed-empty-state');
-        if (emptyState) {
-          emptyState.remove();
-        }
-        
-        feedContainer.innerHTML = '';
-        if (Array.isArray(dataList)) {
-          dataList.forEach(data => {
-            const item = createFeedItem(data);
-            feedContainer.appendChild(item);
-          });
-        }
-        if (window.mockEventSources) {
-          switchTab('sentiment');
+        if (feedContainer) {
+          // Remove empty state if present
+          const emptyState = feedContainer.querySelector('.feed-empty-state');
+          if (emptyState) {
+            emptyState.remove();
+          }
+          
+          feedContainer.innerHTML = '';
+          if (Array.isArray(dataList)) {
+            dataList.forEach(data => {
+              const item = createFeedItem(data);
+              if (item) feedContainer.appendChild(item);
+            });
+          }
         }
       } catch (err) {
         console.error('Error handling SSE hydration event:', err);
@@ -2134,20 +2115,23 @@ function initApp() {
       try {
         const data = JSON.parse(event.data);
         
-        // Remove empty state if present
-        const emptyState = feedContainer.querySelector('.feed-empty-state');
-        if (emptyState) {
-          emptyState.remove();
-        }
+        if (feedContainer) {
+          // Remove empty state if present
+          const emptyState = feedContainer.querySelector('.feed-empty-state');
+          if (emptyState) {
+            emptyState.remove();
+          }
 
-        const item = createFeedItem(data);
+          const item = createFeedItem(data);
+          if (item) {
+            // Insert at the top
+            feedContainer.insertBefore(item, feedContainer.firstChild);
+          }
 
-        // Insert at the top
-        feedContainer.insertBefore(item, feedContainer.firstChild);
-
-        // Keep maximum 15 items in the feed list
-        while (feedContainer.children.length > 15) {
-          feedContainer.lastChild.remove();
+          // Keep maximum 15 items in the feed list
+          while (feedContainer.children.length > 15) {
+            feedContainer.lastChild.remove();
+          }
         }
 
         // If the incoming simulated vote matches current trend, update percentages and timeline
@@ -2156,10 +2140,6 @@ function initApp() {
             updatePollPercentages(data.updatedPolls);
           }
           loadTimeline(currentTrend.title);
-        }
-
-        if (window.mockEventSources) {
-          switchTab('sentiment');
         }
       } catch (err) {
         console.error('Error handling SSE live vote event:', err);
@@ -2343,12 +2323,7 @@ function initApp() {
     });
   }
 
-  // --- Interactive Sentiment Timeline Dashboard ---
-  let prevTimelinePoints = [];
-  let currentTimelinePoints = [];
-  let timelineTransitionProgress = 1.0;
-  let timelineTransitionActive = false;
-  let timelineHoverIndex = -1;
+
 
   function initializeDefaultTimelinePoints() {
     const points = [];
