@@ -343,6 +343,90 @@ function initApp() {
     if (trend && triviaTitle) {
       triviaTitle.textContent = trend.title;
     }
+
+    if (trend) {
+      fetchAndRenderLeaderboard(trend.title, '.trivia-start-screen');
+    }
+  }
+
+  function fetchAndRenderLeaderboard(trendTitle, containerSelector) {
+    const container = document.querySelector(containerSelector);
+    if (!container) return;
+
+    const leaderboardEl = container.querySelector('.trivia-leaderboard');
+    if (!leaderboardEl) return;
+
+    const loadingEl = leaderboardEl.querySelector('.leaderboard-loading');
+    const emptyEl = leaderboardEl.querySelector('.leaderboard-empty');
+    const listEl = leaderboardEl.querySelector('.leaderboard-list');
+    const personalRankEl = leaderboardEl.querySelector('.leaderboard-personal-rank');
+
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (listEl) {
+      listEl.innerHTML = '';
+      listEl.classList.add('hidden');
+    }
+    if (personalRankEl) {
+      personalRankEl.classList.add('hidden');
+      personalRankEl.textContent = '';
+    }
+
+    const url = `/api/trivia/leaderboard?trend=${encodeURIComponent(trendTitle)}&clientId=${localClientId}`;
+    fetch(url)
+      .then(res => {
+        if (!res.ok) throw new Error('Leaderboard fetch failed');
+        return res.json();
+      })
+      .then(data => {
+        if (loadingEl) loadingEl.classList.add('hidden');
+
+        if (!data.success || !data.leaderboard || data.leaderboard.length === 0) {
+          if (emptyEl) emptyEl.classList.remove('hidden');
+          return;
+        }
+
+        if (listEl) {
+          listEl.classList.remove('hidden');
+          data.leaderboard.forEach(row => {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'leaderboard-row';
+            if (row.isCurrentUser) {
+              rowEl.classList.add('highlight', 'current-user');
+            }
+
+            const rankSpan = document.createElement('span');
+            rankSpan.className = 'leaderboard-rank';
+            rankSpan.textContent = `#${row.rank}`;
+
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'leaderboard-nickname';
+            nameSpan.textContent = row.nickname;
+
+            const scoreSpan = document.createElement('span');
+            scoreSpan.className = 'leaderboard-score';
+            scoreSpan.textContent = `${row.score}/3`;
+
+            rowEl.appendChild(rankSpan);
+            rowEl.appendChild(nameSpan);
+            rowEl.appendChild(scoreSpan);
+            listEl.appendChild(rowEl);
+          });
+        }
+
+        if (data.userRank && data.userRank > 10 && personalRankEl) {
+          personalRankEl.textContent = `Your Rank: #${data.userRank} (High Score: ${data.userScore}/3)`;
+          personalRankEl.classList.remove('hidden');
+        }
+      })
+      .catch(err => {
+        console.error('Error loading leaderboard:', err);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) {
+          emptyEl.textContent = 'Failed to load leaderboard.';
+          emptyEl.classList.remove('hidden');
+        }
+      });
   }
 
   async function startTrivia() {
@@ -523,6 +607,16 @@ function initApp() {
       triviaEmojiPattern.textContent = patternStr;
     }
 
+    const nicknameInput = document.getElementById('nickname-input');
+    const nicknameStatus = document.getElementById('nickname-status');
+    if (nicknameInput) {
+      nicknameInput.value = localStorage.getItem('trivia-nickname') || '';
+    }
+    if (nicknameStatus) {
+      nicknameStatus.textContent = '';
+      nicknameStatus.className = '';
+    }
+
     // AC-5: Display capacity reward display success badge
     const rewardDisplay = document.getElementById('trivia-reward-display');
     if (rewardDisplay) {
@@ -555,6 +649,9 @@ function initApp() {
       })
       .then(data => {
         updateLimitAndStreakUI(data);
+        if (currentTrend) {
+          fetchAndRenderLeaderboard(currentTrend.title, '.trivia-results-screen');
+        }
       })
       .catch(err => {
         console.error('Error auto-submitting score and syncing UI:', err);
@@ -1772,6 +1869,56 @@ function initApp() {
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
   if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
   if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
+
+  const btnSaveNickname = document.getElementById('btn-save-nickname');
+  const nicknameInput = document.getElementById('nickname-input');
+  const nicknameStatus = document.getElementById('nickname-status');
+
+  if (btnSaveNickname && nicknameInput) {
+    const savedNick = localStorage.getItem('trivia-nickname') || '';
+    nicknameInput.value = savedNick;
+
+    btnSaveNickname.addEventListener('click', () => {
+      const nickname = nicknameInput.value.trim();
+      if (!nickname || nickname.length > 15) {
+        if (nicknameStatus) {
+          nicknameStatus.textContent = 'Nickname must be 1-15 characters.';
+          nicknameStatus.className = 'error';
+        }
+        return;
+      }
+
+      fetch('/api/trivia/nickname', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: localClientId,
+          nickname: nickname
+        })
+      })
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to save nickname');
+        return res.json();
+      })
+      .then(data => {
+        localStorage.setItem('trivia-nickname', data.nickname);
+        if (nicknameStatus) {
+          nicknameStatus.textContent = 'Nickname saved!';
+          nicknameStatus.className = 'success';
+        }
+        if (currentTrend) {
+          fetchAndRenderLeaderboard(currentTrend.title, '.trivia-results-screen');
+        }
+      })
+      .catch(err => {
+        console.error('Error saving nickname:', err);
+        if (nicknameStatus) {
+          nicknameStatus.textContent = 'Failed to save nickname.';
+          nicknameStatus.className = 'error';
+        }
+      });
+    });
+  }
   const btnReturnToChat = document.getElementById('btn-return-to-chat');
   if (btnReturnToChat) {
     btnReturnToChat.addEventListener('click', () => {
@@ -2716,7 +2863,7 @@ function initApp() {
     playTriviaCTA.addEventListener('click', () => {
       const triviaContainer = document.getElementById('trivia-card-container');
       if (triviaContainer) {
-        triviaContainer.scrollIntoView({ behavior: 'smooth' });
+        triviaContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
       }
       const startTriviaBtn = document.getElementById('btn-start-trivia');
       if (startTriviaBtn) {
