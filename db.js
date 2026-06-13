@@ -93,9 +93,19 @@ if (!firestore) {
         created_at TEXT
       )
     `);
+    try {
+      const schemaRow = sqliteDb.prepare(`
+        SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
+      `).get();
+      if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+        sqliteDb.exec('DROP TABLE topic_images');
+      }
+    } catch (e) {
+      // ignore check/drop error
+    }
     sqliteDb.exec(`
       CREATE TABLE IF NOT EXISTS topic_images (
-        trend TEXT PRIMARY KEY,
+        trend TEXT PRIMARY KEY COLLATE NOCASE,
         svg TEXT,
         created_at TEXT
       )
@@ -752,16 +762,17 @@ export async function getViralPostHistory() {
  * @returns {Promise<string | null>}
  */
 export async function getCachedTopicImage(trend) {
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(trend);
+      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
       const doc = await docRef.get();
       if (doc.exists) {
         return doc.data().svg || null;
       }
       return null;
     } catch (err) {
-      console.error(`Firestore error in getCachedTopicImage for "${trend}":`, err.message);
+      console.error(`Firestore error in getCachedTopicImage for "${normalizedTrend}":`, err.message);
       return null;
     }
   }
@@ -769,18 +780,18 @@ export async function getCachedTopicImage(trend) {
   if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT svg FROM topic_images WHERE trend = ?');
-      const row = stmt.get(trend);
+      const row = stmt.get(normalizedTrend);
       if (row && row.svg !== undefined) {
         return row.svg;
       }
       return null;
     } catch (err) {
-      console.error(`Local SQLite query failed for getCachedTopicImage "${trend}":`, err.message);
+      console.error(`Local SQLite query failed for getCachedTopicImage "${normalizedTrend}":`, err.message);
       return null;
     }
   }
 
-  return inMemoryTopicImages.get(trend) || null;
+  return inMemoryTopicImages.get(normalizedTrend) || null;
 }
 
 /**
@@ -791,18 +802,19 @@ export async function getCachedTopicImage(trend) {
  */
 export async function setCachedTopicImage(trend, svg) {
   const createdAt = new Date().toISOString();
+  const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(trend);
+      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
       await docRef.set({
-        trend,
+        trend: normalizedTrend,
         svg,
         created_at: createdAt
       });
       return;
     } catch (err) {
-      console.error(`Firestore error in setCachedTopicImage for "${trend}":`, err.message);
+      console.error(`Firestore error in setCachedTopicImage for "${normalizedTrend}":`, err.message);
       return;
     }
   }
@@ -812,15 +824,15 @@ export async function setCachedTopicImage(trend, svg) {
       sqliteDb.prepare(`
         INSERT OR REPLACE INTO topic_images (trend, svg, created_at)
         VALUES (?, ?, ?)
-      `).run(trend, svg, createdAt);
+      `).run(normalizedTrend, svg, createdAt);
       return;
     } catch (err) {
-      console.error(`Local SQLite insert failed for setCachedTopicImage "${trend}":`, err.message);
+      console.error(`Local SQLite insert failed for setCachedTopicImage "${normalizedTrend}":`, err.message);
       return;
     }
   }
 
-  inMemoryTopicImages.set(trend, svg);
+  inMemoryTopicImages.set(normalizedTrend, svg);
 }
 
 
