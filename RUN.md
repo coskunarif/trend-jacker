@@ -1,5 +1,5 @@
 task: Increase user session duration and retention via a competitive global trivia leaderboard for each trending topic.              tier: T2   creativity: 0.3
-state: SHIP                   budget: repairs 1/3
+state: complete                 budget: repairs 1/3
 branch: asf/20260613-trivia-leaderboard          checkpoint: none
 caps: agents,ui,web,human
 
@@ -41,4 +41,37 @@ All Acceptance Criteria for the competitive global trivia leaderboard passed com
 - Following the amendment, the full test suite was rerun and all 180 tests passed cleanly.
 
 ## Done
+
+### Shipped Features
+Implemented a competitive global trivia leaderboard for each trending topic. This feature engages users by rendering leaderboard results both when starting a trivia challenge and when checking results. Users can claim and submit custom nicknames up to 15 characters, which are persisted locally (via `localStorage`) and updated in-place without page reloads.
+
+### Verification Results & Evidence
+
+| Requirement (AC) | Implementation Details | Verifiable Evidence (Test / Path) |
+|---|---|---|
+| `[AC-1]` Database Schema & Persistence | SQLite `client_nicknames` table created in `db.js`. Added helper functions `saveClientNickname`, `getClientNickname`, and `getTriviaLeaderboard` with sorting (score DESC, completed_at ASC) and masking. | `tests/trivia-leaderboard.spec.js` unit tests: `should correctly handle database schema operations, scoring, sorting, ranking and name masking` (PASS) |
+| `[AC-2]` Backend API Endpoints | Fastify GET `/api/trivia/leaderboard` and POST `/api/trivia/nickname` endpoints with trimming and 15-character constraint validation implemented in `server.js`. | `tests/trivia-leaderboard.spec.js` integration tests: `should expose GET /api/trivia/leaderboard and POST /api/trivia/nickname endpoints` (PASS) |
+| `[AC-3]` Start Screen Global Leaderboard UI | Added leaderboard section below Start button in `public/index.html`. Fetching on load, displaying top 10, highlighting user rank, handling empty state, and rendering loading spinner. | `tests/trivia-leaderboard.spec.js` E2E tests: `should render the start screen leaderboard correctly including user highlights and empty states` (PASS) |
+| `[AC-4]` Results Screen Leaderboard UI & Nickname Submission | Added results leaderboard card and nickname input form in `public/index.html`. Handles form submission, localStorage persistence (`trivia-nickname`), in-place list update. | `tests/trivia-leaderboard.spec.js` E2E tests: `should handle nickname submission, persistence and live update on the results screen` (PASS) |
+
+### Visual Evidence
+Below is the visual evidence showing the leaderboard interface captured during dogfooding:
+
+#### Start Screen Leaderboard
+![Leaderboard Start Screen](dogfood-output/20260613-trivia-leaderboard/screenshots/initial.png)
+
+#### Results Screen Leaderboard
+![Leaderboard Results Screen](dogfood-output/20260613-trivia-leaderboard/screenshots/results.png)
+
+#### Desktop Results Detail
+![Leaderboard Results Desktop](dogfood-output/20260613-trivia-leaderboard/screenshots/results-desktop.png)
+
+#### Mobile Results Detail
+![Leaderboard Results Mobile](dogfood-output/20260613-trivia-leaderboard/screenshots/results-mobile.png)
+
+### PR and Deploy Links
+- **PR Link**: [https://github.com/coskunarif/trend-jacker/pull/35](https://github.com/coskunarif/trend-jacker/pull/35)
+- **Deployment URL**: [https://trend-jacker-250134012801.us-central1.run.app](https://trend-jacker-250134012801.us-central1.run.app)
+- **Integration Mode**: Squash merge (`gh pr merge --squash`)
+- **Verified Tag**: [asf/20260613-trivia-leaderboard/green-1](https://github.com/coskunarif/trend-jacker/releases/tag/asf/20260613-trivia-leaderboard/green-1)
 

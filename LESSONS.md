@@ -20,3 +20,5 @@
 - **Dynamic Limit Synchronization**: When gamifying feature locks with trivia/referral score rewards, submit the user score asynchronously and trigger immediate limit checks to dynamically unlock UI controls without requiring page reloads or status refreshes.
 - **Daily Streak Verification Gates**: When implementing mock pathways or test hooks in client-server validation logic, avoid gating features by hardcoded mock client ID patterns that disable the feature for real production users.
 - **Synchronous UI Updates & Event Loop Yields**: When updating detail views or rendering multiple UI components atomically in response to a user click, avoid awaiting asynchronous API requests (like feature/chat limit checks) in the middle of the render block; instead, execute them as un-awaited background promises to prevent yielding the event loop and causing E2E test race conditions.
+- **SQLite E2E Direct Connections**: When opening direct SQLite connections in E2E test assertions, always set WAL mode and a busy timeout (e.g. `PRAGMA busy_timeout = 5000;`) to match the backend configurations and prevent transient database locking errors.
+
