@@ -286,7 +286,7 @@
 
           <!-- Micro AI Q&A Card -->
           <div class="glass-card interactive-card flex-col" style="position: relative;">
-            <div id="chat-unlock-toast" class="hidden">Capacity Unlocked! +0 messages available.</div>
+            <div id="chat-unlock-toast" class="unlock-toast toast-notification hidden">Capacity Unlocked! +0 messages available.</div>
             <h3 class="card-heading">
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
               <span id="label-dig-deeper">Dig Deeper with AI</span>
@@ -341,6 +341,35 @@
               </div>
             </div>
           </div>
+        </div>
+
+        <!-- Trend Prediction Card [AC-3] -->
+        <div id="prediction-card-container" class="glass-card prediction-card">
+          <h3 class="card-heading">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="card-icon"><path d="m19 12-7-7-7 7"/><path d="M12 5v14"/></svg>
+            <span>Trend Prediction Stake</span>
+            <div id="prediction-points-badge" class="points-badge" style="margin-left: 8px;">
+              🏆 <span id="prediction-correct-count">0</span> correct
+            </div>
+          </h3>
+          <p class="prediction-prompt">Will this trend continue to rise, or will it decline tomorrow?</p>
+          <div class="prediction-buttons">
+            <button class="prediction-btn btn-predict-rise">Keep Rising 📈</button>
+            <button class="prediction-btn btn-predict-fall">Decline 📉</button>
+          </div>
+          <p id="prediction-status-message" class="prediction-status-message"></p>
+          
+          <div class="prediction-history-section" style="margin-top: var(--space-4, 16px);">
+            <h4 class="section-title">Prediction History</h4>
+            <div class="prediction-history" id="prediction-history-list">
+              <!-- Dynamically populated -->
+            </div>
+          </div>
+          
+          <button id="btn-download-prediction-card" class="download-card-btn" style="margin-top: var(--space-3, 12px); width: 100%;">
+            <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="btn-icon"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download Prediction Card
+          </button>
         </div>
 
         <!-- Trivia Challenge Section [AC-1] -->
@@ -560,6 +589,7 @@
             <option value="general">General Explainer</option>
             <option value="poll">Poll Verdict</option>
             <option value="trivia">Trivia Score</option>
+            <option value="prediction">Trend Prediction</option>
           </select>
         </div>
         <div class="form-group">

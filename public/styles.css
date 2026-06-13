@@ -3082,3 +3082,84 @@ body {
   color: #10b981;
   min-height: 1.2rem;
 }
+
+/* Prediction Card Styles */
+#prediction-card-container {
+  margin-top: var(--space-4, 16px);
+}
+
+.prediction-buttons {
+  display: flex;
+  gap: var(--space-3, 12px);
+  margin-top: var(--space-3, 12px);
+  margin-bottom: var(--space-3, 12px);
+}
+
+.prediction-btn {
+  flex: 1;
+  padding: var(--space-3, 10px) var(--space-4, 16px);
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast, 150ms);
+}
+
+.prediction-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.prediction-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.prediction-btn.selected-rise {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+}
+
+.prediction-btn.selected-fall {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: #ef4444;
+}
+
+.prediction-status-message {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.8);
+  margin: var(--space-2, 8px) 0;
+  font-weight: 500;
+}
+
+.prediction-history-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: var(--space-3, 12px);
+}
+
+.prediction-history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2, 6px) var(--space-3, 10px);
+  border-radius: var(--radius-sm, 4px);
+  background: rgba(255, 255, 255, 0.02);
+  margin-bottom: var(--space-2, 6px);
+  font-size: 0.85rem;
+}
+
+.prediction-history-item .status-correct {
+  color: #10b981;
+  font-weight: bold;
+}
+
+.prediction-history-item .status-incorrect {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.prediction-history-item .status-pending {
+  color: rgba(255, 255, 255, 0.5);
+}
