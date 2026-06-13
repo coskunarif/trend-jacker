@@ -179,6 +179,18 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
   test('7. /api/chat-limit, /api/trivia/score, and /api/chat include predictionBonus in allowedLimit', async ({ request }) => {
     const clientId = 'test-client-limit-formulas';
 
+    // Clean up database state for this client to ensure a pristine start
+    const db = new DatabaseSync(dbPath);
+    try {
+      db.prepare('DELETE FROM client_predictions WHERE client_id = ?').run(clientId);
+      db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
+      db.prepare('DELETE FROM client_trivia_scores WHERE client_id = ?').run(clientId);
+    } catch (e) {
+      console.warn('Could not clean up database for Test 7:', e.message);
+    } finally {
+      db.close();
+    }
+
     const resLimitInitial = await request.get(`/api/chat-limit?clientId=${clientId}&trend=Google%20Gemini`);
     expect(resLimitInitial.status()).toBe(200);
     const initialBody = await resLimitInitial.json();
