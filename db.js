@@ -33,6 +33,7 @@ const inMemoryTrendTrivia = new Map();
 const inMemoryClientReferrals = new Map();
 const inMemoryClientChatCounts = new Map();
 const inMemoryClientTriviaScores = new Map();
+export const inMemoryClientStreaks = new Map();
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -134,6 +135,13 @@ if (!firestore) {
           score INTEGER,
           completed_at TEXT,
           PRIMARY KEY (client_id, trend)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS client_streaks (
+          client_id TEXT PRIMARY KEY,
+          streak_count INTEGER DEFAULT 1,
+          last_active_date TEXT
         )
       `);
       initDb.exec(`
@@ -1303,4 +1311,128 @@ export async function getTriviaScore(clientId, trend) {
   const key = `${clientId}:${normalizedTrend}`;
   const record = inMemoryClientTriviaScores.get(key);
   return record ? record.score : null;
+}
+
+/**
+ * Helper to parse calendar date string (YYYY-MM-DD) into Date object at UTC.
+ * @param {string} dateStr 
+ * @returns {Date}
+ */
+function parseLocalDate(dateStr) {
+  const parts = dateStr.split('-');
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10) - 1;
+  const day = parseInt(parts[2], 10);
+  return new Date(Date.UTC(year, month, day));
+}
+
+/**
+ * Retrieves the client's streak info.
+ * @param {string} clientId
+ * @returns {Promise<{client_id: string, streak_count: number, last_active_date: string} | null>}
+ */
+export async function getClientStreak(clientId) {
+  const normalized = (clientId || '').trim().toLowerCase();
+
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('client_streaks').doc(normalized);
+      const doc = await docRef.get();
+      if (doc.exists) {
+        const data = doc.data();
+        return {
+          client_id: data.client_id,
+          streak_count: data.streak_count,
+          last_active_date: data.last_active_date
+        };
+      }
+      return null;
+    } catch (err) {
+      console.error(`Firestore error in getClientStreak for "${normalized}":`, err.message);
+      return null;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT client_id, streak_count, last_active_date FROM client_streaks WHERE client_id = ?').get(normalized);
+      return row || null;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getClientStreak "${normalized}":`, err.message);
+      return null;
+    }
+  }
+
+  const inMemoryRecord = inMemoryClientStreaks.get(normalized);
+  if (inMemoryRecord) {
+    return {
+      client_id: inMemoryRecord.client_id,
+      streak_count: inMemoryRecord.streak_count,
+      last_active_date: inMemoryRecord.last_active_date
+    };
+  }
+  return null;
+}
+
+/**
+ * Updates the client's streak count and last active date.
+ * @param {string} clientId
+ * @param {string} localDate
+ * @returns {Promise<void>}
+ */
+export async function updateClientStreak(clientId, localDate) {
+  const normalized = (clientId || '').trim().toLowerCase();
+  const existing = await getClientStreak(normalized);
+
+  let streakCount = 1;
+  let nextActiveDate = localDate;
+
+  if (existing) {
+    const d1 = parseLocalDate(localDate);
+    const d2 = parseLocalDate(existing.last_active_date);
+    const msDiff = d1.getTime() - d2.getTime();
+    const diff = Math.round(msDiff / (1000 * 60 * 60 * 24));
+
+    if (diff === 0) {
+      streakCount = existing.streak_count;
+    } else if (diff === 1) {
+      streakCount = existing.streak_count + 1;
+    } else {
+      // diff > 1 or diff < 0
+      streakCount = 1;
+    }
+  }
+
+  if (firestore) {
+    try {
+      await firestore.collection('client_streaks').doc(normalized).set({
+        client_id: normalized,
+        streak_count: streakCount,
+        last_active_date: nextActiveDate
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in updateClientStreak for "${normalized}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO client_streaks (client_id, streak_count, last_active_date)
+        VALUES (?, ?, ?)
+      `).run(normalized, streakCount, nextActiveDate);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for updateClientStreak "${normalized}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryClientStreaks.set(normalized, {
+    client_id: normalized,
+    streak_count: streakCount,
+    last_active_date: nextActiveDate
+  });
 }

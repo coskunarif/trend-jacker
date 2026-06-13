@@ -2776,7 +2776,108 @@ body {
   transform: translateY(-1px);
 }
 
+/* Daily Streak & Chat Capacity Styles */
+#chat-capacity-bar {
+  position: relative;
+  width: 100%;
+  height: 20px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: var(--space-3);
+  margin-top: var(--space-2);
+}
 
+#chat-capacity-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  transition: width 0.3s ease, background-color 0.3s ease;
+  z-index: 1;
+}
 
+#chat-capacity-text {
+  position: relative;
+  z-index: 2;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-heading);
+}
 
+.capacity-green {
+  background-color: rgb(16, 185, 129) !important;
+}
 
+.capacity-orange {
+  background-color: rgb(245, 158, 11) !important;
+}
+
+.capacity-red {
+  background-color: rgb(239, 68, 68) !important;
+}
+
+#streak-badge-container {
+  display: none;
+  margin-left: auto;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  color: #8b5cf6;
+  transition: all 0.3s ease;
+  opacity: 0.3;
+}
+
+#streak-badge-container.active {
+  display: inline-flex;
+  opacity: 1;
+  animation: pulse-streak 2s infinite ease-in-out;
+}
+
+@keyframes pulse-streak {
+  0% {
+    box-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+    text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
+    text-shadow: 0 0 15px rgba(99, 102, 241, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+    text-shadow: 0 0 5px rgba(139, 92, 246, 0.4);
+  }
+}
+
+#chat-unlock-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+  background-color: rgba(16, 185, 129, 0.95);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: #ffffff;
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+#chat-unlock-toast.hidden {
+  display: none;
+  opacity: 0;
+}
