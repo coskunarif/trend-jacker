@@ -102,6 +102,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setCachedExplanation(kidsKey, testExpl);
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
         const row = stmt.get(kidsKey);
@@ -126,6 +128,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setLocalizedExplanation(seniorKey, 'es', testLocData);
 
       const db2 = new DatabaseSync(dbPath);
+      db2.exec('PRAGMA busy_timeout = 5000;');
+      db2.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db2.prepare('SELECT title, explanation FROM localized_explanations WHERE trend = ? AND lang = ?');
         const row = stmt.get(seniorKey, 'es');
@@ -164,6 +168,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setCachedExplanation(kidsKeyMixed, testExpl);
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT trend, explanation FROM trend_explanations WHERE trend = ?');
         // The record in SQLite must have the lowercase normalized trend key
@@ -190,6 +196,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setLocalizedExplanation(seniorKeyMixed, 'ES', testLocData);
 
       const db2 = new DatabaseSync(dbPath);
+      db2.exec('PRAGMA busy_timeout = 5000;');
+      db2.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db2.prepare('SELECT trend, lang, title FROM localized_explanations WHERE trend = ? AND lang = ?');
         const row = stmt.get(seniorKeyLower, 'es');

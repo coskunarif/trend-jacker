@@ -164,6 +164,8 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
     let localDb;
     try {
       localDb = new DatabaseSync(dbPath);
+      localDb.exec('PRAGMA busy_timeout = 5000;');
+      localDb.exec('PRAGMA journal_mode = WAL;');
     } catch (err) {
       test.skip(true, 'SQLite database is not available for seeding');
     }
@@ -212,6 +214,8 @@ test.describe('Search Authority & GEO Optimization Tests', () => {
       } else {
         try {
           const cleanupDb = new DatabaseSync(dbPath);
+          cleanupDb.exec('PRAGMA busy_timeout = 5000;');
+          cleanupDb.exec('PRAGMA journal_mode = WAL;');
           try {
             cleanupDb.prepare('DELETE FROM trend_explanations WHERE trend = ?').run(trendName);
           } finally {

@@ -35,6 +35,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
   test.beforeEach(async () => {
     // Clean up test data from SQLite
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       db.prepare('DELETE FROM client_nicknames WHERE client_id IN (?, ?, ?, ?)')
         .run(testClientId1, testClientId2, testClientId3, testClientIdCurrentUser);
@@ -58,6 +60,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
 
     test('[AC-1] should verify client_nicknames table exists with correct schema', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
@@ -104,6 +108,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
       // testClientId3 remains anonymous
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         // Record scores with controlled completed_at dates to check sorting
         // We write directly to the DB to override dates, as recordTriviaScore uses new Date().toISOString()
@@ -154,6 +160,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
       }
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const insertStmt = db.prepare(`
           INSERT INTO client_trivia_scores (client_id, trend, score, completed_at)
@@ -185,6 +193,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
       }
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         db.prepare(`
           INSERT INTO client_trivia_scores (client_id, trend, score, completed_at)
@@ -209,6 +219,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
     test('[AC-2] GET /api/trivia/leaderboard returns correct response structure', async ({ request }) => {
       // Setup some scores
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         db.prepare('INSERT INTO client_nicknames (client_id, nickname) VALUES (?, ?)').run(testClientId1, 'Bob');
         db.prepare(`
@@ -257,6 +269,8 @@ test.describe('Global Trivia Leaderboard Feature Tests', () => {
 
       // Check DB via unit helper/direct queries
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT nickname FROM client_nicknames WHERE client_id = ?');
         expect(stmt.get(testClientId1).nickname).toBe('MyNewName');

@@ -25,9 +25,9 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA busy_timeout = 5000;');
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id = ?').run(clientId);
     } catch (e) {
@@ -291,6 +291,8 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
   test('[AC-5] should verify client ID and Trend casing normalization handles mixed-case without duplicates', async ({ request }) => {
     // Clear any potential previous scores for test clients
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id IN (?, ?)').run('client-1', 'client-1');
     } catch (e) {} finally {

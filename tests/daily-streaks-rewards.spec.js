@@ -13,10 +13,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
-      // Ensure WAL mode and busy timeout are configured to match backend settings
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA busy_timeout = 5000;');
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
     } catch (e) {
       // client_streaks table might not exist yet, which is expected to fail AC-1 initially
@@ -40,9 +39,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
     // AC-1: Verify client_streaks table schema
     test('should verify client_streaks table exists with correct columns', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
-        db.exec('PRAGMA journal_mode = WAL;');
-        db.exec('PRAGMA busy_timeout = 5000;');
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
           WHERE type = 'table' AND name = 'client_streaks'

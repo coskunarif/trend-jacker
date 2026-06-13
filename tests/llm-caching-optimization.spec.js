@@ -37,6 +37,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table trend_explanations has COLLATE NOCASE
   test('should have trend_explanations table created in SQLite with COLLATE NOCASE on trend', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -53,6 +55,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table localized_explanations has COLLATE NOCASE
   test('should have localized_explanations table created in SQLite with COLLATE NOCASE on trend and lang', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -83,6 +87,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // 2. Modify cached entry in SQLite directly to a unique text string
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     const customHook = `Unique Hook for case-insensitive check ${Date.now()}`;
     try {
       // Find row in database. The row key in DB should be lowercased "case-test-..."
@@ -120,6 +126,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table chat_cache exists
   test('should have the chat_cache table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -161,6 +169,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Clean existing database records just in case to ensure starting clean
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       localDb.prepare('DELETE FROM chat_cache').run();
     } catch (err) {
@@ -179,6 +189,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it exists in SQLite database chat_cache table and modify directly
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const customReply = 'This is custom hacked reply text from cache!';
     try {
       const checkStmt = localDb.prepare('SELECT * FROM chat_cache WHERE key LIKE ?');
@@ -209,6 +221,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-2] Schema Verification: SQLite table generated_posts exists
   test('should have the generated_posts table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -250,6 +264,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Clean existing database records to ensure starting clean
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       localDb.prepare('DELETE FROM generated_posts').run();
     } catch (err) {
@@ -268,6 +284,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it exists in SQLite database generated_posts table and modify directly
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const customPost = 'This is custom hacked post text from cache!';
     try {
       const checkStmt = localDb.prepare('SELECT * FROM generated_posts WHERE key LIKE ?');
@@ -364,6 +382,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table topic_images exists
   test('should have the topic_images table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -416,6 +436,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     
     // Clean database records if needed
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       localDb.prepare("DELETE FROM topic_images WHERE trend = ?").run(testSlug);
     } catch (err) {
@@ -431,6 +453,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it was cached in SQLite and update it directly to verify cache hit on next request
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const hijackedSvg = '<svg id="hijacked"></svg>';
     try {
       // Find trend title (Title Case or matched trend)

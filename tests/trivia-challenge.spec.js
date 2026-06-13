@@ -30,6 +30,8 @@ test.describe('Interactive AI-Generated Trivia Challenge', () => {
     // Verify SQLite Schema existence and details
     test('should have trend_trivia table created in SQLite with correct schema', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
@@ -81,6 +83,8 @@ test.describe('Interactive AI-Generated Trivia Challenge', () => {
 
       // Verify db insertion directly
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const checkStmt = db.prepare('SELECT trivia, created_at FROM trend_trivia WHERE trend = ? AND lang = ?');
         const dbRow = checkStmt.get(testTrend, testLang);

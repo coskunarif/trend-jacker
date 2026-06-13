@@ -33,6 +33,8 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
   // =========================================================================
   test('1. SQLite client_predictions table schema verification', async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = db.prepare(`
         SELECT sql FROM sqlite_master 
@@ -181,6 +183,8 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
 
     // Clean up database state for this client to ensure a pristine start
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       db.prepare('DELETE FROM client_predictions WHERE client_id = ?').run(clientId);
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);

@@ -48,6 +48,8 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
 
     // Check database to verify the stored key is actually lowercase
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const checkStmt = db.prepare('SELECT key FROM chat_cache WHERE reply = ?');
       const row = checkStmt.get(reply);
@@ -75,6 +77,8 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
 
     // Check DB key is lowercase
     const db2 = new DatabaseSync(dbPath);
+    db2.exec('PRAGMA busy_timeout = 5000;');
+    db2.exec('PRAGMA journal_mode = WAL;');
     try {
       const checkStmt = db2.prepare('SELECT key FROM generated_posts WHERE post_text = ?');
       const row = checkStmt.get(postText);
@@ -113,6 +117,8 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
   // =========================================================================
   test('should create client_referrals and client_chat_counts tables with correct schemas', async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       // Check client_referrals table
       const referralsStmt = db.prepare(`
@@ -318,6 +324,8 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
 
     // Wait a brief moment or check the database/API to ensure the referral is recorded
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = db.prepare('SELECT * FROM client_referrals WHERE client_id = ? AND referee_id = ?');
       const row = stmt.get(clientIdA, clientIdB);

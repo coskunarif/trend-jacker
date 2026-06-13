@@ -14,6 +14,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id = ?').run(clientId);
     } catch (e) {
@@ -35,6 +37,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
   test.describe('[AC-1] Client Trivia Score Database Cache & Helpers', () => {
     test('should verify client_trivia_scores table exists with correct columns', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
@@ -112,6 +116,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // Verify direct DB query contains the normalized lowercase trend
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT trend, score FROM client_trivia_scores WHERE client_id = ?');
         const rows = stmt.all(clientId);
@@ -333,7 +339,9 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // Question 3: correct (opt index 1)
       await options.nth(1).click();
+      const scorePromise = page.waitForResponse('**/api/trivia/score');
       await nextBtn.click(); // See Results
+      await scorePromise;
 
       // Results Screen should be visible
       const resultsScreen = page.locator('.trivia-results-screen');
@@ -453,7 +461,9 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       await options.nth(2).click();
       await nextBtn.click();
       await options.nth(1).click();
+      const scorePromise = page.waitForResponse('**/api/trivia/score');
       await nextBtn.click(); // See Results
+      await scorePromise;
 
       // Verify results screen displays
       await expect(page.locator('.trivia-results-screen')).toBeVisible();

@@ -28,6 +28,8 @@ test.describe('Database Explanation Caching [AC-2]', () => {
   // [AC-2] Schema Verification: SQLite table trend_explanations exists and has correct columns
   test('should have the trend_explanations table created in SQLite with correct schema', async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = db.prepare(`
         SELECT sql FROM sqlite_master 
@@ -62,6 +64,8 @@ test.describe('Database Explanation Caching [AC-2]', () => {
 
     // Retrieve directly from SQLite table to confirm serialization
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const checkStmt = db.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
       const dbRow = checkStmt.get(testTrend);
@@ -108,6 +112,8 @@ test.describe('Trend Explanation API Caching [AC-1]', () => {
 
     // Verify it exists in SQLite database
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
       const rowBefore = checkStmt.get(testTrend);
@@ -147,14 +153,16 @@ test.describe('Live Dynamic Sentiment Poll Integration [AC-3]', () => {
 
     // 1. Manually seed SQLite table with a cached explanation to bypass Gemini API call
     const db = new DatabaseSync(dbPath);
-    const customExplanation = {
-      hook: 'Static Cached Hook',
-      whatIsIt: 'Static Cached Explanation text',
-      whyIsItViral: ['Static reason'],
-      takeaway: 'Static Cached Takeaway'
-    };
-    
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
+      const customExplanation = {
+        hook: 'Static Cached Hook',
+        whatIsIt: 'Static Cached Explanation text',
+        whyIsItViral: ['Static reason'],
+        takeaway: 'Static Cached Takeaway'
+      };
+      
       const insertStmt = db.prepare(`
         INSERT OR REPLACE INTO trend_explanations (trend, explanation, created_at)
         VALUES (?, ?, ?)
