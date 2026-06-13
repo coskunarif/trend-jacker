@@ -659,7 +659,7 @@ async function getTrendExplanation(trend, headline = '', snippet = '', bracket =
     }
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.1-flash-lite',
       generationConfig: { 
         thinkingConfig: { thinkingLevel: 'LOW' },
         responseMimeType: 'application/json',
@@ -786,7 +786,7 @@ async function getLocalizedTrendExplanation(trend, lang, headline = '', snippet 
     const englishExpl = await getTrendExplanation(trend, headline, snippet, bracket);
 
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.1-flash-lite',
       generationConfig: {
         responseMimeType: 'application/json',
         responseSchema: {
@@ -1194,7 +1194,7 @@ fastify.post('/api/trivia', async (request, reply) => {
       }
 
       const model = genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3.1-flash-lite',
         generationConfig: {
           thinkingConfig: { thinkingLevel: 'LOW' },
           responseMimeType: 'application/json',
@@ -1296,7 +1296,7 @@ fastify.get('/api/topic-image/:slug', async (request, reply) => {
     // Production Mode: Generate custom topic SVG using Gemini API
     try {
       const model = genAI.getGenerativeModel({
-        model: 'gemini-3.5-flash',
+        model: 'gemini-3.1-flash-lite',
         generationConfig: {
           thinkingConfig: { thinkingLevel: 'LOW' },
           responseMimeType: 'application/json',
@@ -1781,7 +1781,7 @@ fastify.post('/api/chat', async (request, reply) => {
 
   try {
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.1-flash-lite',
       generationConfig: {
         thinkingConfig: { thinkingLevel: 'LOW' }
       }
@@ -2010,7 +2010,7 @@ async function generatePostText(trendTitle, platform, contextType, score, patter
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.5-flash',
+      model: 'gemini-3.1-flash-lite',
     });
 
     let platformInstructions = '';

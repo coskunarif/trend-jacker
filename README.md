@@ -49,7 +49,7 @@ The project is fully deployed and live:
 - **Core**: Node.js (ES Modules, Fastify framework).
 - **Frontend**: Vanilla HTML5, CSS3, and JavaScript served statically from the `/public` directory.
 - **AI SDK**: `@google/generative-ai` version `^0.21.0`.
-- **Model**: `gemini-3.5-flash` for high-speed, cost-efficient viral analysis and conversational chat.
+- **Model**: `gemini-3.1-flash-lite` for high-speed, ultra-cost-efficient viral analysis and conversational chat.
 
 ---
 
