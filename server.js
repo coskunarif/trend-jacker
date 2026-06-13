@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1566,7 +1566,18 @@ fastify.get('/api/chat-limit', async (request, reply) => {
     return reply.status(400).send({ error: 'clientId and trend query parameters are required.' });
   }
   const referralCount = await getReferralCount(clientId);
-  const allowedLimit = 3 + 5 * referralCount;
+  const triviaScore = await getTriviaScore(clientId, trend);
+  let triviaBonus = 0;
+  if (triviaScore !== null && triviaScore !== undefined) {
+    if (triviaScore === 3) {
+      triviaBonus = 5;
+    } else if (triviaScore === 2) {
+      triviaBonus = 3;
+    } else if (triviaScore === 0 || triviaScore === 1) {
+      triviaBonus = 1;
+    }
+  }
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus;
   const currentCount = await getChatCount(clientId, trend);
   const limitReached = currentCount >= allowedLimit;
   return { limitReached, currentCount, allowedLimit };
@@ -1585,6 +1596,34 @@ fastify.post('/api/referral', async (request, reply) => {
   return { success: true };
 });
 
+// POST /api/trivia/score - Record a client trivia score and return updated limits
+fastify.post('/api/trivia/score', async (request, reply) => {
+  const { clientId, trend, score } = request.body || {};
+  if (!clientId || !trend || score === undefined) {
+    return reply.status(400).send({ error: 'clientId, trend, and score are required.' });
+  }
+  const numericScore = Number(score);
+  await recordTriviaScore(clientId, trend, numericScore);
+
+  const referralCount = await getReferralCount(clientId);
+  const triviaScore = await getTriviaScore(clientId, trend);
+  let triviaBonus = 0;
+  if (triviaScore !== null && triviaScore !== undefined) {
+    if (triviaScore === 3) {
+      triviaBonus = 5;
+    } else if (triviaScore === 2) {
+      triviaBonus = 3;
+    } else if (triviaScore === 0 || triviaScore === 1) {
+      triviaBonus = 1;
+    }
+  }
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus;
+  const currentCount = await getChatCount(clientId, trend);
+  const limitReached = currentCount >= allowedLimit;
+
+  return { success: true, allowedLimit, currentCount, limitReached };
+});
+
 // POST /api/chat - Follow-up Q&A chat using Gemini
 fastify.post('/api/chat', async (request, reply) => {
   const { trend, query, history, clientId } = request.body || {};
@@ -1595,7 +1634,18 @@ fastify.post('/api/chat', async (request, reply) => {
   const enforceLimits = (process.env.NODE_ENV !== 'test') || (request.headers['x-enforce-limits'] === 'true');
   if (enforceLimits && clientId) {
     const referralCount = await getReferralCount(clientId);
-    const allowedLimit = 3 + 5 * referralCount;
+    const triviaScore = await getTriviaScore(clientId, trend);
+    let triviaBonus = 0;
+    if (triviaScore !== null && triviaScore !== undefined) {
+      if (triviaScore === 3) {
+        triviaBonus = 5;
+      } else if (triviaScore === 2) {
+        triviaBonus = 3;
+      } else if (triviaScore === 0 || triviaScore === 1) {
+        triviaBonus = 1;
+      }
+    }
+    const allowedLimit = 3 + 5 * referralCount + triviaBonus;
     const currentCount = await getChatCount(clientId, trend);
     if (currentCount >= allowedLimit) {
       return reply.status(403).send({ error: 'limit_reached', allowedLimit });

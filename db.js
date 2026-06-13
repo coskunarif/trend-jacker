@@ -1257,24 +1257,24 @@ export async function getTriviaScore(clientId, trend) {
     try {
       const docId = `${clientId}_${normalizedTrend}`;
       const doc = await firestore.collection('client_trivia_scores').doc(docId).get();
-      return doc.exists ? (doc.data().score || 0) : 0;
+      return doc.exists ? (doc.data().score !== undefined ? doc.data().score : null) : null;
     } catch (err) {
       console.error(`Firestore error in getTriviaScore:`, err.message);
-      return 0;
+      return null;
     }
   }
 
   if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(clientId, normalizedTrend);
-      return row ? row.score : 0;
+      return row ? row.score : null;
     } catch (err) {
       console.error(`Local SQLite query failed for getTriviaScore:`, err.message);
-      return 0;
+      return null;
     }
   }
 
   const key = `${clientId}:${normalizedTrend}`;
   const record = inMemoryClientTriviaScores.get(key);
-  return record ? record.score : 0;
+  return record ? record.score : null;
 }
