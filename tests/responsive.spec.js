@@ -15,6 +15,139 @@ const mockTrends = [
     }
   }
 ];
+const mockTrends10 = [
+  {
+    id: 1,
+    title: 'Google Gemini',
+    traffic: '100K+',
+    description: 'The latest AI models from Google.',
+    source: 'google',
+    news: {
+      headline: 'Google announces Gemini 3.5',
+      snippet: 'Gemini 3.5 is now live with advanced reasoning capabilities.',
+      url: 'https://blog.google/gemini-3.5',
+      source: 'Google Blog'
+    }
+  },
+  {
+    id: 2,
+    title: 'Reddit Bitcoin',
+    traffic: '80K+',
+    description: 'Bitcoin cryptocurrency surges in finance market.',
+    source: 'reddit',
+    news: {
+      headline: 'Bitcoin crosses new milestone',
+      snippet: 'BTC hit a new high today as finance markets react.',
+      url: 'https://reddit.com/r/bitcoin',
+      source: 'Reddit'
+    }
+  },
+  {
+    id: 3,
+    title: 'PlayStation 6',
+    traffic: '75K+',
+    description: 'Leaks reveal next-gen gaming console.',
+    source: 'google',
+    news: {
+      headline: 'PS6 rumors heat up',
+      snippet: 'Next-gen gaming consoles discussed by insiders.',
+      url: 'https://ign.com/ps6',
+      source: 'IGN'
+    }
+  },
+  {
+    id: 4,
+    title: 'Taylor Swift Concert',
+    traffic: '60K+',
+    description: 'Pop star concert tour dates announced.',
+    source: 'google',
+    news: {
+      headline: 'Eras Tour adds new dates',
+      snippet: 'Taylor Swift announces additional cities for next year.',
+      url: 'https://billboard.com/taylor-swift',
+      source: 'Billboard'
+    }
+  },
+  {
+    id: 5,
+    title: 'OpenAI GPT-5',
+    traffic: '50K+',
+    description: 'OpenAI trains new AI models.',
+    source: 'reddit',
+    news: {
+      headline: 'GPT-5 training underway',
+      snippet: 'Next-generation tech model set for release.',
+      url: 'https://openai.com/gpt-5',
+      source: 'OpenAI'
+    }
+  },
+  {
+    id: 6,
+    title: 'NVIDIA Stock Spike',
+    traffic: '45K+',
+    description: 'Chipmaker NVIDIA stock hits records in finance.',
+    source: 'google',
+    news: {
+      headline: 'NVIDIA quarterly earnings soar',
+      snippet: 'AI chip demand drives finance stock to new highs.',
+      url: 'https://bloomberg.com/nvidia',
+      source: 'Bloomberg'
+    }
+  },
+  {
+    id: 7,
+    title: 'Elden Ring DLC',
+    traffic: '40K+',
+    description: 'New gameplay video shows gaming expansion.',
+    source: 'reddit',
+    news: {
+      headline: 'Shadow of the Erdtree gameplay details',
+      snippet: 'FromSoftware shows off gaming combat improvements.',
+      url: 'https://gamespot.com/elden-ring',
+      source: 'Gamespot'
+    }
+  },
+  {
+    id: 8,
+    title: 'Super Bowl Highlights',
+    traffic: '35K+',
+    description: 'Football highlights trending after the big game.',
+    source: 'google',
+    news: {
+      headline: 'Super Bowl ends in thriller',
+      snippet: 'Highlights from the final quarter of the game.',
+      url: 'https://nfl.com/superbowl',
+      source: 'NFL'
+    }
+  },
+  {
+    id: 9,
+    title: 'Apple Vision Pro 2',
+    traffic: '30K+',
+    description: 'Apple developing new tech headset.',
+    source: 'google',
+    news: {
+      headline: 'Vision Pro 2 leaks online',
+      snippet: 'Tech updates on Apple spatial headset timeline.',
+      url: 'https://macrumors.com/vision-pro-2',
+      source: 'MacRumors'
+    }
+  },
+  {
+    id: 10,
+    title: 'Inflation Rates Drop',
+    traffic: '25K+',
+    description: 'Economic reports show finance shift.',
+    source: 'reddit',
+    news: {
+      headline: 'Inflation cooling down',
+      snippet: 'Laters reports show general finance relief.',
+      url: 'https://reuters.com/inflation',
+      source: 'Reuters'
+    }
+  }
+];
+
 
 const mockExplanation = {
   hook: 'Gemini is capturing developer mindshare with low latency and long context.',
@@ -268,4 +401,232 @@ test.describe('TJ-21: Mobile Layout and Responsiveness Overhaul Tests', () => {
     });
   });
 
+  // ==========================================
+  // [AC-2] Mobile Trends List Search and Category Filtering
+  // ==========================================
+  test('should support real-time search box and platform filter tabs', async ({ page }) => {
+    // Override default route to return mockTrends10 (10 items)
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends10),
+      });
+    });
+
+    await page.goto('/');
+    
+    // Wait for the trends list to render and skeleton loaders to disappear
+    const trendsList = page.locator('#trends-list');
+    await expect(trendsList).toBeVisible();
+    
+    const trendItems = trendsList.locator('.trend-item');
+    await expect(trendItems.first()).toBeVisible();
+
+    // Verify search input is present
+    const searchInput = page.locator('#trends-search');
+    await expect(searchInput).toBeVisible();
+
+    // Verify platform filter tabs are present
+    const filterTabs = page.locator('.trends-filter-tabs');
+    await expect(filterTabs).toBeVisible();
+
+    const tabAll = filterTabs.locator('.filter-tab', { hasText: 'All' }).first();
+    const tabGoogle = filterTabs.locator('.filter-tab', { hasText: 'Google' }).first();
+    const tabReddit = filterTabs.locator('.filter-tab', { hasText: 'Reddit' }).first();
+
+    await expect(tabAll).toBeVisible();
+    await expect(tabGoogle).toBeVisible();
+    await expect(tabReddit).toBeVisible();
+
+    // Test Search input: type "gemini" (case-insensitive check)
+    await searchInput.fill('gemini');
+    await expect(trendItems).toHaveCount(1);
+    await expect(trendItems.first()).toContainText('Google Gemini');
+
+    // Test Search input: type "stock" (case-insensitive check)
+    await searchInput.fill('STOCK');
+    await expect(trendItems).toHaveCount(1);
+    await expect(trendItems.first()).toContainText('NVIDIA Stock Spike');
+
+    // Clear search
+    await searchInput.fill('');
+    // On desktop, should show all 10 items
+    await expect(trendItems).toHaveCount(10);
+
+    // Test Platform Filter Tabs: Click "Google"
+    await tabGoogle.click();
+    const visibleCountGoogle = await trendItems.count();
+    expect(visibleCountGoogle).toBe(6);
+    for (let i = 0; i < visibleCountGoogle; i++) {
+      const text = await trendItems.nth(i).innerText();
+      expect(text).not.toContain('Bitcoin');
+      expect(text).not.toContain('GPT-5');
+      expect(text).not.toContain('Elden Ring');
+      expect(text).not.toContain('Inflation');
+    }
+
+    // Click "Reddit"
+    await tabReddit.click();
+    const visibleCountReddit = await trendItems.count();
+    expect(visibleCountReddit).toBe(4);
+    for (let i = 0; i < visibleCountReddit; i++) {
+      const text = await trendItems.nth(i).innerText();
+      expect(text).not.toContain('Gemini');
+      expect(text).not.toContain('PlayStation');
+      expect(text).not.toContain('Taylor Swift');
+      expect(text).not.toContain('NVIDIA');
+      expect(text).not.toContain('Super Bowl');
+      expect(text).not.toContain('Apple Vision');
+    }
+
+    // Click "All"
+    await tabAll.click();
+    await expect(trendItems).toHaveCount(10);
+  });
+
+  // ==========================================
+  // [AC-3] Mobile Trends List Truncation and "Show More" Pagination
+  // ==========================================
+  test('should truncate trends list to 6 on mobile viewports and toggle expand/collapse', async ({ page }) => {
+    // Override default route to return mockTrends10 (10 items)
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends10),
+      });
+    });
+
+    // Set mobile viewport size (e.g. 390x844)
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    const trendsList = page.locator('#trends-list');
+    await expect(trendsList).toBeVisible();
+
+    const trendItems = trendsList.locator('.trend-item');
+    await expect(trendItems.first()).toBeVisible();
+
+    // Confirm that exactly 6 trend items are visible in the trends list
+    const visibleCount = await trendItems.evaluateAll((elements) => {
+      return elements.filter(el => window.getComputedStyle(el).display !== 'none').length;
+    });
+    expect(visibleCount).toBe(6);
+
+    // Confirm the "+ Show More Trends" button is visible
+    const showMoreBtn = page.locator('#btn-show-more-trends');
+    await expect(showMoreBtn).toBeVisible();
+    await expect(showMoreBtn).toContainText('+ Show More Trends');
+
+    // Click "+ Show More Trends"
+    await showMoreBtn.click();
+
+    // Verify the list expands to show all 10 trends
+    const expandedCount = await trendItems.evaluateAll((elements) => {
+      return elements.filter(el => window.getComputedStyle(el).display !== 'none').length;
+    });
+    expect(expandedCount).toBe(10);
+
+    // Verify the button changes text to "- Show Less Trends"
+    await expect(showMoreBtn).toContainText('- Show Less Trends');
+
+    // Click again
+    await showMoreBtn.click();
+
+    // Verify the list collapses back to 6
+    const collapsedCount = await trendItems.evaluateAll((elements) => {
+      return elements.filter(el => window.getComputedStyle(el).display !== 'none').length;
+    });
+    expect(collapsedCount).toBe(6);
+    await expect(showMoreBtn).toContainText('+ Show More Trends');
+  });
+
+  // ==========================================
+  // [AC-4] Dynamic Emojis & Fluid Mobile Typography
+  // ==========================================
+  test('should display dynamic category emojis and scale titles fluidly with clamp', async ({ page }) => {
+    // Override default route to return mockTrends10 (10 items)
+    await page.route('**/api/trends', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockTrends10),
+      });
+    });
+
+    await page.goto('/');
+
+    const trendsList = page.locator('#trends-list');
+    await expect(trendsList).toBeVisible();
+    const trendItems = trendsList.locator('.trend-item');
+    await expect(trendItems.first()).toBeVisible();
+
+    // Verify each trend card has a category emoji
+    const count = await trendItems.count();
+    expect(count).toBeGreaterThan(0);
+    for (let i = 0; i < count; i++) {
+      const card = trendItems.nth(i);
+      const titleText = await card.locator('.trend-item-title').innerText();
+      const badge = card.locator('.trend-category-emoji');
+      await expect(badge).toBeVisible();
+      const emoji = await badge.innerText();
+
+      if (titleText.toLowerCase().includes('gemini') || titleText.toLowerCase().includes('gpt-5') || titleText.toLowerCase().includes('vision pro')) {
+        // Tech/AI -> 🤖
+        expect(emoji).toBe('🤖');
+      } else if (titleText.toLowerCase().includes('bitcoin') || titleText.toLowerCase().includes('stock') || titleText.toLowerCase().includes('inflation')) {
+        // Business/Finance -> 📈
+        expect(emoji).toBe('📈');
+      } else if (titleText.toLowerCase().includes('playstation') || titleText.toLowerCase().includes('elden ring')) {
+        // Gaming -> 🎮
+        expect(emoji).toBe('🎮');
+      } else {
+        // Other -> 🔥
+        expect(emoji).toBe('🔥');
+      }
+    }
+
+    // Load trend detail page to verify .trend-title uses fluid typography
+    // Let's click the first trend item
+    await trendItems.first().click();
+    const title = page.locator('.trend-title');
+    await expect(title).toBeVisible();
+
+    // Resize viewport from 1280px to 375px
+    // 1. Large viewport (1280px)
+    await page.setViewportSize({ width: 1280, height: 800 });
+    const sizeLarge = await title.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).fontSize);
+    });
+
+    // 2. Small viewport (375px)
+    await page.setViewportSize({ width: 375, height: 667 });
+    const sizeSmall = await title.evaluate((el) => {
+      return parseFloat(window.getComputedStyle(el).fontSize);
+    });
+
+    // Verify that the font size at 375px is smaller than at 1280px, showing fluid scaling
+    expect(sizeSmall).toBeLessThan(sizeLarge);
+
+    // Verify that clamp() is used in the CSS rule for .trend-title
+    const hasClamp = await page.evaluate(() => {
+      for (const sheet of document.styleSheets) {
+        try {
+          for (const rule of sheet.cssRules) {
+            if (rule.selectorText && rule.selectorText.includes('.trend-title')) {
+              const fs = rule.style.fontSize;
+              if (fs && fs.includes('clamp')) {
+                return true;
+              }
+            }
+          }
+        } catch (e) {}
+      }
+      return false;
+    });
+    expect(hasClamp).toBe(true);
+  });
+
 });
+
