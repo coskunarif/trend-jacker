@@ -269,6 +269,229 @@ function initApp() {
   const gaugeGeniusPct = document.getElementById('gauge-genius-pct');
   const btnDownloadInfographic = document.getElementById('btn-download-infographic');
 
+  // Trivia Elements & State
+  const triviaContainer = document.getElementById('trivia-card-container');
+  const triviaStartScreen = triviaContainer ? triviaContainer.querySelector('.trivia-start-screen') : null;
+  const triviaGameplayScreen = triviaContainer ? triviaContainer.querySelector('.trivia-gameplay-screen') : null;
+  const triviaResultsScreen = triviaContainer ? triviaContainer.querySelector('.trivia-results-screen') : null;
+  const btnStartTrivia = document.getElementById('btn-start-trivia');
+  const btnPlayAgain = document.getElementById('btn-play-again');
+  const btnShareScore = document.getElementById('btn-share-score');
+  const triviaTitle = triviaContainer ? triviaContainer.querySelector('.trivia-title') : null;
+  const triviaQuestionText = triviaContainer ? triviaContainer.querySelector('.trivia-question-text') : null;
+  const triviaProgress = triviaContainer ? triviaContainer.querySelector('.trivia-progress') : null;
+  const triviaProgressFill = triviaContainer ? triviaContainer.querySelector('.trivia-progress-bar-fill') : null;
+  const triviaOptionsContainer = triviaContainer ? triviaContainer.querySelector('.trivia-options-container') : null;
+  const triviaExplanationBlock = triviaContainer ? triviaContainer.querySelector('.trivia-explanation-block') : null;
+  const triviaFeedback = triviaContainer ? triviaContainer.querySelector('.trivia-feedback') : null;
+  const triviaCorrectAnswer = triviaContainer ? triviaContainer.querySelector('.trivia-correct-answer') : null;
+  const triviaExplanationText = triviaContainer ? triviaContainer.querySelector('.trivia-explanation-text') : null;
+  const triviaNavBtn = triviaContainer ? triviaContainer.querySelector('.trivia-nav-btn') : null;
+  const triviaResultsTitle = triviaContainer ? triviaContainer.querySelector('.trivia-results-title') : null;
+  const triviaResultsScore = triviaContainer ? triviaContainer.querySelector('.trivia-results-score') : null;
+  const triviaEmojiPattern = triviaContainer ? triviaContainer.querySelector('.trivia-emoji-pattern') : null;
+
+  let triviaQuestions = [];
+  let currentQuestionIndex = 0;
+  let userScore = 0;
+  let answerPattern = [];
+  let isAnswerSelected = false;
+
+  function resetTrivia(trend) {
+    triviaQuestions = [];
+    currentQuestionIndex = 0;
+    userScore = 0;
+    answerPattern = [];
+    isAnswerSelected = false;
+
+    if (triviaStartScreen) triviaStartScreen.classList.remove('hidden');
+    if (triviaGameplayScreen) triviaGameplayScreen.classList.add('hidden');
+    if (triviaResultsScreen) triviaResultsScreen.classList.add('hidden');
+
+    if (trend && triviaTitle) {
+      triviaTitle.textContent = trend.title;
+    }
+  }
+
+  async function startTrivia() {
+    if (!currentTrend) return;
+    
+    if (btnStartTrivia) btnStartTrivia.disabled = true;
+    
+    try {
+      const selectedLang = document.getElementById('lang-select')?.value || 'en';
+      const res = await fetch('/api/trivia', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trend: currentTrend.title,
+          lang: selectedLang
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to fetch trivia questions');
+      triviaQuestions = await res.json();
+      currentQuestionIndex = 0;
+      userScore = 0;
+      answerPattern = [];
+      
+      if (triviaStartScreen) triviaStartScreen.classList.add('hidden');
+      if (triviaGameplayScreen) triviaGameplayScreen.classList.remove('hidden');
+      
+      renderQuestion();
+    } catch (err) {
+      console.error('Trivia load failed:', err);
+      alert('Could not load trivia challenge. Please try again.');
+    } finally {
+      if (btnStartTrivia) btnStartTrivia.disabled = false;
+    }
+  }
+
+  function renderQuestion() {
+    isAnswerSelected = false;
+    if (!triviaQuestions || triviaQuestions.length === 0) return;
+    const currentQuestion = triviaQuestions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const lang = document.getElementById('lang-select')?.value || 'en';
+    const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+    
+    const total = triviaQuestions.length;
+    const progressIndex = currentQuestionIndex + 1;
+    if (triviaProgress) {
+      if (typeof dict.triviaProgress === 'function') {
+        triviaProgress.textContent = dict.triviaProgress(progressIndex, total);
+      } else {
+        triviaProgress.textContent = `Question ${progressIndex} of ${total}`;
+      }
+    }
+
+    if (triviaProgressFill) {
+      const progressPct = ((currentQuestionIndex) / total) * 100;
+      triviaProgressFill.style.width = `${progressPct}%`;
+    }
+
+    if (triviaQuestionText) {
+      triviaQuestionText.textContent = currentQuestion.question;
+    }
+
+    if (triviaOptionsContainer) {
+      triviaOptionsContainer.innerHTML = '';
+      currentQuestion.options.forEach((option, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'trivia-option-btn';
+        btn.textContent = option;
+        btn.addEventListener('click', () => selectAnswer(index));
+        triviaOptionsContainer.appendChild(btn);
+      });
+    }
+
+    if (triviaExplanationBlock) {
+      triviaExplanationBlock.classList.add('hidden');
+    }
+  }
+
+  function selectAnswer(selectedIndex) {
+    if (isAnswerSelected) return;
+    isAnswerSelected = true;
+
+    if (!triviaQuestions || triviaQuestions.length === 0) return;
+    const currentQuestion = triviaQuestions[currentQuestionIndex];
+    if (!currentQuestion) return;
+
+    const isCorrect = selectedIndex === currentQuestion.correctAnswer;
+    const optionBtns = triviaOptionsContainer ? triviaOptionsContainer.querySelectorAll('.trivia-option-btn') : [];
+    optionBtns.forEach((btn, index) => {
+      btn.disabled = true;
+      if (index === currentQuestion.correctAnswer) {
+        btn.classList.add('correct-highlight');
+      } else if (index === selectedIndex) {
+        btn.classList.add('wrong-highlight');
+      }
+    });
+
+    const lang = document.getElementById('lang-select')?.value || 'en';
+    const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+
+    if (isCorrect) {
+      userScore++;
+      answerPattern.push('🟩');
+      if (triviaFeedback) {
+        triviaFeedback.textContent = dict.triviaCorrect || 'Correct! 🟩';
+        triviaFeedback.style.color = 'rgb(34, 197, 94)';
+      }
+    } else {
+      answerPattern.push('🟥');
+      if (triviaFeedback) {
+        triviaFeedback.textContent = dict.triviaIncorrect || 'Incorrect! 🟥';
+        triviaFeedback.style.color = 'rgb(239, 68, 68)';
+      }
+    }
+
+    const correctOptionText = currentQuestion.options[currentQuestion.correctAnswer];
+    let correctLabel = "Correct Answer";
+    if (lang === 'es') correctLabel = "Respuesta Correcta";
+    else if (lang === 'fr') correctLabel = "Réponse Correcte";
+    else if (lang === 'ja') correctLabel = "正解";
+
+    if (triviaCorrectAnswer) {
+      triviaCorrectAnswer.textContent = `${correctLabel}: ${correctOptionText}`;
+    }
+
+    if (triviaExplanationText) {
+      triviaExplanationText.textContent = currentQuestion.explanation;
+    }
+
+    if (triviaNavBtn) {
+      const isLastQuestion = currentQuestionIndex === triviaQuestions.length - 1;
+      if (isLastQuestion) {
+        triviaNavBtn.textContent = dict.triviaResultsBtn || 'See Results';
+      } else {
+        triviaNavBtn.textContent = dict.triviaNext || 'Next Question';
+      }
+    }
+
+    if (triviaExplanationBlock) {
+      triviaExplanationBlock.classList.remove('hidden');
+    }
+  }
+
+  function handleTriviaNavigation() {
+    const isLastQuestion = currentQuestionIndex === triviaQuestions.length - 1;
+    if (isLastQuestion) {
+      showResults();
+    } else {
+      currentQuestionIndex++;
+      renderQuestion();
+    }
+  }
+
+  function showResults() {
+    if (triviaGameplayScreen) triviaGameplayScreen.classList.add('hidden');
+    if (triviaResultsScreen) triviaResultsScreen.classList.remove('hidden');
+
+    const lang = document.getElementById('lang-select')?.value || 'en';
+    const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+
+    if (triviaResultsTitle) {
+      triviaResultsTitle.textContent = dict.triviaResultsTitle || 'Challenge Completed!';
+    }
+
+    const total = triviaQuestions.length;
+    if (triviaResultsScore) {
+      if (typeof dict.triviaScore === 'function') {
+        triviaResultsScore.textContent = dict.triviaScore(userScore, total);
+      } else {
+        triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
+      }
+    }
+
+    const patternStr = answerPattern.join('');
+    if (triviaEmojiPattern) {
+      triviaEmojiPattern.textContent = patternStr;
+    }
+  }
+
   function updateDemographicPills(demographic) {
     const pills = document.querySelectorAll('.demo-pill');
     pills.forEach(pill => {
@@ -368,7 +591,18 @@ function initApp() {
       sentiment: "Community Sentiment",
       pollPrompt: "Is this trend actually genius, or is it totally overrated?",
       digDeeper: "Dig Deeper with AI",
-      chatPlaceholder: "Type your question..."
+      chatPlaceholder: "Type your question...",
+      triviaStart: "Start Trivia Challenge",
+      triviaProgress: (index, total) => `Question ${index} of ${total}`,
+      triviaCorrect: "Correct! 🟩",
+      triviaIncorrect: "Incorrect! 🟥",
+      triviaNext: "Next Question",
+      triviaResultsBtn: "See Results",
+      triviaResultsTitle: "Challenge Completed!",
+      triviaScore: (score, total) => `You scored ${score} out of ${total}`,
+      triviaPlayAgain: "Play Again",
+      triviaShareScore: "Share Score",
+      triviaHeader: "Trivia Challenge"
     },
     es: {
       whatIsIt: "¿Qué es?",
@@ -377,7 +611,18 @@ function initApp() {
       sentiment: "Sentimiento de la Comunidad",
       pollPrompt: "¿Este tema es una genialidad o está sobrevalorado?",
       digDeeper: "Profundizar con IA",
-      chatPlaceholder: "Escribe tu pregunta..."
+      chatPlaceholder: "Escribe tu pregunta...",
+      triviaStart: "Comenzar Desafío de Trivia",
+      triviaProgress: (index, total) => `Pregunta ${index} de ${total}`,
+      triviaCorrect: "¡Correcto! 🟩",
+      triviaIncorrect: "¡Incorrecto! 🟥",
+      triviaNext: "Siguiente Pregunta",
+      triviaResultsBtn: "Ver Resultados",
+      triviaResultsTitle: "¡Desafío Completado!",
+      triviaScore: (score, total) => `Tu puntuación es ${score} de ${total}`,
+      triviaPlayAgain: "Jugar de Nuevo",
+      triviaShareScore: "Compartir Puntuación",
+      triviaHeader: "Desafío de Trivia"
     },
     fr: {
       whatIsIt: "Qu'est-ce que c'est ?",
@@ -386,7 +631,18 @@ function initApp() {
       sentiment: "Sentiment de la communauté",
       pollPrompt: "Cette tendance est-elle géniale ou surfaite ?",
       digDeeper: "Approfondir avec l'IA",
-      chatPlaceholder: "Posez votre question..."
+      chatPlaceholder: "Posez votre question...",
+      triviaStart: "Commencer le Défi Trivia",
+      triviaProgress: (index, total) => `Question ${index} sur ${total}`,
+      triviaCorrect: "Correct ! 🟩",
+      triviaIncorrect: "Incorrect ! 🟥",
+      triviaNext: "Question Suivante",
+      triviaResultsBtn: "Voir les Résultats",
+      triviaResultsTitle: "Défi Terminé !",
+      triviaScore: (score, total) => `Votre score est de ${score} sur ${total}`,
+      triviaPlayAgain: "Rejouer",
+      triviaShareScore: "Partager le Score",
+      triviaHeader: "Défi Trivia"
     },
     ja: {
       whatIsIt: "概要",
@@ -395,7 +651,18 @@ function initApp() {
       sentiment: "コミュニティの反応",
       pollPrompt: "このトレンドは天才的ですか、それとも過大評価ですか？",
       digDeeper: "AIで深掘りする",
-      chatPlaceholder: "質問を入力..."
+      chatPlaceholder: "質問を入力...",
+      triviaStart: "トリビアチャレンジを開始",
+      triviaProgress: (index, total) => `問題 ${index} / ${total}`,
+      triviaCorrect: "正解！ 🟩",
+      triviaIncorrect: "不正解！ 🟥",
+      triviaNext: "次の問題",
+      triviaResultsBtn: "結果を見る",
+      triviaResultsTitle: "チャレンジ完了！",
+      triviaScore: (score, total) => `${total}問中 ${score}問正解`,
+      triviaPlayAgain: "もう一度プレイ",
+      triviaShareScore: "スコアを共有",
+      triviaHeader: "トリビアチャレンジ"
     }
   };
 
@@ -422,6 +689,80 @@ function initApp() {
     
     const chatInput = document.getElementById('chat-input');
     if (chatInput) chatInput.setAttribute('placeholder', dict.chatPlaceholder);
+
+    // Trivia Translations
+    const labelTriviaHeader = document.getElementById('trivia-header-label');
+    if (labelTriviaHeader) labelTriviaHeader.textContent = dict.triviaHeader;
+
+    const triviaIntro = triviaContainer ? triviaContainer.querySelector('.trivia-intro') : null;
+    if (triviaIntro) {
+      let introText = "Test your knowledge about this trend!";
+      if (lang === 'es') introText = "¡Pon a prueba tus conocimientos sobre esta tendencia!";
+      else if (lang === 'fr') introText = "Testez vos connaissances sur cette tendance !";
+      else if (lang === 'ja') introText = "このトレンドに関する知識をテストしましょう！";
+      triviaIntro.textContent = introText;
+    }
+
+    if (btnStartTrivia) btnStartTrivia.textContent = dict.triviaStart;
+    if (btnPlayAgain) btnPlayAgain.textContent = dict.triviaPlayAgain;
+    
+    if (btnShareScore) {
+      const svg = btnShareScore.querySelector('svg');
+      btnShareScore.innerHTML = '';
+      if (svg) btnShareScore.appendChild(svg);
+      btnShareScore.appendChild(document.createTextNode(' ' + (dict.triviaShareScore || 'Share Score')));
+    }
+
+    // If gameplay is active, update active gameplay strings
+    if (triviaQuestions && triviaQuestions.length > 0 && triviaGameplayScreen && !triviaGameplayScreen.classList.contains('hidden')) {
+      const progressLabel = triviaGameplayScreen.querySelector('.trivia-progress');
+      if (progressLabel) {
+        const total = triviaQuestions.length;
+        const progressIndex = currentQuestionIndex + 1;
+        if (typeof dict.triviaProgress === 'function') {
+          progressLabel.textContent = dict.triviaProgress(progressIndex, total);
+        } else {
+          progressLabel.textContent = `Question ${progressIndex} of ${total}`;
+        }
+      }
+
+      if (isAnswerSelected) {
+        const isCorrect = currentQuestionIndex < answerPattern.length && answerPattern[currentQuestionIndex] === '🟩';
+        if (isCorrect) {
+          triviaFeedback.textContent = dict.triviaCorrect || 'Correct! 🟩';
+        } else {
+          triviaFeedback.textContent = dict.triviaIncorrect || 'Incorrect! 🟥';
+        }
+
+        const isLastQuestion = currentQuestionIndex === triviaQuestions.length - 1;
+        if (isLastQuestion) {
+          triviaNavBtn.textContent = dict.triviaResultsBtn || 'See Results';
+        } else {
+          triviaNavBtn.textContent = dict.triviaNext || 'Next Question';
+        }
+
+        const correctQuestion = triviaQuestions[currentQuestionIndex];
+        if (correctQuestion) {
+          const correctOptionText = correctQuestion.options[correctQuestion.correctAnswer];
+          let correctLabel = "Correct Answer";
+          if (lang === 'es') correctLabel = "Respuesta Correcta";
+          else if (lang === 'fr') correctLabel = "Réponse Correcte";
+          else if (lang === 'ja') correctLabel = "正解";
+          triviaCorrectAnswer.textContent = `${correctLabel}: ${correctOptionText}`;
+        }
+      }
+    }
+
+    // If results screen is active, update results strings
+    if (triviaResultsScreen && !triviaResultsScreen.classList.contains('hidden')) {
+      triviaResultsTitle.textContent = dict.triviaResultsTitle || 'Challenge Completed!';
+      const total = triviaQuestions ? triviaQuestions.length : 3;
+      if (typeof dict.triviaScore === 'function') {
+        triviaResultsScore.textContent = dict.triviaScore(userScore, total);
+      } else {
+        triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
+      }
+    }
   }
 
   // Hydration data loader
@@ -1242,6 +1583,7 @@ function initApp() {
       if (timelineCanvas) {
         timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
       }
+      resetTrivia(trend);
     } catch (err) {
       if (loadId !== activeLoadId) return;
       console.error(err);
@@ -1258,6 +1600,11 @@ function initApp() {
   if (btnDownloadInfographic) {
     btnDownloadInfographic.addEventListener('click', generateInfographicCard);
   }
+
+  // Trivia Click Listeners
+  if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
+  if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
+  if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
 
   const customTextElInit = document.getElementById('info-custom-text-input');
   if (customTextElInit) {
