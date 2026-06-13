@@ -1,11 +1,12 @@
 task: Resolve the news footer test suite failure to restore baseline test suite verification to 100% success.              tier: T2   creativity: 0.5
-state: plan                budget: repairs 0/3
+state: test                budget: repairs 0/3
 branch: asf/20260613-news-footer          checkpoint: none
 caps: agents,ui,web,human
 
 ## Log
 - 2026-06-13: Conductor starting fresh run with T2 (Scout trigger). Starting Scout phase.
 - 2026-06-13: Scout completed. Conductor starting Architect phase.
+- 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 
 ## Task
 - **Objective**: Resolve the news footer test suite failure to restore baseline test suite verification to 100% success.
