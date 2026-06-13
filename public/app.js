@@ -1681,7 +1681,7 @@ function initApp() {
           Ask me any follow-up question about the viral rise of <strong>${trend.title}</strong>.
         </div>
       `;
-      await checkChatLimit(trend.title);
+      checkChatLimit(trend.title);
 
       // Populate Viral Vibe Card properties based on trend category meta
       const meta = getTrendCategoryMeta(trend.title);

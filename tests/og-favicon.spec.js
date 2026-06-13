@@ -79,8 +79,7 @@ const mockExplanation = {
 
 test.describe('OG Image & Publisher Favicon Integration', () => {
 
-  // [AC-1] Server-Side Metadata Fetcher & Caching
-  // [AC-2] Robust Fallbacks & Test Safety
+  // [AC-2] Flakiness-Free E2E Verification: Verify cached or mocked metadata on the server api/trends
   test('should return cached or mocked metadata on the server api/trends', async ({ request }) => {
     const response = await request.get('/api/trends');
     expect(response.status()).toBe(200);
@@ -106,8 +105,7 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     }
   });
 
-  // [AC-3] Trend List Items Visual Upgrade
-  // [AC-5] Playwright E2E Verification - list items
+  // [AC-2] Flakiness-Free E2E Verification: Verify visual thumbnails and publisher favicons in trend list items
   test('should render visual thumbnails and publisher favicons in trend list items', async ({ page }) => {
     // Intercept all image/icon requests to return a successful transparent PNG
     await page.route('**/*', async (route) => {
@@ -163,8 +161,8 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     expect(faviconSrc).toContain('google.com/s2/favicons?domain=fastify.io');
   });
 
-  // [AC-4] Trend Details & News Footer Enhancement
-  // [AC-5] Playwright E2E Verification - detail view & footer
+  // [AC-1] Synchronous and Atomic Detail View Rendering: Verify details update synchronously and atomically without event loop yields
+  // [AC-2] Flakiness-Free E2E Verification: Verify E2E stability of news footer publisher favicon and hero images
   test('should render hero image banner and publisher favicon in detail view and news footer', async ({ page }) => {
     // Intercept all image/icon requests to return a successful transparent PNG
     await page.route('**/*', async (route) => {
@@ -219,7 +217,7 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     const genericSvg = footerIconContainer.locator('svg.lucide-newspaper');
     await expect(genericSvg).not.toBeVisible();
 
-    // [AC-3] Select the second trend (no OG image, fallback to /api/topic-image/:slug)
+    // Select the second trend (no OG image, fallback to /api/topic-image/:slug)
     const secondItem = page.locator('.trend-item').nth(1);
     await secondItem.click();
 
@@ -234,8 +232,7 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     expect(secondFooterSrc).toContain('google.com/s2/favicons?domain=fastify.io');
   });
 
-  // [AC-3] List Item Thumbnail Fallback on Error
-  // [AC-2] List Item Publisher Favicon Fallback (from previous specs, kept for regression)
+  // [AC-2] Flakiness-Free E2E Verification: Verify fallback and error handling for list items
   test('should handle loading failures for list item thumbnails and publisher favicons', async ({ page }) => {
     // Intercept trends API to return mock metadata
     await page.route('**/api/trends', async (route) => {
@@ -265,14 +262,14 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
 
     // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
     await expect(async () => {
-      // AC-3: thumbnail image onerror swaps src to /api/topic-image/:slug
+      // thumbnail image onerror swaps src to /api/topic-image/:slug
       const imgSrc = await thumbnailImg.getAttribute('src');
       expect(imgSrc).toBe('/api/topic-image/google-gemini');
 
       // and the thumbnail is visible
       await expect(thumbnailImg).toBeVisible();
 
-      // AC-2: publisher favicon image is hidden/removed (display: none or removed from DOM)
+      // publisher favicon image is hidden/removed (display: none or removed from DOM)
       const faviconCount = await publisherFavicon.count();
       const isFaviconHidden = faviconCount === 0 || 
                               (await publisherFavicon.evaluate(el => window.getComputedStyle(el).display === 'none'));
@@ -280,8 +277,7 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
     }).toPass();
   });
 
-  // [AC-3] Detail View Hero Image Fallback on Error
-  // [AC-4] News Footer Favicon Fallback (from previous specs, kept for regression)
+  // [AC-2] Flakiness-Free E2E Verification: Verify detail view fallback and error handling under failure conditions
   test('should handle loading failures for detail view hero image and news footer favicon', async ({ page }) => {
     // Intercept trends API to return mock metadata
     await page.route('**/api/trends', async (route) => {
@@ -320,14 +316,14 @@ test.describe('OG Image & Publisher Favicon Integration', () => {
 
     // Use Playwright retrying assertions to wait for the client-side onerror handlers to fire
     await expect(async () => {
-      // AC-3: detail hero image onerror swaps src to /api/topic-image/:slug
+      // detail hero image onerror swaps src to /api/topic-image/:slug
       const heroSrc = await heroImage.getAttribute('src');
       expect(heroSrc).toBe('/api/topic-image/google-gemini');
 
       // and the hero image is visible
       await expect(heroImage).toBeVisible();
 
-      // AC-4: news footer favicon image is hidden (display: none)
+      // news footer favicon image is hidden (display: none)
       const footerFaviconDisplay = await footerFavicon.evaluate(el => window.getComputedStyle(el).display);
       expect(footerFaviconDisplay).toBe('none');
 
