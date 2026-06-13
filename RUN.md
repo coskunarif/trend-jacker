@@ -17,4 +17,31 @@ caps: agents,ui,web,human
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
 
 ## Verdict
+
+### Summary of Checks
+- **Database Schema & Persistence (`[AC-1]`)**: PASS (verified via unit tests)
+- **Backend API Endpoints (`[AC-2]`)**: PASS (verified via integration/API tests)
+- **Start Screen Global Leaderboard UI (`[AC-3]`)**: PASS (verified via Playwright tests and manual dogfooding)
+- **Results Screen Leaderboard UI & Nickname Submission (`[AC-4]`)**: PASS (verified via Playwright E2E and manual dogfooding)
+- **Full Test Suite / Regression Check**: FAIL (flaked on first execution under parallel load, passed on individual run and retry)
+
+### Details & Evidence
+
+#### 1. Additive Leaderboard Verification
+All Acceptance Criteria for the competitive global trivia leaderboard passed completely.
+- Unit and integration tests correctly assert rankings, nicknames (including anonymous masking `Player_<last-5-chars>`), case-insensitivity, and limits.
+- Manual dogfooding confirms that playing the game displays the leaderboard, highlights the current user, permits entering and saving a nickname, stores the name in `localStorage` (`trivia-nickname`), and updates the UI instantly in-place without reloading the page.
+
+#### 2. Regression Test Failure (Flake)
+- **Failing Spec**: `tests/e2e.spec.js`
+- **Failing Test**: `should use Web Share file sharing when fully supported`
+- **Line**: 565 (`expect(shareCalls.length).toBe(1);`)
+- **Evidence**:
+  ```
+  Expected: 1
+  Received: 0
+  ```
+- **Triage / Suspected Cause**: Test code race condition. The test fires a click event (`#btn-download-card`) and immediately queries `window.shareCalls` without waiting for the share handler promise or event loop to yield. Under parallel load, this causes a race condition. The test is passing when executed individually.
+
 ## Done
+
