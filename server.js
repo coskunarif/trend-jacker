@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1122,6 +1122,111 @@ fastify.post('/api/explain', async (request, reply) => {
     fastify.log.error(err);
     return reply.status(500).send({ error: 'Failed to generate trend explanation.' });
   }
+});
+
+// GET /api/topic-image/:slug
+fastify.get('/api/topic-image/:slug', async (request, reply) => {
+  const { slug } = request.params;
+  let cleanSlug = slug;
+  if (slug.endsWith('.md')) {
+    cleanSlug = slug.slice(0, -3);
+  }
+  
+  let trendName = '';
+  try {
+    if (latestTrends.length === 0) {
+      if (process.env.NODE_ENV === 'test') {
+        latestTrends = [
+          { id: 1, title: "Google Gemini", source: "google" },
+          { id: 2, title: "Fastify framework", source: "google" }
+        ];
+      } else {
+        await updateTrendsCache();
+      }
+    }
+    const match = latestTrends.find(item => titleToSlug(item.title) === cleanSlug);
+    if (match) {
+      trendName = match.title;
+    }
+  } catch (err) {
+    fastify.log.error(err);
+  }
+  
+  if (!trendName) {
+    trendName = cleanSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  }
+
+  // Check cache first
+  try {
+    const cachedSvg = await getCachedTopicImage(trendName);
+    if (cachedSvg) {
+      reply.header('Content-Type', 'image/svg+xml');
+      return reply.send(cachedSvg);
+    }
+  } catch (err) {
+    fastify.log.error('Cache read error for topic image: ' + err.message);
+  }
+
+  let svgContent = '';
+  // Check if test or dev mode
+  if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || !genAI) {
+    svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+      <rect width="800" height="600" fill="#2d1b4e"/>
+      <circle cx="400" cy="300" r="150" fill="#705af8" opacity="0.3"/>
+      <text x="400" y="310" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+      <text x="400" y="360" font-family="sans-serif" font-size="20" fill="#a599e8" text-anchor="middle">Topic Image Placeholder</text>
+    </svg>`;
+  } else {
+    // Production Mode: Generate custom topic SVG using Gemini API
+    try {
+      const model = genAI.getGenerativeModel({
+        model: 'gemini-3.5-flash',
+        generationConfig: {
+          thinkingConfig: { thinkingLevel: 'LOW' },
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: "OBJECT",
+            properties: {
+              svg: { type: "STRING" }
+            },
+            required: ["svg"]
+          }
+        }
+      });
+
+      const prompt = `You are a creative UI designer. Generate a custom, beautiful, topic-themed SVG image for the trending topic: "${trendName}".
+Requirements:
+1. The output must be valid SVG code.
+2. It should have a width of 800 and height of 600.
+3. The design should be modern, clean, and visually represent the topic "${trendName}". Use appropriate colors, shapes, and minimal text if necessary.
+4. Keep the output clean and return it inside the JSON response matching the schema.`;
+
+      const result = await model.generateContent(prompt);
+      const textResponse = result.response.text();
+      const parsed = JSON.parse(textResponse.trim());
+      if (parsed && parsed.svg) {
+        svgContent = parsed.svg;
+      } else {
+        throw new Error('Gemini response missing svg field');
+      }
+    } catch (err) {
+      fastify.log.error('Gemini SVG generation failed: ' + err.message);
+      svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+        <rect width="800" height="600" fill="#2d1b4e"/>
+        <text x="400" y="300" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+      </svg>`;
+    }
+  }
+
+  // Cache the SVG
+  try {
+    await setCachedTopicImage(trendName, svgContent);
+  } catch (err) {
+    fastify.log.error('Cache write error for topic image: ' + err.message);
+  }
+
+  reply.header('Content-Type', 'image/svg+xml');
+  return reply.send(svgContent);
 });
 
 // GET /api/og/:slug
