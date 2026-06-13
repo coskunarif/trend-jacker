@@ -8,4 +8,12 @@ caps: agents,ui,web,human
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Conductor starting Verifier phase.
 ## Verdict
+- **[AC-1] Set NODE_ENV=production in Cloud Run Deploy Workflow**: PASS
+  - Evidence: Verified that `.github/workflows/deploy.yml` sets `NODE_ENV=production` in `--set-env-vars`.
+- **[AC-2] Update Example Deployment Command in README.md**: PASS
+  - Evidence: Verified that `README.md` contains the updated `gcloud run deploy` example command with `NODE_ENV=production` in `--set-env-vars`.
+- **Test Suite**: PASS
+  - Evidence: All 120 Playwright tests passed successfully.
+- **Dogfood / Visual Checks**: SKIPPED
+  - Reason: The changes are limited to CI/CD and documentation files, which cannot affect the local runtime behavior or web user interface.
 ## Done
