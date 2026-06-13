@@ -64,11 +64,7 @@
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="close-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-          <!-- Mobile Tab Bar -->
-          <div class="sidebar-tabs">
-            <button type="button" class="tab-btn active" data-tab="trending">Trending</button>
-            <button type="button" class="tab-btn" data-tab="sentiment">Sentiment Feed</button>
-          </div>
+
         </div>
         <div id="trends-list" class="scroll-container">
           <!-- Skeleton Loaders -->
@@ -80,28 +76,7 @@
         </div>
       </div>
 
-      <!-- Section 2: Global Sentiment Feed -->
-      <div class="live-feed-section">
-        <div class="panel-header feed-header">
-          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-            <div>
-              <h2 class="section-title">Global Sentiment Feed</h2>
-              <p class="section-subtitle">Real-time simulated votes</p>
-            </div>
-            <span class="live-indicator">
-              <span class="status-dot animate-pulse"></span>
-              <span class="status-label">Live</span>
-            </span>
-          </div>
-        </div>
-        <div id="sentiment-explanation-banner" class="explanation-banner">
-          <span>This feed displays live community sentiment from around the world. Select any trending topic to cast your vote!</span>
-          <button id="btn-close-banner" aria-label="Dismiss banner">&times;</button>
-        </div>
-        <div id="live-sentiment-feed" class="feed-scroll-container" role="log" aria-live="polite">
-          <div class="feed-empty-state">Waiting for activity...</div>
-        </div>
-      </div>
+
     </aside>
 
     <!-- Center Panel: Explainer Board -->

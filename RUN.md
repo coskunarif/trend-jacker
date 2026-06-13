@@ -16,4 +16,6 @@ caps: agents,ui,web,human
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
 ## Verdict
+- **Disputed Test**: `tests/view-transitions.spec.js:102:3` ("should trigger startViewTransition when switching mobile tabs") contradicts **[AC-2] Sidebar Tab Bar Removal** and **[AC-1] Global Sentiment Feed Removal**, as mobile tab switcher elements are removed.
+
 ## Done
