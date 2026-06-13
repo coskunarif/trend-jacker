@@ -40,3 +40,8 @@ caps: agents,ui,web,human
 
 ## Done
 
+## Disputes
+- tests/chat-limit-referral.spec.js:146:3 - fails because it strictly asserts only three keys in `/api/chat-limit` payload, contradicting `[AC-2]` which adds `streakCount` and `streakBonus`.
+- tests/chat-limit-referral.spec.js:229:3 - fails because it asserts chat lockout after 3 messages, contradicting `[AC-2]` where a new user's streak of 1 day raises the allowed limit to 5.
+- tests/chat-limit-referral.spec.js:273:3 - fails because it asserts chat lockout after 3 messages, contradicting `[AC-2]` where a new user's streak of 1 day raises the allowed limit to 5.
+

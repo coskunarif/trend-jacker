@@ -2691,11 +2691,8 @@ function initApp() {
   async function checkChatLimit(trendTitle) {
     if (!trendTitle) return;
     try {
-      const useStreak = localClientId.toLowerCase().includes('streak');
-      const url = useStreak
-        ? `/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}&localDate=${getLocalDateString()}`
-        : `/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}`;
-      const res = await fetch(url);
+      const localDate = getLocalDateString();
+      const res = await fetch(`/api/chat-limit?clientId=${localClientId}&trend=${encodeURIComponent(trendTitle)}&localDate=${localDate}`);
       if (res.ok) {
         const data = await res.json();
         updateLimitAndStreakUI(data);
