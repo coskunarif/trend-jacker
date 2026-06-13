@@ -2743,6 +2743,20 @@ body {
   color: var(--text-muted);
 }
 
+#trivia-milestone-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--primary-color, #3b82f6);
+  margin-top: var(--space-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#trivia-milestone-badge {
+  font-size: 2.5rem;
+  margin: var(--space-2) 0;
+}
+
 .trivia-emoji-pattern {
   font-size: 2.2rem;
   letter-spacing: 0.1em;

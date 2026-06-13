@@ -341,6 +341,11 @@ function initApp() {
       rewardDisplay.style.display = 'none';
     }
 
+    const milestoneTitleEl = document.getElementById('trivia-milestone-title');
+    const milestoneBadgeEl = document.getElementById('trivia-milestone-badge');
+    if (milestoneTitleEl) milestoneTitleEl.textContent = '';
+    if (milestoneBadgeEl) milestoneBadgeEl.textContent = '';
+
     if (trend && triviaTitle) {
       triviaTitle.textContent = trend.title;
     }
@@ -583,6 +588,27 @@ function initApp() {
     }
   }
 
+  function updateTriviaMilestone(score) {
+    const milestoneTitleEl = document.getElementById('trivia-milestone-title');
+    const milestoneBadgeEl = document.getElementById('trivia-milestone-badge');
+    if (milestoneTitleEl && milestoneBadgeEl) {
+      let title = '';
+      let badge = '';
+      if (score === 3) {
+        title = "Brainiac Mastermind";
+        badge = "🏆";
+      } else if (score === 2) {
+        title = "Sharp Challenger";
+        badge = "🥈";
+      } else {
+        title = "Curious Mind";
+        badge = "🥉";
+      }
+      milestoneTitleEl.textContent = title;
+      milestoneBadgeEl.textContent = badge;
+    }
+  }
+
   function showResults() {
     if (triviaGameplayScreen) triviaGameplayScreen.classList.add('hidden');
     if (triviaResultsScreen) triviaResultsScreen.classList.remove('hidden');
@@ -602,6 +628,8 @@ function initApp() {
         triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
       }
     }
+
+    updateTriviaMilestone(userScore);
 
     const patternStr = answerPattern.join('');
     if (triviaEmojiPattern) {
@@ -933,6 +961,7 @@ function initApp() {
       } else {
         triviaResultsScore.textContent = `You scored ${userScore} out of ${total}`;
       }
+      updateTriviaMilestone(userScore);
     }
   }
 
