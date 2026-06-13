@@ -1,5 +1,5 @@
 task: Increase user retention and sharing virality via daily streak recovery mechanics and social achievements.              tier: T2   creativity: 0.5
-state: VERIFIER                budget: repairs 0/3
+state: SHIPPER                budget: repairs 0/3
 branch: asf/20260613-streak-achievements          checkpoint: none
 caps: agents,ui,web,human
 
@@ -16,6 +16,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite. Observed state: green. Conductor starting Builder phase.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
 ## Verdict
 - **[AC-1] SQLite Streak Persistence & Helpers**: PASS. Fully verified with unit tests `tests/daily-streaks-rewards.spec.js` asserting table creation, normalization, insertion/updating, same day, consecutive day, past day, and gap day calculations.
 - **[AC-2] Backend API & Chat Limit Logic Integration**: PASS. Integration tests successfully hit `GET /api/chat-limit` and `POST /api/chat` showing capacity calculations (`3 + 5 * referrals + triviaBonus + streakBonus`) are correctly integrated and enforced (returning 403 when limit is reached).
