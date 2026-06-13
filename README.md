@@ -133,5 +133,5 @@ Records user votes on a trend ("overrated" vs. "genius").
     --project profithelm-477200 \
     --region us-central1 \
     --allow-unauthenticated \
-    --set-env-vars="GEMINI_API_KEY=YOUR_KEY"
+    --set-env-vars="GEMINI_API_KEY=YOUR_KEY,NODE_ENV=production"
   ```
