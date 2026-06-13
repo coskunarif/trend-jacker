@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1573,8 +1573,10 @@ fastify.get('/api/chat-limit', async (request, reply) => {
   const normalizedClientId = clientId.trim().toLowerCase();
   const normalizedTrend = trend.trim().toLowerCase();
 
+  let newlyResolvedPredictions = [];
   if (localDate) {
     await updateClientStreak(normalizedClientId, localDate);
+    newlyResolvedPredictions = await resolvePredictions(normalizedClientId, localDate);
   }
 
   let streakCount = 0;
@@ -1597,10 +1599,38 @@ fastify.get('/api/chat-limit', async (request, reply) => {
       triviaBonus = 1;
     }
   }
-  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
+  const predictionBonus = await getPredictionBonus(normalizedClientId);
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus + predictionBonus;
   const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
   const limitReached = currentCount >= allowedLimit;
-  return { limitReached, currentCount, allowedLimit, streakCount, streakBonus };
+  return { limitReached, currentCount, allowedLimit, streakCount, streakBonus, newlyResolvedPredictions, predictionBonus };
+});
+
+// POST /api/predict - Record a client prediction
+fastify.post('/api/predict', async (request, reply) => {
+  const { clientId, trend, prediction, localDate } = request.body || {};
+  if (!clientId || !trend || !prediction || !localDate) {
+    return reply.status(400).send({ error: 'clientId, trend, prediction, and localDate are required.' });
+  }
+  if (prediction !== 'rise' && prediction !== 'fall') {
+    return reply.status(400).send({ error: 'prediction must be "rise" or "fall".' });
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(localDate)) {
+    return reply.status(400).send({ error: 'localDate must be in YYYY-MM-DD format.' });
+  }
+
+  await recordPrediction(clientId, trend, prediction, localDate);
+  return { success: true };
+});
+
+// GET /api/predictions - Get client predictions
+fastify.get('/api/predictions', async (request, reply) => {
+  const { clientId } = request.query || {};
+  if (!clientId || typeof clientId !== 'string' || !clientId.trim()) {
+    return reply.status(400).send({ error: 'clientId query parameter is required.' });
+  }
+  const list = await getClientPredictions(clientId);
+  return reply.send(list);
 });
 
 // POST /api/referral - Record a client referral
@@ -1649,7 +1679,8 @@ fastify.post('/api/trivia/score', async (request, reply) => {
       triviaBonus = 1;
     }
   }
-  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
+  const predictionBonus = await getPredictionBonus(normalizedClientId);
+  const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus + predictionBonus;
   const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
   const limitReached = currentCount >= allowedLimit;
 
@@ -1723,7 +1754,8 @@ fastify.post('/api/chat', async (request, reply) => {
         triviaBonus = 1;
       }
     }
-    const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus;
+    const predictionBonus = await getPredictionBonus(normalizedClientId);
+    const allowedLimit = 3 + 5 * referralCount + triviaBonus + streakBonus + predictionBonus;
     const currentCount = await getChatCount(normalizedClientId, normalizedTrend);
     if (currentCount >= allowedLimit) {
       return reply.status(403).send({ error: 'limit_reached', allowedLimit });
@@ -1889,13 +1921,13 @@ fastify.post('/api/log', async (request, reply) => {
 
 // POST /api/generate-post - Generates a viral social media post using Gemini
 fastify.post('/api/generate-post', async (request, reply) => {
-  const { trendTitle: bodyTrendTitle, trend: bodyTrend, platform, contextType, score, pattern } = request.body || {};
+  const { trendTitle: bodyTrendTitle, trend: bodyTrend, platform, contextType, score, pattern, prediction } = request.body || {};
   const trendTitle = bodyTrendTitle || bodyTrend;
   if (!trendTitle) {
     return reply.status(400).send({ error: 'Trend title is required.' });
   }
   try {
-    const postText = await generatePostText(trendTitle, platform, contextType, score, pattern);
+    const postText = await generatePostText(trendTitle, platform, contextType, score, pattern, prediction);
     return { postText };
   } catch (err) {
     fastify.log.error(err);
@@ -1903,9 +1935,9 @@ fastify.post('/api/generate-post', async (request, reply) => {
   }
 });
 
-async function generatePostText(trendTitle, platform, contextType, score, pattern) {
+async function generatePostText(trendTitle, platform, contextType, score, pattern, prediction) {
   const targetPlatform = platform || 'x';
-  const targetContext = contextType === 'trivia' ? `trivia:${score !== undefined ? score : ''}:${pattern || ''}` : (contextType || 'general');
+  const targetContext = contextType === 'trivia' ? `trivia:${score !== undefined ? score : ''}:${pattern || ''}` : (contextType === 'prediction' ? `prediction:${prediction || ''}` : (contextType || 'general'));
   const slug = titleToSlug(trendTitle);
   const targetUrl = `https://viraljacker.com/t/${slug}`;
 
@@ -1933,6 +1965,24 @@ async function generatePostText(trendTitle, platform, contextType, score, patter
         postText = `Trivia Challenge completed for ${trendTitle}! Score: ${score}/3\n\nPattern: ${pattern}\n\nTry it here: ${targetUrl}`;
       } else {
         postText = `I scored ${score}/3 on the ${trendTitle} Trivia Challenge! ${pattern}\n${targetUrl}`;
+      }
+    } else if (contextType === 'prediction') {
+      const predLabel = prediction === 'fall' ? 'Decline 📉' : 'Keep Rising 📈';
+      if (targetPlatform === 'x' || targetPlatform === 'twitter') {
+        postText = `I just predicted that ${trendTitle} will ${predLabel} tomorrow! Join me on TrendJacker! ${targetUrl} #${trendTitle.replace(/\s+/g, '')}`;
+        if (postText.length > 280) {
+          postText = postText.substring(0, 277) + '...';
+        }
+      } else if (targetPlatform === 'pinterest') {
+        postText = `Pin Title: ${trendTitle} Prediction\n\nPin Description: I just predicted that ${trendTitle} will ${predLabel} tomorrow! Check out live trend prediction details here: ${targetUrl}`;
+      } else if (targetPlatform === 'linkedin') {
+        postText = `I just predicted that ${trendTitle} will ${predLabel} tomorrow!\n\nJoin the trend prediction challenge on TrendJacker and unlock extra message capacity. ${targetUrl}\n\n#AI #Innovation #TrendPrediction`;
+      } else if (targetPlatform === 'facebook') {
+        postText = `I just predicted that ${trendTitle} will ${predLabel} tomorrow! Join me on TrendJacker to predict daily trend outcomes: ${targetUrl}`;
+      } else if (targetPlatform === 'reddit') {
+        postText = `Trend Prediction for ${trendTitle}: I predicted it will ${predLabel} tomorrow!\n\nVote and predict here: ${targetUrl}`;
+      } else {
+        postText = `I just predicted that ${trendTitle} will ${predLabel} tomorrow! ${targetUrl}`;
       }
     } else {
       if (targetPlatform === 'x' || targetPlatform === 'twitter') {
@@ -1997,9 +2047,15 @@ async function generatePostText(trendTitle, platform, contextType, score, patter
       triviaInstructions = `\nYou must explicitly feature the trivia score "${score}/3" and the Wordle-style score emoji pattern "${pattern}" in the post text. Encourage followers to test their own knowledge and beat this score.`;
     }
 
+    let predictionInstructions = '';
+    if (contextType === 'prediction') {
+      const predLabel = prediction === 'fall' ? 'Decline 📉' : 'Keep Rising 📈';
+      predictionInstructions = `\nYou must explicitly mention that you predicted that the trend "${trendTitle}" will "${predLabel}" tomorrow. Frame it as an exciting prediction stake.`;
+    }
+
     const prompt = `You are a world-class viral social media marketer. Generate a highly engaging, professional yet catchy social media post about the trending topic "${trendTitle}".
 
-The angle/context for the post is: "${contextType || 'general'}".${triviaInstructions}
+The angle/context for the post is: "${contextType || 'general'}".${triviaInstructions}${predictionInstructions}
 You MUST explicitly include the following target URL in the post: "${targetUrl}"
 
 Platform-Specific Constraints:

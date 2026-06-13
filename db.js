@@ -35,6 +35,7 @@ const inMemoryClientChatCounts = new Map();
 const inMemoryClientTriviaScores = new Map();
 const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
+const inMemoryClientPredictions = new Map();
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -185,6 +186,17 @@ if (!firestore) {
           trivia TEXT,
           created_at TEXT,
           PRIMARY KEY (trend, lang)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS client_predictions (
+          client_id TEXT,
+          trend TEXT COLLATE NOCASE,
+          prediction TEXT,
+          prediction_date TEXT,
+          status TEXT,
+          resolved_at TEXT,
+          PRIMARY KEY (client_id, trend, prediction_date)
         )
       `);
     } finally {
@@ -1703,5 +1715,266 @@ export async function getTriviaLeaderboard(trend, clientId) {
     userRank,
     userScore
   };
+}
+
+/**
+ * Records a client prediction.
+ * @param {string} clientId
+ * @param {string} trend
+ * @param {'rise'|'fall'} prediction
+ * @param {string} predictionDate
+ * @returns {Promise<void>}
+ */
+export async function recordPrediction(clientId, trend, prediction, predictionDate) {
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const data = {
+    client_id: normalizedClientId,
+    trend: normalizedTrend,
+    prediction,
+    prediction_date: predictionDate,
+    status: 'pending',
+    resolved_at: null
+  };
+
+  if (firestore) {
+    try {
+      const docId = `${normalizedClientId}_${normalizedTrend}_${predictionDate}`;
+      await firestore.collection('client_predictions').doc(docId).set(data);
+      return;
+    } catch (err) {
+      console.error('Firestore error in recordPrediction:', err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare(`
+        INSERT OR REPLACE INTO client_predictions (client_id, trend, prediction, prediction_date, status, resolved_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(normalizedClientId, normalizedTrend, prediction, predictionDate, 'pending', null);
+      return;
+    } catch (err) {
+      console.error('Local SQLite insert failed for recordPrediction:', err.message);
+      return;
+    }
+  }
+
+  const key = `${normalizedClientId}:${normalizedTrend}:${predictionDate}`;
+  inMemoryClientPredictions.set(key, data);
+}
+
+/**
+ * Retrieves all predictions for a client.
+ * @param {string} clientId
+ * @returns {Promise<Array>}
+ */
+export async function getClientPredictions(clientId) {
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('client_predictions')
+        .where('client_id', '==', normalizedClientId)
+        .get();
+      const list = [];
+      snapshot.forEach(doc => {
+        list.push(doc.data());
+      });
+      return list;
+    } catch (err) {
+      console.error('Firestore error in getClientPredictions:', err.message);
+      return [];
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT * FROM client_predictions WHERE client_id = ?');
+      return stmt.all(normalizedClientId);
+    } catch (err) {
+      console.error('Local SQLite query failed for getClientPredictions:', err.message);
+      return [];
+    }
+  }
+
+  const list = [];
+  for (const [key, value] of inMemoryClientPredictions.entries()) {
+    if (value.client_id === normalizedClientId) {
+      list.push({ ...value });
+    }
+  }
+  return list;
+}
+
+/**
+ * Resolves any pending predictions dated before localDate.
+ * @param {string} clientId
+ * @param {string} localDate
+ * @returns {Promise<Array>}
+ */
+export async function resolvePredictions(clientId, localDate) {
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  const resolvedList = [];
+  const nowStr = new Date().toISOString();
+
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('client_predictions')
+        .where('client_id', '==', normalizedClientId)
+        .where('status', '==', 'pending')
+        .get();
+      
+      const batch = firestore.batch();
+      snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.prediction_date < localDate) {
+          const trend = data.trend;
+          const predDate = data.prediction_date;
+          const hashVal = crypto.createHash('sha256').update(trend.toLowerCase() + ":" + predDate).digest('hex');
+          const lastChar = hashVal.slice(-1);
+          const modVal = parseInt(lastChar, 16) % 2;
+          const outcome = modVal === 0 ? 'rise' : 'fall';
+          
+          const status = data.prediction === outcome ? 'correct' : 'incorrect';
+          const resolved_at = nowStr;
+          
+          const docRef = firestore.collection('client_predictions').doc(doc.id);
+          batch.update(docRef, { status, resolved_at });
+          
+          resolvedList.push({
+            ...data,
+            status,
+            resolved_at
+          });
+        }
+      });
+      if (resolvedList.length > 0) {
+        await batch.commit();
+      }
+      return resolvedList;
+    } catch (err) {
+      console.error('Firestore error in resolvePredictions:', err.message);
+      return [];
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const pending = sqliteDb.prepare(`
+        SELECT * FROM client_predictions 
+        WHERE client_id = ? AND status = 'pending' AND prediction_date < ?
+      `).all(normalizedClientId, localDate);
+
+      const db = new DatabaseSyncClass(dbPath);
+      db.exec('PRAGMA journal_mode = WAL;');
+      db.exec('PRAGMA busy_timeout = 5000;');
+      try {
+        db.exec('BEGIN TRANSACTION;');
+        const updateStmt = db.prepare(`
+          UPDATE client_predictions 
+          SET status = ?, resolved_at = ? 
+          WHERE client_id = ? AND trend = ? AND prediction_date = ?
+        `);
+        for (const record of pending) {
+          const trend = record.trend;
+          const predDate = record.prediction_date;
+          const hashVal = crypto.createHash('sha256').update(trend.toLowerCase() + ":" + predDate).digest('hex');
+          const lastChar = hashVal.slice(-1);
+          const modVal = parseInt(lastChar, 16) % 2;
+          const outcome = modVal === 0 ? 'rise' : 'fall';
+          
+          const status = record.prediction === outcome ? 'correct' : 'incorrect';
+          const resolved_at = nowStr;
+
+          updateStmt.run(status, resolved_at, normalizedClientId, trend, predDate);
+          
+          resolvedList.push({
+            ...record,
+            status,
+            resolved_at
+          });
+        }
+        db.exec('COMMIT;');
+      } catch (err) {
+        try {
+          db.exec('ROLLBACK;');
+        } catch (rollbackErr) {}
+        throw err;
+      } finally {
+        db.close();
+      }
+      return resolvedList;
+    } catch (err) {
+      console.error('Local SQLite error in resolvePredictions:', err.message);
+      return [];
+    }
+  }
+
+  for (const [key, value] of inMemoryClientPredictions.entries()) {
+    if (value.client_id === normalizedClientId && value.status === 'pending' && value.prediction_date < localDate) {
+      const trend = value.trend;
+      const predDate = value.prediction_date;
+      const hashVal = crypto.createHash('sha256').update(trend.toLowerCase() + ":" + predDate).digest('hex');
+      const lastChar = hashVal.slice(-1);
+      const modVal = parseInt(lastChar, 16) % 2;
+      const outcome = modVal === 0 ? 'rise' : 'fall';
+      
+      const status = value.prediction === outcome ? 'correct' : 'incorrect';
+      const resolved_at = nowStr;
+
+      const updated = {
+        ...value,
+        status,
+        resolved_at
+      };
+      inMemoryClientPredictions.set(key, updated);
+      resolvedList.push(updated);
+    }
+  }
+  return resolvedList;
+}
+
+/**
+ * Returns the bonus capacity based on correct predictions count.
+ * @param {string} clientId
+ * @returns {Promise<number>}
+ */
+export async function getPredictionBonus(clientId) {
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  let correctCount = 0;
+
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('client_predictions')
+        .where('client_id', '==', normalizedClientId)
+        .where('status', '==', 'correct')
+        .get();
+      correctCount = snapshot.size;
+    } catch (err) {
+      console.error('Firestore error in getPredictionBonus:', err.message);
+      correctCount = 0;
+    }
+  } else if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare(`
+        SELECT COUNT(*) as count FROM client_predictions 
+        WHERE client_id = ? AND status = 'correct'
+      `).get(normalizedClientId);
+      correctCount = row ? row.count : 0;
+    } catch (err) {
+      console.error('Local SQLite query failed for getPredictionBonus:', err.message);
+      correctCount = 0;
+    }
+  } else {
+    for (const value of inMemoryClientPredictions.values()) {
+      if (value.client_id === normalizedClientId && value.status === 'correct') {
+        correctCount++;
+      }
+    }
+  }
+
+  return correctCount * 3;
 }
 

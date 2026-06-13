@@ -1163,6 +1163,16 @@ function initApp() {
         requestBody.score = userScore;
         requestBody.pattern = answerPattern.join('');
       }
+      if (activeShareContext === 'prediction') {
+        const statusMsg = document.getElementById('prediction-status-message');
+        let prediction = 'rise';
+        if (statusMsg && statusMsg.textContent) {
+          if (statusMsg.textContent.toLowerCase().includes('fall') || statusMsg.textContent.toLowerCase().includes('decline')) {
+            prediction = 'fall';
+          }
+        }
+        requestBody.prediction = prediction;
+      }
       const response = await fetch('/api/generate-post', {
         method: 'POST',
         headers: {
@@ -1885,6 +1895,7 @@ function initApp() {
         timelineCanvas.scrollIntoView({ behavior: 'instant', block: 'center' });
       }
       resetTrivia(trend);
+      fetchPredictionHistory();
     } catch (err) {
       if (loadId !== activeLoadId) return;
       console.error(err);
@@ -1912,6 +1923,251 @@ function initApp() {
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
   if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
   if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
+
+  // Trend Predictions UI Handlers [AC-3]
+  const btnPredictRise = document.querySelector('.btn-predict-rise');
+  const btnPredictFall = document.querySelector('.btn-predict-fall');
+  const btnDownloadPredictionCard = document.getElementById('btn-download-prediction-card');
+  const predictionStatusMsg = document.getElementById('prediction-status-message');
+
+  if (btnPredictRise) {
+    btnPredictRise.addEventListener('click', () => submitPrediction('rise'));
+  }
+  if (btnPredictFall) {
+    btnPredictFall.addEventListener('click', () => submitPrediction('fall'));
+  }
+  if (btnDownloadPredictionCard) {
+    btnDownloadPredictionCard.addEventListener('click', generatePredictionCardImage);
+  }
+
+  async function submitPrediction(prediction) {
+    if (!currentTrend || !localClientId) return;
+    
+    // Disable buttons immediately
+    if (btnPredictRise) btnPredictRise.disabled = true;
+    if (btnPredictFall) btnPredictFall.disabled = true;
+    
+    if (predictionStatusMsg) {
+      predictionStatusMsg.textContent = `You predicted this trend will ${prediction === 'rise' ? 'Rise' : 'Fall'} tomorrow.`;
+    }
+
+    if (prediction === 'rise') {
+      if (btnPredictRise) btnPredictRise.classList.add('selected-rise');
+      if (btnPredictFall) btnPredictFall.classList.remove('selected-fall');
+    } else {
+      if (btnPredictFall) btnPredictFall.classList.add('selected-fall');
+      if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
+    }
+
+    // [AC-4] Lock prediction triggers immediate un-awaited call to checkChatLimit
+    checkChatLimit(currentTrend.title);
+
+    try {
+      const localDate = getLocalDateString();
+      const res = await fetch('/api/predict', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          clientId: localClientId,
+          trend: currentTrend.title,
+          prediction,
+          localDate
+        })
+      });
+      
+      // Update history
+      await fetchPredictionHistory();
+    } catch (err) {
+      console.error('Error submitting prediction:', err);
+    }
+  }
+
+  async function fetchPredictionHistory() {
+    if (!currentTrend || !localClientId) return;
+    try {
+      const res = await fetch(`/api/predictions?clientId=${localClientId}`);
+      if (res.ok) {
+        const predictions = await res.json();
+        
+        // Update correct count
+        const correctCount = predictions.filter(p => p.status === 'correct').length;
+        const correctCountEl = document.getElementById('prediction-correct-count');
+        if (correctCountEl) {
+          correctCountEl.textContent = correctCount;
+        }
+        
+        // Populate history list
+        const listEl = document.getElementById('prediction-history-list');
+        if (listEl) {
+          listEl.innerHTML = '';
+          if (predictions.length === 0) {
+            listEl.innerHTML = '<div class="prediction-history-item" style="color: rgba(255,255,255,0.4)">No predictions made yet.</div>';
+          } else {
+            const sorted = [...predictions].sort((a, b) => b.prediction_date.localeCompare(a.prediction_date));
+            sorted.forEach(p => {
+              const item = document.createElement('div');
+              item.className = 'prediction-history-item';
+              
+              const dateStr = p.prediction_date;
+              const predStr = p.prediction === 'rise' ? 'Rise 📈' : 'Fall 📉';
+              
+              let statusBadge = '';
+              if (p.status === 'correct') {
+                statusBadge = '<span class="status-correct">Correct ✓</span>';
+              } else if (p.status === 'incorrect') {
+                statusBadge = '<span class="status-incorrect">Incorrect ✗</span>';
+              } else {
+                statusBadge = '<span class="status-pending">Pending</span>';
+              }
+              
+              item.innerHTML = `
+                <span><strong>${p.trend}</strong> (${dateStr})</span>
+                <span>Predicted: ${predStr} - ${statusBadge}</span>
+              `;
+              listEl.appendChild(item);
+            });
+          }
+        }
+        
+        // Check if prediction is already made today for the active trend
+        const todayStr = getLocalDateString();
+        const activeTrendPrediction = predictions.find(p => p.trend.toLowerCase() === currentTrend.title.toLowerCase() && p.prediction_date === todayStr);
+        
+        if (activeTrendPrediction) {
+          if (btnPredictRise) btnPredictRise.disabled = true;
+          if (btnPredictFall) btnPredictFall.disabled = true;
+          if (predictionStatusMsg) {
+            predictionStatusMsg.textContent = `You predicted this trend will ${activeTrendPrediction.prediction === 'rise' ? 'Rise' : 'Fall'} tomorrow.`;
+          }
+          if (activeTrendPrediction.prediction === 'rise') {
+            if (btnPredictRise) btnPredictRise.classList.add('selected-rise');
+            if (btnPredictFall) btnPredictFall.classList.remove('selected-fall');
+          } else {
+            if (btnPredictFall) btnPredictFall.classList.add('selected-fall');
+            if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
+          }
+        } else {
+          if (btnPredictRise) {
+            btnPredictRise.disabled = false;
+            btnPredictRise.classList.remove('selected-rise');
+          }
+          if (btnPredictFall) {
+            btnPredictFall.disabled = false;
+            btnPredictFall.classList.remove('selected-fall');
+          }
+          if (predictionStatusMsg) {
+            predictionStatusMsg.textContent = '';
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching prediction history:', err);
+    }
+  }
+
+  async function generatePredictionCardImage() {
+    if (!currentTrend) return;
+    
+    // Ensure custom fonts are loaded before drawing
+    await document.fonts.ready;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = 2400;
+    canvas.height = 1260;
+    const ctx = canvas.getContext('2d');
+    ctx.scale(2, 2);
+
+    // 1. Background Gradient
+    const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    bgGrad.addColorStop(0, '#0f1225');
+    bgGrad.addColorStop(1, '#05070f');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, 1200, 630);
+
+    // 2. Glowing Neon Border Accent
+    const borderGrad = ctx.createLinearGradient(0, 0, 1200, 630);
+    borderGrad.addColorStop(0, '#6366f1'); // Indigo
+    borderGrad.addColorStop(0.5, '#06b6d4'); // Cyan
+    borderGrad.addColorStop(1, '#6366f1');
+    ctx.strokeStyle = borderGrad;
+    ctx.lineWidth = 8;
+    ctx.strokeRect(4, 4, 1192, 622);
+
+    // 3. Logo/Brand
+    ctx.font = "bold 26px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("Trend", 80, 80);
+    const trendTextWidth = ctx.measureText("Trend").width;
+    
+    const logoGrad = ctx.createLinearGradient(80 + trendTextWidth, 0, 80 + trendTextWidth + 100, 0);
+    logoGrad.addColorStop(0, '#06b6d4');
+    logoGrad.addColorStop(1, '#6366f1');
+    ctx.fillStyle = logoGrad;
+    ctx.fillText("Jacker", 80 + trendTextWidth, 80);
+
+    // LIVE ANALYTICS Badge
+    ctx.fillStyle = "rgba(6, 182, 212, 0.1)";
+    ctx.fillRect(1000, 56, 120, 32);
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "rgba(6, 182, 212, 0.3)";
+    ctx.strokeRect(1000, 56, 120, 32);
+
+    ctx.font = "bold 13px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#06b6d4";
+    ctx.textAlign = "center";
+    ctx.fillText("PREDICTION", 1060, 76);
+    ctx.textAlign = "left"; // Reset alignment
+
+    // 4. Trend Header
+    ctx.font = "bold 68px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(currentTrend.title, 80, 175);
+
+    // 5. Prediction Status Details
+    ctx.font = "bold 15px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#6366f1";
+    ctx.fillText("MY PREDICTION", 80, 240);
+
+    // Check if prediction is already made today for the active trend
+    let predictionText = "Not predicted yet";
+    const statusMsg = document.getElementById('prediction-status-message');
+    if (statusMsg && statusMsg.textContent) {
+      predictionText = statusMsg.textContent;
+    }
+
+    ctx.fillStyle = "rgba(255, 255, 255, 0.03)";
+    ctx.fillRect(80, 260, 1040, 140);
+    
+    ctx.font = "bold 32px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#cbd5e1";
+    ctx.fillText(predictionText, 120, 340);
+
+    // 6. Correct Count Stats
+    const correctCountEl = document.getElementById('prediction-correct-count');
+    const correctCount = correctCountEl ? correctCountEl.textContent : '0';
+
+    ctx.font = "bold 15px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#06b6d4";
+    ctx.fillText("TOTAL SCORE", 80, 450);
+
+    ctx.font = "bold 24px 'Space Grotesk', sans-serif";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText(`🏆 ${correctCount} correct predictions`, 80, 490);
+
+    // 7. Footer Call To Action
+    ctx.font = "500 15px 'Plus Jakarta Sans', sans-serif";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+    ctx.fillText("Predict trends and unlock chat limits at viraljacker.com", 80, 560);
+
+    const filename = `prediction-card-${titleToSlug(currentTrend.title)}.png`;
+    const title = `TrendJacker Prediction — ${currentTrend.title}`;
+    const text = `I just predicted the development of "${currentTrend.title}"! Join me and predict on TrendJacker!`;
+    const fallbackUrl = window.location.origin + '/t/' + titleToSlug(currentTrend.title);
+
+    await shareOrDownloadCanvas(canvas, filename, title, text, fallbackUrl);
+  }
 
   const btnSaveNickname = document.getElementById('btn-save-nickname');
   const nicknameInput = document.getElementById('nickname-input');
@@ -2991,6 +3247,12 @@ function initApp() {
         if (data.rewardCount !== undefined) {
           showUnlockToast(data.rewardCount);
         }
+        if (data.newlyResolvedPredictions && data.newlyResolvedPredictions.length > 0) {
+          const correctResolved = data.newlyResolvedPredictions.filter(p => p.status === 'correct');
+          if (correctResolved.length > 0) {
+            showUnlockToast(correctResolved.length * 3);
+          }
+        }
       } else {
         // Already unlocked or initial page load
         if (chatForm) {
@@ -3000,6 +3262,13 @@ function initApp() {
         if (chatLockContainer) {
           chatLockContainer.classList.add('hidden');
         }
+      }
+    }
+
+    if (data.newlyResolvedPredictions && data.newlyResolvedPredictions.length > 0) {
+      const correctResolved = data.newlyResolvedPredictions.filter(p => p.status === 'correct');
+      if (correctResolved.length > 0) {
+        showUnlockToast(correctResolved.length * 3);
       }
     }
   }
