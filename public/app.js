@@ -62,7 +62,28 @@ function initApp() {
   let activeLoadId = 0;
 
   const pageLoadTime = Date.now();
-  const localClientId = 'client-' + Math.random().toString(36).substr(2, 9);
+  let storedClientId = localStorage.getItem('clientId');
+  if (!storedClientId) {
+    storedClientId = 'client-' + Math.random().toString(36).substr(2, 9);
+    localStorage.setItem('clientId', storedClientId);
+  }
+  const localClientId = storedClientId;
+
+  // Capture referral
+  const urlParams = new URLSearchParams(window.location.search);
+  const refValue = urlParams.get('ref');
+  if (refValue && refValue !== localClientId) {
+    fetch('/api/referral', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        client_id: refValue,
+        referee_id: localClientId
+      })
+    }).catch(err => console.error('Error sending referral POST:', err));
+  }
 
 
 
