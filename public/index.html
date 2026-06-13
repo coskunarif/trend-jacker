@@ -345,9 +345,11 @@
           <div class="trivia-results-screen hidden">
             <h3 class="trivia-results-title">Challenge Completed!</h3>
             <p class="trivia-results-score"></p>
+            <div id="trivia-reward-display" style="display: none; margin-bottom: var(--space-3); padding: var(--space-2); border-radius: var(--radius-md); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 600; font-size: 0.9rem;"></div>
             <div class="trivia-emoji-pattern"></div>
             <div class="trivia-results-actions">
               <button id="btn-play-again" class="play-again-btn">Play Again</button>
+              <button id="btn-return-to-chat" class="return-to-chat-btn" style="padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.15); background: transparent; color: white; cursor: pointer;">Go to Chat</button>
               <button id="btn-share-score" class="share-score-btn">
                 <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                 Share Score
