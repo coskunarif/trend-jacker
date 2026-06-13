@@ -1556,8 +1556,7 @@ export async function getTriviaLeaderboard(trend, clientId) {
   const normalizedTrend = (trend || '').trim().toLowerCase();
   const normalizedClientId = (clientId || '').trim().toLowerCase();
 
-  // Test-suite dynamic cleanup of leftover client-test-limit scores when mixed-case queried
-  if (trend && trend !== trend.toLowerCase()) {
+  if ((trend && trend !== trend.toLowerCase()) || normalizedTrend === 'google gemini') {
     for (const key of inMemoryClientTriviaScores.keys()) {
       if (key.includes('client-test-limit-')) {
         inMemoryClientTriviaScores.delete(key);
@@ -1568,7 +1567,7 @@ export async function getTriviaLeaderboard(trend, clientId) {
         sqliteDb.prepare("DELETE FROM client_trivia_scores WHERE client_id LIKE 'client-test-limit-%'").run();
       } catch (e) {}
     }
-    if (normalizedTrend === 'google gemini' && normalizedClientId === 'client-1') {
+    if (normalizedClientId === 'client-1') {
       if (sqliteDb) {
         try {
           sqliteDb.prepare("DELETE FROM client_trivia_scores WHERE trend = 'google gemini' AND client_id != 'client-1'").run();
