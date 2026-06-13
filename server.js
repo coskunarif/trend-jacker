@@ -7,7 +7,7 @@ import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1559,11 +1559,48 @@ fastify.get('/sitemap.xml', async (request, reply) => {
   }
 });
 
+// GET /api/chat-limit - Check chat limit and current counts
+fastify.get('/api/chat-limit', async (request, reply) => {
+  const { clientId, trend } = request.query || {};
+  if (!clientId || !trend) {
+    return reply.status(400).send({ error: 'clientId and trend query parameters are required.' });
+  }
+  const referralCount = await getReferralCount(clientId);
+  const allowedLimit = 3 + 5 * referralCount;
+  const currentCount = await getChatCount(clientId, trend);
+  const limitReached = currentCount >= allowedLimit;
+  return { limitReached, currentCount, allowedLimit };
+});
+
+// POST /api/referral - Record a client referral
+fastify.post('/api/referral', async (request, reply) => {
+  const { client_id, referee_id } = request.body || {};
+  if (!client_id || !referee_id) {
+    return reply.status(400).send({ error: 'client_id and referee_id are required.' });
+  }
+  if (client_id === referee_id) {
+    return { success: false, error: 'Self-referral is not allowed.' };
+  }
+  await recordReferral(client_id, referee_id);
+  return { success: true };
+});
+
 // POST /api/chat - Follow-up Q&A chat using Gemini
 fastify.post('/api/chat', async (request, reply) => {
-  const { trend, query, history } = request.body || {};
+  const { trend, query, history, clientId } = request.body || {};
   if (!trend || !query) {
     return reply.status(400).send({ error: 'Trend and query are required.' });
+  }
+
+  const enforceLimits = (process.env.NODE_ENV !== 'test') || (request.headers['x-enforce-limits'] === 'true');
+  if (enforceLimits && clientId) {
+    const referralCount = await getReferralCount(clientId);
+    const allowedLimit = 3 + 5 * referralCount;
+    const currentCount = await getChatCount(clientId, trend);
+    if (currentCount >= allowedLimit) {
+      return reply.status(403).send({ error: 'limit_reached', allowedLimit });
+    }
+    await incrementChatCount(clientId, trend);
   }
 
   // Check cache first

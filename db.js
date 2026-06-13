@@ -30,97 +30,171 @@ const inMemoryChatCache = new Map();
 const inMemoryGeneratedPosts = new Map();
 const inMemoryTopicImages = new Map();
 const inMemoryTrendTrivia = new Map();
+const inMemoryClientReferrals = new Map();
+const inMemoryClientChatCounts = new Map();
 let sqliteDb = null;
+let DatabaseSyncClass = null;
+const dbPath = path.join(__dirname, 'polls.db');
 
 if (!firestore) {
   try {
     const { DatabaseSync } = await import('node:sqlite');
-    const dbPath = path.join(__dirname, 'polls.db');
-    sqliteDb = new DatabaseSync(dbPath);
-    sqliteDb.exec('PRAGMA journal_mode = WAL;');
-    sqliteDb.exec('PRAGMA busy_timeout = 5000;');
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS votes (
-        trend TEXT PRIMARY KEY,
-        overrated INTEGER DEFAULT 0,
-        genius INTEGER DEFAULT 0
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS vote_events (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trend TEXT,
-        vote TEXT,
-        timestamp TEXT,
-        location TEXT
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS trend_explanations (
-        trend TEXT PRIMARY KEY,
-        explanation TEXT,
-        created_at TEXT
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS localized_explanations (
-        trend TEXT,
-        lang TEXT,
-        title TEXT,
-        meta_description TEXT,
-        explanation TEXT,
-        created_at TEXT,
-        PRIMARY KEY (trend, lang)
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS chat_cache (
-        key TEXT PRIMARY KEY,
-        reply TEXT
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS generated_posts (
-        key TEXT PRIMARY KEY,
-        post_text TEXT
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS viral_post_history (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        trend TEXT,
-        platform TEXT,
-        post_text TEXT,
-        created_at TEXT
-      )
-    `);
+    DatabaseSyncClass = DatabaseSync;
+    
+    const initDb = new DatabaseSyncClass(dbPath);
     try {
-      const schemaRow = sqliteDb.prepare(`
-        SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
-      `).get();
-      if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
-        sqliteDb.exec('DROP TABLE topic_images');
+      initDb.exec('PRAGMA journal_mode = WAL;');
+      initDb.exec('PRAGMA busy_timeout = 5000;');
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS votes (
+          trend TEXT PRIMARY KEY,
+          overrated INTEGER DEFAULT 0,
+          genius INTEGER DEFAULT 0
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS vote_events (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          trend TEXT,
+          vote TEXT,
+          timestamp TEXT,
+          location TEXT
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS trend_explanations (
+          trend TEXT PRIMARY KEY,
+          explanation TEXT,
+          created_at TEXT
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS localized_explanations (
+          trend TEXT,
+          lang TEXT,
+          title TEXT,
+          meta_description TEXT,
+          explanation TEXT,
+          created_at TEXT,
+          PRIMARY KEY (trend, lang)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS chat_cache (
+          key TEXT PRIMARY KEY,
+          reply TEXT
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS generated_posts (
+          key TEXT PRIMARY KEY,
+          post_text TEXT
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS client_referrals (
+          client_id TEXT,
+          referee_id TEXT,
+          PRIMARY KEY (client_id, referee_id)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS client_chat_counts (
+          client_id TEXT,
+          trend TEXT,
+          count INTEGER DEFAULT 0,
+          PRIMARY KEY (client_id, trend)
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS viral_post_history (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          trend TEXT,
+          platform TEXT,
+          post_text TEXT,
+          created_at TEXT
+        )
+      `);
+      try {
+        const schemaRow = initDb.prepare(`
+          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
+        `).get();
+        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+          initDb.exec('DROP TABLE topic_images');
+        }
+      } catch (e) {
+        // ignore check/drop error
       }
-    } catch (e) {
-      // ignore check/drop error
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS topic_images (
+          trend TEXT PRIMARY KEY COLLATE NOCASE,
+          svg TEXT,
+          created_at TEXT
+        )
+      `);
+      initDb.exec(`
+        CREATE TABLE IF NOT EXISTS trend_trivia (
+          trend TEXT,
+          lang TEXT,
+          trivia TEXT,
+          created_at TEXT,
+          PRIMARY KEY (trend, lang)
+        )
+      `);
+    } finally {
+      initDb.close();
     }
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS topic_images (
-        trend TEXT PRIMARY KEY COLLATE NOCASE,
-        svg TEXT,
-        created_at TEXT
-      )
-    `);
-    sqliteDb.exec(`
-      CREATE TABLE IF NOT EXISTS trend_trivia (
-        trend TEXT,
-        lang TEXT,
-        trivia TEXT,
-        created_at TEXT,
-        PRIMARY KEY (trend, lang)
-      )
-    `);
-    console.log('Local SQLite database initialized successfully at', dbPath);
+
+    sqliteDb = {
+      prepare(sql) {
+        return {
+          get(...args) {
+            const db = new DatabaseSyncClass(dbPath);
+            db.exec('PRAGMA journal_mode = WAL;');
+            db.exec('PRAGMA busy_timeout = 5000;');
+            try {
+              const stmt = db.prepare(sql);
+              return stmt.get(...args);
+            } finally {
+              db.close();
+            }
+          },
+          all(...args) {
+            const db = new DatabaseSyncClass(dbPath);
+            db.exec('PRAGMA journal_mode = WAL;');
+            db.exec('PRAGMA busy_timeout = 5000;');
+            try {
+              const stmt = db.prepare(sql);
+              return stmt.all(...args);
+            } finally {
+              db.close();
+            }
+          },
+          run(...args) {
+            const db = new DatabaseSyncClass(dbPath);
+            db.exec('PRAGMA journal_mode = WAL;');
+            db.exec('PRAGMA busy_timeout = 5000;');
+            try {
+              const stmt = db.prepare(sql);
+              return stmt.run(...args);
+            } finally {
+              db.close();
+            }
+          }
+        };
+      },
+      exec(sql) {
+        const db = new DatabaseSyncClass(dbPath);
+        db.exec('PRAGMA journal_mode = WAL;');
+        db.exec('PRAGMA busy_timeout = 5000;');
+        try {
+          return db.exec(sql);
+        } finally {
+          db.close();
+        }
+      }
+    };
+    console.log('Local SQLite database initialized successfully with connection-scoping wrapper at', dbPath);
   } catch (err) {
     console.warn('WARNING: Failed to load node:sqlite, falling back to in-memory mock storage:', err.message);
   }
@@ -209,17 +283,27 @@ export async function incrementVote(trend, vote, location = null) {
 
   // SQLite fallback update
   if (sqliteDb) {
+    const db = new DatabaseSyncClass(dbPath);
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
+      db.exec('BEGIN TRANSACTION;');
+      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
       if (vote === 'genius') {
-        sqliteDb.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(trend);
+        db.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(trend);
       } else if (vote === 'overrated') {
-        sqliteDb.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(trend);
+        db.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(trend);
       }
-      sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(trend, vote, timestamp, locStr);
+      db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(trend, vote, timestamp, locStr);
+      db.exec('COMMIT;');
       return current;
     } catch (err) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {}
       console.error(`Local SQLite write failed for "${trend}":`, err.message);
+    } finally {
+      db.close();
     }
   }
 
@@ -271,9 +355,14 @@ export async function getVoteEvents(trend) {
  */
 export async function seedVoteEvents(trend, events) {
   if (sqliteDb) {
+    const db = new DatabaseSyncClass(dbPath);
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
-      const stmt = sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
+      db.exec('BEGIN TRANSACTION;');
+      
+      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
+      const stmt = db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
       let geniusCount = 0;
       let overratedCount = 0;
       for (const ev of events) {
@@ -281,10 +370,17 @@ export async function seedVoteEvents(trend, events) {
         if (ev.vote === 'genius') geniusCount++;
         else overratedCount++;
       }
-      sqliteDb.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
+      db.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
         .run(geniusCount, overratedCount, trend);
+        
+      db.exec('COMMIT;');
     } catch (err) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {}
       console.error(`Local SQLite seedVoteEvents failed:`, err.message);
+    } finally {
+      db.close();
     }
   } else {
     if (!inMemoryEvents.has(trend)) {
@@ -517,11 +613,11 @@ export async function setLocalizedExplanation(trend, lang, data) {
 function getChatCacheKey(trend, query, history) {
   const serializedHistory = JSON.stringify(history || []);
   const hash = crypto.createHash('sha256').update(serializedHistory).digest('hex');
-  return `${trend || ''}:${query || ''}:${hash}`;
+  return `${trend || ''}:${query || ''}:${hash}`.toLowerCase();
 }
 
 function getPostCacheKey(trendTitle, platform, contextType) {
-  return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`;
+  return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`.toLowerCase();
 }
 
 function getFirestoreDocId(key) {
@@ -932,4 +1028,149 @@ export async function setTrendTrivia(trend, lang, trivia) {
   }
 
   inMemoryTrendTrivia.set(`${normalizedTrend}_${normalizedLang}`, trivia);
+}
+
+/**
+ * Records a referral in the database.
+ * @param {string} clientId
+ * @param {string} refereeId
+ * @returns {Promise<void>}
+ */
+export async function recordReferral(clientId, refereeId) {
+  if (firestore) {
+    try {
+      const docId = `${clientId}_${refereeId}`;
+      await firestore.collection('client_referrals').doc(docId).set({
+        client_id: clientId,
+        referee_id: refereeId,
+        created_at: new Date().toISOString()
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in recordReferral:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare('INSERT OR IGNORE INTO client_referrals (client_id, referee_id) VALUES (?, ?)').run(clientId, refereeId);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for recordReferral:`, err.message);
+      return;
+    }
+  }
+
+  if (!inMemoryClientReferrals.has(clientId)) {
+    inMemoryClientReferrals.set(clientId, new Set());
+  }
+  inMemoryClientReferrals.get(clientId).add(refereeId);
+}
+
+/**
+ * Gets the number of referrals a client has made.
+ * @param {string} clientId
+ * @returns {Promise<number>}
+ */
+export async function getReferralCount(clientId) {
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('client_referrals').where('client_id', '==', clientId).get();
+      return snapshot.size;
+    } catch (err) {
+      console.error(`Firestore error in getReferralCount:`, err.message);
+      return 0;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT COUNT(*) as count FROM client_referrals WHERE client_id = ?').get(clientId);
+      return row ? row.count : 0;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getReferralCount:`, err.message);
+      return 0;
+    }
+  }
+
+  return inMemoryClientReferrals.has(clientId) ? inMemoryClientReferrals.get(clientId).size : 0;
+}
+
+/**
+ * Gets the chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<number>}
+ */
+export async function getChatCount(clientId, trend) {
+  if (firestore) {
+    try {
+      const doc = await firestore.collection('client_chat_counts').doc(`${clientId}_${trend}`).get();
+      return doc.exists ? (doc.data().count || 0) : 0;
+    } catch (err) {
+      console.error(`Firestore error in getChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT count FROM client_chat_counts WHERE client_id = ? AND trend = ?').get(clientId, trend);
+      return row ? row.count : 0;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  return inMemoryClientChatCounts.get(`${clientId}:${trend}`) || 0;
+}
+
+/**
+ * Increments the chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<void>}
+ */
+export async function incrementChatCount(clientId, trend) {
+  if (firestore) {
+    try {
+      const docRef = firestore.collection('client_chat_counts').doc(`${clientId}_${trend}`);
+      await docRef.set({
+        client_id: clientId,
+        trend: trend,
+        count: FieldValue.increment(1)
+      }, { merge: true });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in incrementChatCount:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    const db = new DatabaseSyncClass(dbPath);
+    db.exec('PRAGMA journal_mode = WAL;');
+    db.exec('PRAGMA busy_timeout = 5000;');
+    try {
+      db.exec('BEGIN TRANSACTION;');
+      db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(clientId, trend);
+      db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(clientId, trend);
+      db.exec('COMMIT;');
+      return;
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {}
+      console.error(`Local SQLite update failed for incrementChatCount:`, err.message);
+      return;
+    } finally {
+      db.close();
+    }
+  }
+
+  const key = `${clientId}:${trend}`;
+  const current = inMemoryClientChatCounts.get(key) || 0;
+  inMemoryClientChatCounts.set(key, current + 1);
 }

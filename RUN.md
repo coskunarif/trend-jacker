@@ -1,58 +1,56 @@
-task: Implement an interactive AI-Generated Trivia Challenge to increase user session duration and drive organic referral growth via shareable Wordle-style score cards. (Runner-up: Trend Prediction Speculator Market)
-state: complete             budget: repairs 0/3
-branch: asf/20260613-trivia-challenge          checkpoint: asf/20260613-trivia-challenge/green-1
+task: Limit conversational message count to optimize LLM query costs and drive organic referral traffic. Why now: Chat has zero restrictions, risking high API costs and missing viral referral loops. Runner-up: Normalize caching keys to lowercase.              tier: T2   creativity: 0.3
+state: complete               budget: repairs 1/3
+branch: asf/20260613-chat-limit          checkpoint: asf/20260613-chat-limit/green-1
 caps: agents,ui,web,human
 
 ## Log
 - 2026-06-13: Conductor starting fresh run with T2 (Scout trigger). Starting Scout phase.
-- 2026-06-13: Scout spawning local server at port 3000 for dogfooding exploration.
 - 2026-06-13: Scout completed analysis. Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite adaptation. Observed state: red. Conductor starting Builder phase.
+- 2026-06-13: Verifier ran the full test suite, performed dogfooding, and confirmed functionality of chat limit and referral loops. Encountered a transient 'database is locked' SQLite concurrency failure in the full test run, which passed successfully when re-run in isolation.
+- 2026-06-13: Verifier reported failing test under concurrency. Conductor starting Builder repair with hypothesis: Connection-scoping or close lifecycle for SQLite database in db.js / server.js is incomplete, causing database lock in parallel runs.
 - 2026-06-13: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
-- 2026-06-13: Verifier spawning local server at port 3003 for dogfooding.
+- 2026-06-13: Verifier ran the full test suite, performed dogfooding, and confirmed 142/142 tests passing with zero database locks.
 - 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
 
 ## Verdict
-### Verification Checklist
-- **Playwright Test Suite (135 tests)**: PASS
-  - All 135 tests passed successfully, including unit tests for schema, backend controllers, and client-side gameplay states.
-- **[AC-1] Trivia Card UI Component**: PASS
-  - `#trivia-card-container` is displayed correctly with glassmorphism styles below the interactive grid.
-- **[AC-2] Loading & DB Caching**: PASS
-  - Lazy loads trivia on click, caches to `trend_trivia` SQLite/Firestore schema, and supports test-mode mock payloads.
-- **[AC-3] Interactive Trivia Gameplay**: PASS
-  - Answer selection locks inputs, disables options, reveals explanation blocks, and correctly displays correct/incorrect visual feedback (🟩/🟥).
-- **[AC-4] Score Card & Results Screen**: PASS
-  - Renders Wordle-style score card block, score details, and "Play Again" button which resets state correctly.
-- **[AC-5] Social Share & Unified Modal Integration**: PASS
-  - "Share Score" copies the score card text (with emoji grids, score, and link) to clipboard and launches the Unified Share Modal with "Trivia Score" preloaded.
-- **Localization Support**: PASS
-  - Verified UI dictionary translations on dropdown toggle for Spanish, French, and Japanese.
+### Checks
+- **[AC-1] Lowercase Caching Keys**: **PASS** (Normalizes chat_cache and generated_posts keys to lowercase; verified in db.js and caching tests).
+- **[AC-2] Persistent Client ID**: **PASS** (Stored in localStorage and retained across page reloads; verified via dogfooding and tests).
+- **[AC-3] Chat message Tracking & Referral Storage**: **PASS** (Schemas initialized and CRUD works correctly).
+- **[AC-4] Enforcing Chat Limits on Chat Endpoint**: **PASS** (403 returned on reaching limit, incrementing works, test mode bypasses).
+- **[AC-5] Chat Limit UI & Locked State**: **PASS** (Hides form, shows referral links and Check Status button when limit is hit).
+- **[AC-6] Referral Visit Loop Execution**: **PASS** (Query string referral recorded, unlocks chat on status check).
+- **Full Test Suite**: **PASS** (142/142 tests passed, no SQLite locks).
+
+### Triage
+- **Failure**: None. All checks and tests passed successfully.
+- **Dogfood Evidence**: Screenshots and reports saved to `dogfood-output/20260613-chat-limit/`.
 
 ## Done
 
 ### What Shipped
-We implemented an interactive, AI-Generated Trivia Challenge matching all design requirements from SPEC.md. It fetches trend-specific trivia on-demand, caches results in a local database (or Firestore in production), presents an engaging interactive gameplay screen (3 questions, correctness feedback, immediate visual cues 🟩/🟥, and explanation cards), shows a Results screen with a Wordle-style score representation, copies the score card to the clipboard, and pre-populates the Unified Share Modal under the "Trivia Score" context.
+We shipped the Conversational Message Count Limit and Referral Loop functionality to prevent high Gemini API costs and drive organic loops. Conversational requests (`POST /api/chat`) check message counts against `3 + 5 * referrals`. If the limit is reached, a styled lock overlay `#chat-lock-container` replaces the input form, providing a personalized referral URL `?ref=clientId` and a check status button. Visiting with a referrer's query string captures the connection, and checking status on the referrer's browser unlocks extra chat queries. Caching keys for chat and posts have also been normalized to lowercase to avoid redundant LLM invocations.
 
 ### Acceptance Criteria Verification
 
 | Acceptance Criteria | Verdict | Evidence / Details |
 | :--- | :--- | :--- |
-| **[AC-1] Trivia Card UI Component** | PASS | `#trivia-card-container` is rendered below the interactive grid using the app's glassmorphism dark-mode style. Starts on the Start Screen. |
-| **[AC-2] On-Demand Trivia Generation / Loading & DB Caching** | PASS | Lazily fetches questions from `POST /api/trivia`, caches to SQLite/Firestore database table `trend_trivia`, and handles mocks. |
-| **[AC-3] Interactive Trivia Gameplay** | PASS | 3-question flow with locked choices, explanation panels showing correct/incorrect feedback (🟩/🟥), and "Next"/"See Results" navigation. |
-| **[AC-4] Wordle-style Score Card & Results Screen** | PASS | Displays "Challenge Completed!", user score, colored emoji patterns, and "Play Again" reset flow. |
-| **[AC-5] Wordle Score Card Social Share & Unified Modal Integration** | PASS | "Share Score" copies the score card text and opens the Unified Share Modal with "Trivia Score" preloaded. Backend `POST /api/generate-post` supports `trivia` contextType. |
+| **[AC-1] Lowercase Caching Keys** | PASS | Cache keys in `db.js` normalized to lowercase for `chat_cache` and `generated_posts`. |
+| **[AC-2] Persistent Client ID** | PASS | Client ID is persisted in `localStorage` as `clientId`, surviving page reloads. |
+| **[AC-3] Chat tracking & Referrals** | PASS | `client_referrals` and `client_chat_counts` DB schemas initialize and handle CRUD operations. |
+| **[AC-4] Enforcing Chat Limits** | PASS | Backend `POST /api/chat` rejects messages with `403` once the limit is hit. Bypassed in `test` mode. |
+| **[AC-5] Chat Limit UI & Locked State** | PASS | `#chat-lock-container` shows limit, referral link, and status button. Screenshot: `dogfood-output/20260613-chat-limit/screenshots/locked-desktop.png`. |
+| **[AC-6] Referral Visit Loop** | PASS | Visit via `/?ref=clientId` creates referral connection. Checking status on referrer's end increments limit and unlocks chat. Screenshot: `dogfood-output/20260613-chat-limit/screenshots/unlocked-desktop.png`. |
 
 ### Integration and Deployment
-- **Green Tag State:** `asf/20260613-trivia-challenge/green-1` (pointing to commit `66438d6`)
-- **Pull Request:** [GitHub PR #29](https://github.com/coskunarif/trend-jacker/pull/29)
-- **Integration Method:** `--squash`
-- **Deployment Target:** [Google Cloud Run Live URL](https://trend-jacker-250134012801.us-central1.run.app)
+- **Green Tag State:** `asf/20260613-chat-limit/green-1` (pointing to commit `6eaa2501285ae8d29d68b78c6f2d213c9ba7a35e`)
+- **Pull Request:** [GitHub PR #30](https://github.com/coskunarif/trend-jacker/pull/30)
+- **Integration Method:** Squash and merge
+- **Deployment Target:** [Google Cloud Run Live URL](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
 
-### Verification Screenshot
+### Verification Screenshots
 
-![Desktop Start Screen](/home/ubuntuadmin/.gemini/antigravity-cli/brain/809a7caf-b51c-42c1-ac23-4e2ae9688464/screenshots/desktop_start.png)
-![Desktop Results Screen](/home/ubuntuadmin/.gemini/antigravity-cli/brain/809a7caf-b51c-42c1-ac23-4e2ae9688464/screenshots/desktop_results.png)
-![Mobile Share Modal](/home/ubuntuadmin/.gemini/antigravity-cli/brain/809a7caf-b51c-42c1-ac23-4e2ae9688464/screenshots/mobile_share_modal.png)
+![Chat Locked State](dogfood-output/20260613-chat-limit/screenshots/locked-desktop.png)
+![Chat Unlocked State](dogfood-output/20260613-chat-limit/screenshots/unlocked-desktop.png)
