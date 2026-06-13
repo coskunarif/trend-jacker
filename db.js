@@ -517,11 +517,11 @@ export async function setLocalizedExplanation(trend, lang, data) {
 function getChatCacheKey(trend, query, history) {
   const serializedHistory = JSON.stringify(history || []);
   const hash = crypto.createHash('sha256').update(serializedHistory).digest('hex');
-  return `${trend || ''}:${query || ''}:${hash}`;
+  return `${trend || ''}:${query || ''}:${hash}`.toLowerCase();
 }
 
 function getPostCacheKey(trendTitle, platform, contextType) {
-  return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`;
+  return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`.toLowerCase();
 }
 
 function getFirestoreDocId(key) {
