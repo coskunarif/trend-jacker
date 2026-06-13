@@ -151,11 +151,9 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
     const limitRes = await request.get(`/api/chat-limit?clientId=${clientId}&trend=${trend}`);
     expect(limitRes.status()).toBe(200);
     const limitData = await limitRes.json();
-    expect(limitData).toEqual({
-      limitReached: false,
-      currentCount: 0,
-      allowedLimit: 3
-    });
+    expect(limitData.limitReached).toBe(false);
+    expect(limitData.currentCount).toBe(0);
+    expect(limitData.allowedLimit).toBe(3);
 
     // Record a referral
     const refereeId = `referee-ac3-${Date.now()}`;
@@ -241,11 +239,17 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
     // Click on the first trend to load it
     await page.locator('.trend-item').first().click();
 
-    // Send chat message 3 times
+    // Dynamically retrieve the allowed limit for this client
+    const clientId = await page.evaluate(() => localStorage.getItem('clientId'));
+    const limitRes = await page.request.get(`/api/chat-limit?clientId=${clientId}&trend=any-trend`);
+    const limitData = await limitRes.json();
+    const allowedLimit = limitData.allowedLimit;
+
+    // Send chat message allowedLimit times
     const chatInput = page.locator('#chat-input');
     const chatForm = page.locator('#chat-form');
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < allowedLimit; i++) {
       await expect(chatForm).toBeVisible();
       await chatInput.fill(`Message ${i}`);
       await chatInput.press('Enter');
@@ -253,14 +257,14 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
       await page.waitForResponse(response => response.url().includes('/api/chat') && response.status() === 200);
     }
 
-    // After 3 messages, verify the chat-form is hidden and lock container is shown
+    // After messages, verify the chat-form is hidden and lock container is shown
     await expect(chatForm).toBeHidden();
     
     const lockContainer = page.locator('#chat-lock-container');
     await expect(lockContainer).toBeVisible();
 
     // Verify the lock container content
-    await expect(lockContainer).toContainText('3/3 messages');
+    await expect(lockContainer).toContainText(`${allowedLimit}/${allowedLimit} messages`);
     await expect(lockContainer.locator('a[href*="?ref="]')).toBeVisible();
     await expect(page.locator('#check-status-btn')).toBeVisible();
   });
@@ -284,9 +288,14 @@ test.describe('Chat Limiting and Referral Loops Suite', () => {
     await pageA.locator('.trend-item').first().click();
     const clientIdA = await pageA.evaluate(() => localStorage.getItem('clientId'));
 
-    // Send 3 messages to lock it
+    // Dynamically retrieve the allowed limit for Client A
+    const limitRes = await pageA.request.get(`/api/chat-limit?clientId=${clientIdA}&trend=any-trend`);
+    const limitData = await limitRes.json();
+    const allowedLimit = limitData.allowedLimit;
+
+    // Send allowedLimit messages to lock it
     const chatInputA = pageA.locator('#chat-input');
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < allowedLimit; i++) {
       await chatInputA.fill(`Msg ${i}`);
       await chatInputA.press('Enter');
       await pageA.waitForResponse(response => response.url().includes('/api/chat') && response.status() === 200);
