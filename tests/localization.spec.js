@@ -27,6 +27,8 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
     // [AC-3] SQLite Schema Verification
     test('should have localized_explanations table created in SQLite with correct schema', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
@@ -52,7 +54,7 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
         throw new Error('getLocalizedExplanation or setLocalizedExplanation is not exported from db.js');
       }
 
-      const testTrend = `local-trend-${Date.now()}`;
+      const testTrend = `local-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const testLang = 'es';
       const testTitle = 'Spanish Title';
       const testMeta = 'Spanish Meta Description';
@@ -72,6 +74,8 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
 
       // Retrieve directly from SQLite table to confirm serialization
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const checkStmt = db.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
         const dbRow = checkStmt.get(testTrend, testLang);

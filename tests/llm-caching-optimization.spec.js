@@ -37,6 +37,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table trend_explanations has COLLATE NOCASE
   test('should have trend_explanations table created in SQLite with COLLATE NOCASE on trend', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -53,6 +55,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table localized_explanations has COLLATE NOCASE
   test('should have localized_explanations table created in SQLite with COLLATE NOCASE on trend and lang', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -69,7 +73,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-1] API Integration: Case-Insensitive Cache Lookups for POST /api/explain
   test('should serve case-insensitive explanation from cache (verified via DB modification)', async ({ request }) => {
-    const uppercaseTrend = `CASE-TEST-${Date.now()}`;
+    const uppercaseTrend = `CASE-TEST-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const lowercaseTrend = uppercaseTrend.toLowerCase();
     const mixedcaseTrend = uppercaseTrend.charAt(0).toUpperCase() + uppercaseTrend.slice(1).toLowerCase();
 
@@ -83,7 +87,9 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // 2. Modify cached entry in SQLite directly to a unique text string
     const db = new DatabaseSync(dbPath);
-    const customHook = `Unique Hook for case-insensitive check ${Date.now()}`;
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
+    const customHook = `Unique Hook for case-insensitive check ${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     try {
       // Find row in database. The row key in DB should be lowercased "case-test-..."
       const checkStmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
@@ -120,6 +126,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table chat_cache exists
   test('should have the chat_cache table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -140,8 +148,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedChatResponse or setCachedChatResponse is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
-    const testQuery = `test-query-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const testQuery = `test-query-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testHistory = [{ role: 'user', content: 'hello' }];
     const testReply = 'This is a cached chat reply.';
 
@@ -155,14 +163,16 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-1] API Integration: /api/chat caching verified via DB mutation
   test('should serve chat response from cache on subsequent API calls (verified via DB modification)', async ({ request }) => {
-    const testTrend = `chat-api-trend-${Date.now()}`;
-    const testQuery = `chat-api-query-${Date.now()}`;
+    const testTrend = `chat-api-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const testQuery = `chat-api-query-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testHistory = [{ role: 'user', content: 'tell me more' }];
 
     // Clean existing database records just in case to ensure starting clean
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
-      localDb.prepare('DELETE FROM chat_cache').run();
+      localDb.prepare('DELETE FROM chat_cache WHERE key LIKE ?').run(`${testTrend}:%`);
     } catch (err) {
       // Ignored if table doesn't exist yet
     } finally {
@@ -179,6 +189,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it exists in SQLite database chat_cache table and modify directly
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const customReply = 'This is custom hacked reply text from cache!';
     try {
       const checkStmt = localDb.prepare('SELECT * FROM chat_cache WHERE key LIKE ?');
@@ -209,6 +221,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-2] Schema Verification: SQLite table generated_posts exists
   test('should have the generated_posts table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -229,7 +243,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedGeneratedPost or setCachedGeneratedPost is not exported from db.js');
     }
 
-    const testTitle = `trend-title-${Date.now()}`;
+    const testTitle = `trend-title-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testPlatform = 'linkedin';
     const testContext = 'developer';
     const testPostText = 'This is a cached social post text.';
@@ -244,14 +258,16 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] API Integration: /api/generate-post caching verified via DB mutation
   test('should serve generated post from cache on subsequent API calls (verified via DB modification)', async ({ request }) => {
-    const testTitle = `post-api-title-${Date.now()}`;
+    const testTitle = `post-api-title-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testPlatform = 'x';
     const testContext = 'funny';
 
     // Clean existing database records to ensure starting clean
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
-      localDb.prepare('DELETE FROM generated_posts').run();
+      localDb.prepare('DELETE FROM generated_posts WHERE key LIKE ?').run(`${testTitle}:%`);
     } catch (err) {
       // Ignored if table doesn't exist yet
     } finally {
@@ -268,6 +284,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it exists in SQLite database generated_posts table and modify directly
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const customPost = 'This is custom hacked post text from cache!';
     try {
       const checkStmt = localDb.prepare('SELECT * FROM generated_posts WHERE key LIKE ?');
@@ -364,6 +382,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
   // [AC-1] Schema Verification: SQLite table topic_images exists
   test('should have the topic_images table created in SQLite with correct schema', async () => {
     const localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       const stmt = localDb.prepare(`
         SELECT sql FROM sqlite_master 
@@ -385,7 +405,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
       throw new Error('getCachedTopicImage or setCachedTopicImage is not exported from db.js');
     }
 
-    const testTrend = `test-trend-${Date.now()}`;
+    const testTrend = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const testSvg = '<svg>test</svg>';
 
     // Store in cache
@@ -400,7 +420,7 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] API Integration: GET /api/topic-image/:slug
   test('should return a generated SVG image with correct headers', async ({ request }) => {
-    const testSlug = `test-trend-${Date.now()}`;
+    const testSlug = `test-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     const res = await request.get(`/api/topic-image/${testSlug}`);
     expect(res.status()).toBe(200);
     expect(res.headers()['content-type']).toContain('image/svg+xml');
@@ -412,10 +432,12 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
   // [AC-2] Cache validation on endpoint (verified via direct DB modification)
   test('should cache the generated SVG and serve from cache on subsequent calls', async ({ request }) => {
-    const testSlug = `image-api-trend-${Date.now()}`;
+    const testSlug = `image-api-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
     
     // Clean database records if needed
     let localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     try {
       localDb.prepare("DELETE FROM topic_images WHERE trend = ?").run(testSlug);
     } catch (err) {
@@ -431,6 +453,8 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
 
     // Verify it was cached in SQLite and update it directly to verify cache hit on next request
     localDb = new DatabaseSync(dbPath);
+    localDb.exec('PRAGMA busy_timeout = 5000;');
+    localDb.exec('PRAGMA journal_mode = WAL;');
     const hijackedSvg = '<svg id="hijacked"></svg>';
     try {
       // Find trend title (Title Case or matched trend)

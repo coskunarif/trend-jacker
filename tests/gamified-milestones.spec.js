@@ -20,14 +20,14 @@ function getPngDimensions(filePath) {
 }
 
 test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
-  const clientId = `test-client-milestones-${Date.now()}`;
+  const clientId = `test-client-milestones-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA busy_timeout = 5000;');
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id = ?').run(clientId);
     } catch (e) {
@@ -289,10 +289,16 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
   // [AC-5] Caching, Case-Insensitive Normalization & Robustness
   // ==========================================
   test('[AC-5] should verify client ID and Trend casing normalization handles mixed-case without duplicates', async ({ request }) => {
+    const uniqueSuffix = Date.now() + '-' + Math.floor(Math.random() * 1000000);
+    const mixedTrend = `GoOgLe GeMiNi-${uniqueSuffix}`;
+    const lowerTrend = `google gemini-${uniqueSuffix}`;
+
     // Clear any potential previous scores for test clients
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
-      db.prepare('DELETE FROM client_trivia_scores WHERE client_id IN (?, ?)').run('client-1', 'client-1');
+      db.prepare('DELETE FROM client_trivia_scores WHERE client_id IN (?, ?) AND trend = ?').run('ClIeNt-1', 'client-1', lowerTrend);
     } catch (e) {} finally {
       db.close();
     }
@@ -301,7 +307,7 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
     const scoreRes1 = await request.post('/api/trivia/score', {
       data: {
         clientId: 'ClIeNt-1',
-        trend: 'GoOgLe GeMiNi',
+        trend: mixedTrend,
         score: 3
       }
     });
@@ -312,14 +318,14 @@ test.describe('Gamified Trivia Milestones and Daily Streaks Spec Tests', () => {
     const scoreRes2 = await request.post('/api/trivia/score', {
       data: {
         clientId: 'client-1',
-        trend: 'google gemini',
+        trend: lowerTrend,
         score: 2
       }
     });
     expect(scoreRes2.status()).toBe(200);
 
     // Query leaderboard for mixed-case trend and client
-    const lbRes = await request.get('/api/trivia/leaderboard?trend=GoOgLe GeMiNi&clientId=ClIeNt-1');
+    const lbRes = await request.get(`/api/trivia/leaderboard?trend=${mixedTrend}&clientId=ClIeNt-1`);
     expect(lbRes.status()).toBe(200);
     const lbData = await lbRes.json();
     expect(lbData.success).toBe(true);

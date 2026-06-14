@@ -89,7 +89,7 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
         throw new Error('Database functions not loaded');
       }
 
-      const baseTrend = `test-cache-trend-${Date.now()}`;
+      const baseTrend = `test-cache-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const testExpl = {
         hook: 'Dynamic Hook',
         whatIsIt: 'Dynamic explanation text',
@@ -102,6 +102,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setCachedExplanation(kidsKey, testExpl);
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT explanation FROM trend_explanations WHERE trend = ?');
         const row = stmt.get(kidsKey);
@@ -126,6 +128,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setLocalizedExplanation(seniorKey, 'es', testLocData);
 
       const db2 = new DatabaseSync(dbPath);
+      db2.exec('PRAGMA busy_timeout = 5000;');
+      db2.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db2.prepare('SELECT title, explanation FROM localized_explanations WHERE trend = ? AND lang = ?');
         const row = stmt.get(seniorKey, 'es');
@@ -148,7 +152,7 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
         throw new Error('Database functions not loaded');
       }
 
-      const baseTrendMixed = `Test-Cache-Trend-Case-${Date.now()}`;
+      const baseTrendMixed = `Test-Cache-Trend-Case-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       const bracketMixed = `Kids_Teens`;
       const testExpl = {
         hook: 'Dynamic Hook',
@@ -164,6 +168,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setCachedExplanation(kidsKeyMixed, testExpl);
 
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT trend, explanation FROM trend_explanations WHERE trend = ?');
         // The record in SQLite must have the lowercase normalized trend key
@@ -190,6 +196,8 @@ test.describe('Dynamic Demographic Trend Presentation', () => {
       await setLocalizedExplanation(seniorKeyMixed, 'ES', testLocData);
 
       const db2 = new DatabaseSync(dbPath);
+      db2.exec('PRAGMA busy_timeout = 5000;');
+      db2.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db2.prepare('SELECT trend, lang, title FROM localized_explanations WHERE trend = ? AND lang = ?');
         const row = stmt.get(seniorKeyLower, 'es');

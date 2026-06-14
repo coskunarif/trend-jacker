@@ -260,8 +260,16 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
     const canvas = page.locator('#sentiment-timeline-canvas');
     await expect(canvas).toBeVisible();
 
-    const box = await canvas.boundingBox();
+    let box = await canvas.boundingBox();
     expect(box).not.toBeNull();
+    // Wait for the canvas to have a valid non-zero size
+    for (let i = 0; i < 10 && (box.width < 50 || box.height < 50); i++) {
+      await page.waitForTimeout(100);
+      box = await canvas.boundingBox();
+      expect(box).not.toBeNull();
+    }
+    expect(box.width).toBeGreaterThanOrEqual(50);
+    expect(box.height).toBeGreaterThanOrEqual(50);
 
     // Hover at the center of the canvas. Sometimes a single move fails if coordinates aren't fully resolved in style recalculations.
     // Move slightly, then move to center to guarantee event triggers.
@@ -322,8 +330,16 @@ test.describe('Sentiment Timeline Dashboard E2E & API Adversarial Tests', () => 
     await responsePromise;
 
     const canvas = page.locator('#sentiment-timeline-canvas');
-    const box = await canvas.boundingBox();
+    let box = await canvas.boundingBox();
     expect(box).not.toBeNull();
+    // Wait for the canvas to have a valid non-zero size
+    for (let i = 0; i < 10 && (box.width < 50 || box.height < 50); i++) {
+      await page.waitForTimeout(100);
+      box = await canvas.boundingBox();
+      expect(box).not.toBeNull();
+    }
+    expect(box.width).toBeGreaterThanOrEqual(50);
+    expect(box.height).toBeGreaterThanOrEqual(50);
 
     // Hover near top-left boundary
     await page.mouse.move(box.x + 1, box.y + 1);

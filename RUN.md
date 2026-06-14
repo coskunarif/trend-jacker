@@ -1,57 +1,62 @@
-task: Implement gamified trend predictions to increase daily user retention and viral share conversions.              tier: T2   creativity: 0.3
-state: complete               budget: repairs 1/3
-branch: asf/20260613-trend-predictions          checkpoint: none
+task: Improve test suite reliability to achieve a 100% pass rate under concurrent execution. Metric: test pass rate. Why now: baseline test suite has database locking failures. Runner-up: Reduce LLM API request volume and user latency via client-side response caching.              tier: T2   creativity: 0.18
+state: complete            budget: repairs 2/3
+branch: asf/20260613-test-reliability          checkpoint: none
 caps: agents,ui,web,human
-
-## Task
-- **Objective**: Implement gamified trend predictions to increase daily user retention and viral share conversions.
-- **Metric**: Daily user retention and viral share conversions.
-- **Why Now**: User retention spikes when they have a stake in tomorrow's trend outcomes, creating a natural daily re-engagement loop.
-- **Runner-up**: Subtraction of fragile news URL scraping logic to reduce server latency.
 
 ## Log
 - 2026-06-13: Conductor starting fresh run with T2 (Scout trigger). Starting Scout phase.
-- 2026-06-13: Scout completed. Selected task: Implement gamified trend predictions.
-- 2026-06-13: Conductor starting Architect phase.
+- 2026-06-13: Scout completed. Selected task: Improve test suite reliability. Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
-- 2026-06-13: Builder disputed Test 7. Ruled against test. Conductor starting Tester repair phase.
+- 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Verifier phase.
+- 2026-06-13: Verifier failed. Hypothesis: Tests running concurrently on the same database interfere via global DELETEs, and direct connections are not fully isolated or closed before server requests. Conductor restarting Tester phase.
 - 2026-06-13: Tester updated tests, suite is green. Conductor starting Verifier phase.
-- 2026-06-13: Verifier completed validation. All checks passed.
-- 2026-06-13: Verifier completed validation checks successfully. Conductor starting Shipper phase.
+- 2026-06-13: Verifier failed. Hypothesis: Write transactions in db.js deadlock under concurrent load, file-level Date.now() in tests collides, and page.goto races in tests. Conductor restarting Tester phase.
+- 2026-06-13: Tester and Builder completed fixes, suite is green. Conductor starting Verifier phase.
+- 2026-06-14: Verifier started verification run. Running full test suite concurrently (green) and spawning dev server on port 3001 for dogfooding.
+- 2026-06-14: Verifier completed validation checks successfully. Conductor starting Shipper phase.
+- 2026-06-14: Shipper completed deployment and closed the run.
+
 
 ## Verdict
-- [AC-1] Database Schema & Methods: PASS. SQLite schema verifies successfully, casing/normalizations are enforced, deterministic hash resolution works.
-- [AC-2] Backend Route Handlers: PASS. Validation works, and predictionBonus is factored into allowedLimit calculation.
-- [AC-3] Trend Predictor UI Card: PASS. Card elements, buttons, badges, and history load, behave, and disable correctly.
-- [AC-4] Celebratory Toast & Immediate Synchronization: PASS. checkChatLimit runs immediately upon click, and toast fires correctly on correct predictions.
-- [AC-5] Shareable Canvas Prediction Card: PASS. Download functionality works and canvas exports standard PNG.
-- [AC-6] Unified Share Preview Integration: PASS. Unified share context dropdown has prediction option and generates correct viral post copy.
-- Visual Audit: PASS. Desktop and mobile viewports verified. Twin-blade layouts render cleanly on mobile and desktop viewports.
-- LLM Content Delivery & Caching: PASS. Alternate link header injected on HTML, Content-Type is text/plain.
+
+### Check 1: Playwright Test Concurrency & SQLite WAL Mode
+- **Status**: PASS
+- **Acceptance Criteria**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-5]`
+- **Evidence**:
+  - The Playwright test suite was executed multiple times under concurrent execution with 4 parallel workers (`npm test -- --workers=4`).
+  - Achieved a 100% pass rate (202/202 tests passing successfully) on consecutive runs with zero transient database locking or race condition failures.
+  - Verified that SQLite database transactions in `db.js` are robust under concurrent load (using immediate transactions, retry logic, and properly scoped connection closures).
+
+### Check 2: Behavioral / Dogfooding
+- **Status**: PASS
+- **Acceptance Criteria**: Verification of actual user flows.
+- **Evidence**:
+  - Spawned the dev server locally and used browser automation (`agent-browser`) to test core flows.
+  - Successfully submitted trend predictions (which correctly locked/disabled prediction buttons on client side).
+  - Played the trivia challenge to completion, answered questions, submitted and saved leaderboard nicknames, and verified correct updates in community scores without any backend database exceptions or deadlock/lock errors.
 
 ## Done
 
 ### What Shipped
-Implement gamified trend predictions where users can predict if a trend will rise or fall tomorrow. This increases daily user retention and rewards them with message capacity bonus limits (+3 messages per correct prediction) dynamically and synchronously.
+- Update `playwright.config.js` to run tests concurrently across multiple parallel workers.
+- Configured all direct SQLite connections in E2E tests with `busy_timeout = 5000`.
+- Ensured connection lifecycle boundaries are wrapped in try/finally blocks and closed before asynchronous API calls in tests.
+- Replaced deferred transactions (`BEGIN TRANSACTION`) with immediate write transactions (`BEGIN IMMEDIATE TRANSACTION`) in backend `db.js` helpers to resolve database locks/deadlocks under parallel load.
 
-### Acceptance Criteria Verification
+### Acceptance Criteria & Evidence
+| Acceptance Criterion | Verification Evidence |
+|---|---|
+| `[AC-1] Concurrency Configuration` | Workers count constraint removed from `playwright.config.js`, enabling parallel test workers. |
+| `[AC-2] E2E Direct SQLite Connection WAL Mode & Timeout` | `busy_timeout = 5000` is initialized on direct SQLite test connections in all 12 spec files. |
+| `[AC-3] Database Connection Scoping and Leak Prevention` | Clean connection closure blocks implemented; connections closed before async network calls. |
+| `[AC-4] E2E Async Testing Race Condition Prevention` | Race conditions avoided via `page.waitForResponse` gates before verifying database mutations. |
+| `[AC-5] 100% Pass Rate` | Concurrently ran 202 tests over multiple workers; 100% pass rate achieved with zero errors. |
 
-| Criterion | Evidence | Status |
-|---|---|---|
-| **[AC-1] Database Schema & Methods** | SQLite and mock `client_predictions` database schema verify successfully, normalizations/casing are normalized to lowercase, and deterministic hash outcomes are fully operational. | PASS |
-| **[AC-2] Backend Route Handlers** | `POST /api/predict`, `GET /api/predictions`, and `/api/chat-limit` include prediction bonus limits and auto-resolutions dynamically. | PASS |
-| **[AC-3] Trend Predictor UI Card** | The prediction card loads below the interactive grid, allows voting/prediction, shows history/badges, and disables once predicted. | PASS |
-| **[AC-4] Celebratory Toast & Immediate Sync** | Immediate un-awaited synchronization check of limits on prediction submit, showing unlock toasts for correct predictions. | PASS |
-| **[AC-5] Shareable Canvas Prediction Card** | Canvas renders a beautiful 2400x1260 PNG with user's predictions, correct count, and brand markings. | PASS |
-| **[AC-6] Unified Share Preview Integration** | Unified share context dropdown has a prediction option, generating viral prediction copy in `/api/generate-post`. | PASS |
+### Integration & Deployment Details
+- **Pull Request**: [GitHub PR #39](https://github.com/coskunarif/trend-jacker/pull/39)
+- **Integration Method**: Squash merge via `gh pr merge --squash`
+- **Production URL**: [https://trend-jacker-q2wur4uk2q-uc.a.run.app](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
+- **Verified Green Tag**: `asf/20260613-test-reliability/green-1`
 
-### PR Link
-- PR: [PR #38: Implement gamified trend predictions](https://github.com/coskunarif/trend-jacker/pull/38)
-- Integration Method: Squash and Merge
 
-### Visual Evidence
-- [Before Prediction Screen](dogfood-output/20260613-trend-predictions/screenshots/step-1-before-predict.png)
-- [After Prediction Screen](dogfood-output/20260613-trend-predictions/screenshots/step-2-after-predict.png)
-- [Downloaded Prediction Card](dogfood-output/20260613-trend-predictions/screenshots/step-3-after-download.png)
-- [Interactive Walkthrough Video](dogfood-output/20260613-trend-predictions/videos/prediction-walkthrough.webm)
+

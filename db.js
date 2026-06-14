@@ -45,162 +45,186 @@ if (!firestore) {
     const { DatabaseSync } = await import('node:sqlite');
     DatabaseSyncClass = DatabaseSync;
     
-    const initDb = new DatabaseSyncClass(dbPath);
-    try {
-      initDb.exec('PRAGMA journal_mode = WAL;');
-      initDb.exec('PRAGMA busy_timeout = 5000;');
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS votes (
-          trend TEXT PRIMARY KEY,
-          overrated INTEGER DEFAULT 0,
-          genius INTEGER DEFAULT 0
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS vote_events (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          trend TEXT,
-          vote TEXT,
-          timestamp TEXT,
-          location TEXT
-        )
-      `);
+    let retries = 10;
+    let delay = 100;
+    let initSuccess = false;
+    let initError = null;
+
+    while (retries > 0 && !initSuccess) {
+      let initDb = null;
       try {
-        const schemaRow = initDb.prepare(`
-          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'trend_explanations'
-        `).get();
-        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
-          initDb.exec('DROP TABLE trend_explanations');
+        initDb = new DatabaseSyncClass(dbPath);
+        initDb.exec('PRAGMA journal_mode = WAL;');
+        initDb.exec('PRAGMA busy_timeout = 5000;');
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS votes (
+            trend TEXT PRIMARY KEY,
+            overrated INTEGER DEFAULT 0,
+            genius INTEGER DEFAULT 0
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS vote_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trend TEXT,
+            vote TEXT,
+            timestamp TEXT,
+            location TEXT
+          )
+        `);
+        try {
+          const schemaRow = initDb.prepare(`
+            SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'trend_explanations'
+          `).get();
+          if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+            initDb.exec('DROP TABLE trend_explanations');
+          }
+        } catch (e) {
+          // ignore
         }
-      } catch (e) {
-        // ignore
-      }
-      try {
-        const schemaRow = initDb.prepare(`
-          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'localized_explanations'
-        `).get();
-        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
-          initDb.exec('DROP TABLE localized_explanations');
+        try {
+          const schemaRow = initDb.prepare(`
+            SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'localized_explanations'
+          `).get();
+          if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+            initDb.exec('DROP TABLE localized_explanations');
+          }
+        } catch (e) {
+          // ignore
         }
-      } catch (e) {
-        // ignore
-      }
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS trend_explanations (
-          trend TEXT PRIMARY KEY COLLATE NOCASE,
-          explanation TEXT,
-          created_at TEXT
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS localized_explanations (
-          trend TEXT COLLATE NOCASE,
-          lang TEXT COLLATE NOCASE,
-          title TEXT,
-          meta_description TEXT,
-          explanation TEXT,
-          created_at TEXT,
-          PRIMARY KEY (trend, lang)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS chat_cache (
-          key TEXT PRIMARY KEY,
-          reply TEXT
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS generated_posts (
-          key TEXT PRIMARY KEY,
-          post_text TEXT
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_referrals (
-          client_id TEXT,
-          referee_id TEXT,
-          PRIMARY KEY (client_id, referee_id)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_chat_counts (
-          client_id TEXT,
-          trend TEXT,
-          count INTEGER DEFAULT 0,
-          PRIMARY KEY (client_id, trend)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_trivia_scores (
-          client_id TEXT,
-          trend TEXT,
-          score INTEGER,
-          completed_at TEXT,
-          PRIMARY KEY (client_id, trend)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_streaks (
-          client_id TEXT PRIMARY KEY,
-          streak_count INTEGER DEFAULT 1,
-          last_active_date TEXT
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_nicknames (
-          client_id TEXT,
-          nickname TEXT,
-          PRIMARY KEY (client_id)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS viral_post_history (
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          trend TEXT,
-          platform TEXT,
-          post_text TEXT,
-          created_at TEXT
-        )
-      `);
-      try {
-        const schemaRow = initDb.prepare(`
-          SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
-        `).get();
-        if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
-          initDb.exec('DROP TABLE topic_images');
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS trend_explanations (
+            trend TEXT PRIMARY KEY COLLATE NOCASE,
+            explanation TEXT,
+            created_at TEXT
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS localized_explanations (
+            trend TEXT COLLATE NOCASE,
+            lang TEXT COLLATE NOCASE,
+            title TEXT,
+            meta_description TEXT,
+            explanation TEXT,
+            created_at TEXT,
+            PRIMARY KEY (trend, lang)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS chat_cache (
+            key TEXT PRIMARY KEY,
+            reply TEXT
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS generated_posts (
+            key TEXT PRIMARY KEY,
+            post_text TEXT
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_referrals (
+            client_id TEXT,
+            referee_id TEXT,
+            PRIMARY KEY (client_id, referee_id)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_chat_counts (
+            client_id TEXT,
+            trend TEXT,
+            count INTEGER DEFAULT 0,
+            PRIMARY KEY (client_id, trend)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_trivia_scores (
+            client_id TEXT,
+            trend TEXT,
+            score INTEGER,
+            completed_at TEXT,
+            PRIMARY KEY (client_id, trend)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_streaks (
+            client_id TEXT PRIMARY KEY,
+            streak_count INTEGER DEFAULT 1,
+            last_active_date TEXT
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_nicknames (
+            client_id TEXT,
+            nickname TEXT,
+            PRIMARY KEY (client_id)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS viral_post_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            trend TEXT,
+            platform TEXT,
+            post_text TEXT,
+            created_at TEXT
+          )
+        `);
+        try {
+          const schemaRow = initDb.prepare(`
+            SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'topic_images'
+          `).get();
+          if (schemaRow && !schemaRow.sql.includes('COLLATE NOCASE')) {
+            initDb.exec('DROP TABLE topic_images');
+          }
+        } catch (e) {
+          // ignore check/drop error
         }
-      } catch (e) {
-        // ignore check/drop error
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS topic_images (
+            trend TEXT PRIMARY KEY COLLATE NOCASE,
+            svg TEXT,
+            created_at TEXT
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS trend_trivia (
+            trend TEXT,
+            lang TEXT,
+            trivia TEXT,
+            created_at TEXT,
+            PRIMARY KEY (trend, lang)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_predictions (
+            client_id TEXT,
+            trend TEXT COLLATE NOCASE,
+            prediction TEXT,
+            prediction_date TEXT,
+            status TEXT,
+            resolved_at TEXT,
+            PRIMARY KEY (client_id, trend, prediction_date)
+          )
+        `);
+        initSuccess = true;
+      } catch (err) {
+        initError = err;
+        retries--;
+        if (retries > 0) {
+          await new Promise(resolve => setTimeout(resolve, delay));
+          delay *= 1.5;
+        }
+      } finally {
+        if (initDb) {
+          try {
+            initDb.close();
+          } catch (e) {}
+        }
       }
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS topic_images (
-          trend TEXT PRIMARY KEY COLLATE NOCASE,
-          svg TEXT,
-          created_at TEXT
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS trend_trivia (
-          trend TEXT,
-          lang TEXT,
-          trivia TEXT,
-          created_at TEXT,
-          PRIMARY KEY (trend, lang)
-        )
-      `);
-      initDb.exec(`
-        CREATE TABLE IF NOT EXISTS client_predictions (
-          client_id TEXT,
-          trend TEXT COLLATE NOCASE,
-          prediction TEXT,
-          prediction_date TEXT,
-          status TEXT,
-          resolved_at TEXT,
-          PRIMARY KEY (client_id, trend, prediction_date)
-        )
-      `);
-    } finally {
-      initDb.close();
+    }
+
+    if (!initSuccess) {
+      throw initError || new Error('Failed to initialize local SQLite database');
     }
 
     sqliteDb = {
@@ -208,7 +232,6 @@ if (!firestore) {
         return {
           get(...args) {
             const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA journal_mode = WAL;');
             db.exec('PRAGMA busy_timeout = 5000;');
             try {
               const stmt = db.prepare(sql);
@@ -219,7 +242,6 @@ if (!firestore) {
           },
           all(...args) {
             const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA journal_mode = WAL;');
             db.exec('PRAGMA busy_timeout = 5000;');
             try {
               const stmt = db.prepare(sql);
@@ -230,7 +252,6 @@ if (!firestore) {
           },
           run(...args) {
             const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA journal_mode = WAL;');
             db.exec('PRAGMA busy_timeout = 5000;');
             try {
               const stmt = db.prepare(sql);
@@ -243,7 +264,6 @@ if (!firestore) {
       },
       exec(sql) {
         const db = new DatabaseSyncClass(dbPath);
-        db.exec('PRAGMA journal_mode = WAL;');
         db.exec('PRAGMA busy_timeout = 5000;');
         try {
           return db.exec(sql);
@@ -342,10 +362,9 @@ export async function incrementVote(trend, vote, location = null) {
   // SQLite fallback update
   if (sqliteDb) {
     const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN TRANSACTION;');
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
       db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
       if (vote === 'genius') {
         db.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(trend);
@@ -414,10 +433,9 @@ export async function getVoteEvents(trend) {
 export async function seedVoteEvents(trend, events) {
   if (sqliteDb) {
     const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN TRANSACTION;');
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
       
       db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(trend);
       const stmt = db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
@@ -1222,10 +1240,9 @@ export async function incrementChatCount(clientId, trend) {
 
   if (sqliteDb) {
     const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA journal_mode = WAL;');
     db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN TRANSACTION;');
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
       db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
       db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
       db.exec('COMMIT;');
@@ -1868,10 +1885,9 @@ export async function resolvePredictions(clientId, localDate) {
       `).all(normalizedClientId, localDate);
 
       const db = new DatabaseSyncClass(dbPath);
-      db.exec('PRAGMA journal_mode = WAL;');
       db.exec('PRAGMA busy_timeout = 5000;');
       try {
-        db.exec('BEGIN TRANSACTION;');
+        db.exec('BEGIN IMMEDIATE TRANSACTION;');
         const updateStmt = db.prepare(`
           UPDATE client_predictions 
           SET status = ?, resolved_at = ? 

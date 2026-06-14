@@ -8,12 +8,14 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Trivia Challenge Chat Capacity Rewards', () => {
-  const clientId = `test-client-rewards-${Date.now()}`;
+  const clientId = `test-client-rewards-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
   const lowercaseTrend = 'google gemini';
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
       db.prepare('DELETE FROM client_trivia_scores WHERE client_id = ?').run(clientId);
     } catch (e) {
@@ -35,6 +37,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
   test.describe('[AC-1] Client Trivia Score Database Cache & Helpers', () => {
     test('should verify client_trivia_scores table exists with correct columns', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
@@ -84,7 +88,7 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       const dbModule = await import('../db.js');
       // If we temporarily disable sqliteDb or test the fallback, it should work.
       // We can assert that the helpers can run without throwing errors and save to a fallback store.
-      const testClientMemory = `client-mem-${Date.now()}`;
+      const testClientMemory = `client-mem-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
       await dbModule.recordTriviaScore(testClientMemory, 'Memory Trend', 3);
       const score = await dbModule.getTriviaScore(testClientMemory, 'Memory Trend');
       expect(score).toBe(3);
@@ -112,6 +116,8 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // Verify direct DB query contains the normalized lowercase trend
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
         const stmt = db.prepare('SELECT trend, score FROM client_trivia_scores WHERE client_id = ?');
         const rows = stmt.all(clientId);
@@ -148,7 +154,7 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // 2. Add one referral to DB directly or via API
       await request.post('/api/referral', {
-        data: { client_id: clientId, referee_id: `ref-${Date.now()}` }
+        data: { client_id: clientId, referee_id: `ref-${Date.now()}-${Math.floor(Math.random() * 1000000)}` }
       });
 
       // GET again: referralCount = 1 => allowedLimit = 3 + 5*1 + 0 = 8
@@ -333,7 +339,9 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
 
       // Question 3: correct (opt index 1)
       await options.nth(1).click();
+      const scorePromise = page.waitForResponse('**/api/trivia/score');
       await nextBtn.click(); // See Results
+      await scorePromise;
 
       // Results Screen should be visible
       const resultsScreen = page.locator('.trivia-results-screen');
@@ -453,7 +461,9 @@ test.describe('Trivia Challenge Chat Capacity Rewards', () => {
       await options.nth(2).click();
       await nextBtn.click();
       await options.nth(1).click();
+      const scorePromise = page.waitForResponse('**/api/trivia/score');
       await nextBtn.click(); // See Results
+      await scorePromise;
 
       // Verify results screen displays
       await expect(page.locator('.trivia-results-screen')).toBeVisible();

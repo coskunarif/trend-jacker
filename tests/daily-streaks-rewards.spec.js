@@ -8,15 +8,14 @@ const __dirname = path.dirname(__filename);
 const dbPath = path.resolve(__dirname, '../polls.db');
 
 test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
-  const clientId = `test-client-streaks-${Date.now()}`;
+  const clientId = `test-client-streaks-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
   const trend = 'Google Gemini';
 
   test.beforeEach(async () => {
     const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
     try {
-      // Ensure WAL mode and busy timeout are configured to match backend settings
-      db.exec('PRAGMA journal_mode = WAL;');
-      db.exec('PRAGMA busy_timeout = 5000;');
       db.prepare('DELETE FROM client_streaks WHERE client_id = ?').run(clientId);
     } catch (e) {
       // client_streaks table might not exist yet, which is expected to fail AC-1 initially
@@ -40,9 +39,9 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
     // AC-1: Verify client_streaks table schema
     test('should verify client_streaks table exists with correct columns', async () => {
       const db = new DatabaseSync(dbPath);
+      db.exec('PRAGMA busy_timeout = 5000;');
+      db.exec('PRAGMA journal_mode = WAL;');
       try {
-        db.exec('PRAGMA journal_mode = WAL;');
-        db.exec('PRAGMA busy_timeout = 5000;');
         const stmt = db.prepare(`
           SELECT sql FROM sqlite_master 
           WHERE type = 'table' AND name = 'client_streaks'
@@ -65,7 +64,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
 
       const { updateClientStreak, getClientStreak } = dbModule;
 
-      const messyClientId = `  Client-Streak-Test-${Date.now()}  `;
+      const messyClientId = `  Client-Streak-Test-${Date.now()}-${Math.floor(Math.random() * 1000000)}  `;
       const normalizedClientId = messyClientId.trim().toLowerCase();
 
       // Initially no record
@@ -148,7 +147,7 @@ test.describe('Daily Streaks & Trivia Rewards Gamification', () => {
     test('should handle malformed or out-of-order date strings gracefully', async () => {
       const dbModule = await import('../db.js');
       const { updateClientStreak, getClientStreak } = dbModule;
-      const tempClientId = `temp-date-test-${Date.now()}`;
+      const tempClientId = `temp-date-test-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
       await updateClientStreak(tempClientId, '2026-06-13');
       let streak = await getClientStreak(tempClientId);

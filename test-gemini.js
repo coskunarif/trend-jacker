@@ -42,7 +42,7 @@ async function testModel(modelName) {
 }
 
 async function main() {
-  const models = ['gemini-3.5-flash', 'gemini-3.1-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro'];
+  const models = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-3.1-flash', 'gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-pro'];
   for (const m of models) {
     const ok = await testModel(m);
     if (ok) {
