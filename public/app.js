@@ -2080,7 +2080,7 @@ function initApp() {
       
       // Update history and chat limit in proper order
       await fetchPredictionHistory();
-      await checkChatLimit(currentTrend.title);
+      checkChatLimit(currentTrend.title);
     } catch (err) {
       console.error('Error submitting prediction:', err);
     }
@@ -3453,9 +3453,9 @@ function initApp() {
 
   const checkStatusBtn = document.getElementById('check-status-btn');
   if (checkStatusBtn) {
-    checkStatusBtn.addEventListener('click', async () => {
+    checkStatusBtn.addEventListener('click', () => {
       if (currentTrend) {
-        await checkChatLimit(currentTrend.title);
+        checkChatLimit(currentTrend.title);
       }
     });
   }
@@ -3577,7 +3577,7 @@ function initApp() {
       chatMessages.push({ role: 'user', content: query });
       chatMessages.push({ role: 'assistant', content: data.reply });
 
-      await checkChatLimit(currentTrend.title);
+      checkChatLimit(currentTrend.title);
       
     } catch (err) {
       if (loadingBubble && loadingBubble.parentNode) {
