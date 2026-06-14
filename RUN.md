@@ -9,10 +9,16 @@ caps: agents,ui,web,human
 - 2026-06-14: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
 - 2026-06-14: Builder disputed test 'Verify GET /api/og/:slug returns valid SVG with elements' in tests/pinterest-sharing-suite.spec.js. Conductor ruled test wrong against SPEC.md [AC-1]. Starting Tester phase to amend the test.
 - 2026-06-14: Tester completed test amendment. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-14: Verifier starting dev server on port 3001 for behavioral dogfooding.
 ## Disputes
 - `Verify GET /api/og/:slug returns valid SVG with elements` in `tests/pinterest-sharing-suite.spec.js` contradicts SPEC.md [AC-1] which requires `/api/og/:slug` to return rasterized PNG with Content-Type `image/png`.
 
 ## Verdict
+- `[AC-1] Dynamic OG PNG Preview Cards`: PASS (verified `Content-Type` is `image/png` and binary dimensions are exactly 1200x630 pixels)
+- `[AC-2] Case-Insensitive Cache Lookup & Storage`: PASS (verified key normalization to lowercase and identical cached responses for case-variant queries)
+- `[AC-3] Thematic Dynamic Category Styling`: PASS (verified dynamic vibe badge and category elements match for Tech, Workplace, Innovation, and Default categories)
+- `[AC-4] Multi-Language Search Engine Indexing`: PASS (verified IndexNow pings default English and localized variant URLs `/es`, `/fr`, `/ja`)
+
 ## Done
 
 
