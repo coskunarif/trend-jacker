@@ -1569,7 +1569,16 @@ fastify.get('/llms.txt', async (request, reply) => {
     let md = `# TrendJacker\n`;
     md += `> TrendJacker is a dynamic viral trend explainer platform summarizing what is trending and why.\n\n`;
     md += `## Trends\n`;
-    for (const trend of latestTrends) {
+    const seenSlugs = new Set();
+    const uniqueTrends = latestTrends.filter(trend => {
+      const slug = titleToSlug(trend.title);
+      if (seenSlugs.has(slug)) {
+        return false;
+      }
+      seenSlugs.add(slug);
+      return true;
+    });
+    for (const trend of uniqueTrends) {
       const slug = titleToSlug(trend.title);
       const desc = trend.description || 'No description available.';
       let citationPart = '';
@@ -1602,8 +1611,18 @@ fastify.get('/llms-full.txt', async (request, reply) => {
     
     let md = `# TrendJacker - Full Content\n\n`;
     
+    const seenSlugs = new Set();
+    const uniqueTrends = latestTrends.filter(trend => {
+      const slug = titleToSlug(trend.title);
+      if (seenSlugs.has(slug)) {
+        return false;
+      }
+      seenSlugs.add(slug);
+      return true;
+    });
+
     const trendsExplanations = await Promise.all(
-      latestTrends.map(async (trend) => {
+      uniqueTrends.map(async (trend) => {
         const headline = trend.news?.headline || '';
         const snippet = trend.news?.snippet || '';
         let explanation;
@@ -1662,14 +1681,18 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
-    const slugs = latestTrends.map(item => titleToSlug(item.title));
+    const slugs = [...new Set(latestTrends.map(item => titleToSlug(item.title)))];
+
+    const host = process.env.APP_HOST || 'viraljacker.com';
+    const protocol = process.env.APP_PROTOCOL || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
+    const canonicalBase = `${protocol}://${host}`;
 
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
     
     // Add homepage
     xml += `  <url>\n`;
-    xml += `    <loc>https://viraljacker.com/</loc>\n`;
+    xml += `    <loc>${canonicalBase}/</loc>\n`;
     xml += `    <changefreq>daily</changefreq>\n`;
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
@@ -1679,18 +1702,18 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     for (const slug of slugs) {
       for (const lang of locales) {
         const loc = lang === 'en'
-          ? `https://viraljacker.com/t/${slug}`
-          : `https://viraljacker.com/t/${slug}/${lang}`;
+          ? `${canonicalBase}/t/${slug}`
+          : `${canonicalBase}/t/${slug}/${lang}`;
         
         xml += `  <url>\n`;
         xml += `    <loc>${loc}</loc>\n`;
         xml += `    <changefreq>daily</changefreq>\n`;
         xml += `    <priority>0.8</priority>\n`;
-        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="https://viraljacker.com/t/${slug}" />\n`;
-        xml += `    <xhtml:link rel="alternate" hreflang="en" href="https://viraljacker.com/t/${slug}" />\n`;
-        xml += `    <xhtml:link rel="alternate" hreflang="es" href="https://viraljacker.com/t/${slug}/es" />\n`;
-        xml += `    <xhtml:link rel="alternate" hreflang="fr" href="https://viraljacker.com/t/${slug}/fr" />\n`;
-        xml += `    <xhtml:link rel="alternate" hreflang="ja" href="https://viraljacker.com/t/${slug}/ja" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${canonicalBase}/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="en" href="${canonicalBase}/t/${slug}" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="es" href="${canonicalBase}/t/${slug}/es" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="fr" href="${canonicalBase}/t/${slug}/fr" />\n`;
+        xml += `    <xhtml:link rel="alternate" hreflang="ja" href="${canonicalBase}/t/${slug}/ja" />\n`;
         xml += `  </url>\n`;
       }
     }
