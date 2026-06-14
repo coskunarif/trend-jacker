@@ -2221,6 +2221,23 @@ body {
   color: var(--text-heading);
 }
 
+.compare-select {
+  background: rgba(18, 22, 33, 0.6);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.compare-select:focus, .compare-select:hover {
+  border-color: var(--primary);
+  color: var(--text-heading);
+}
+
 /* Unified Preview Card Styles */
 #share-card-preview {
   margin-top: var(--space-2);

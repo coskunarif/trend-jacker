@@ -1863,8 +1863,9 @@ fastify.get('/api/poll/history', async (request, reply) => {
   if (!trend || !trend.trim()) {
     return reply.status(400).send({ error: 'Trend query parameter is required.' });
   }
+  const normalizedTrend = trend.toLowerCase();
 
-  let events = await getVoteEvents(trend);
+  let events = await getVoteEvents(normalizedTrend);
   if (!events || events.length === 0) {
     const mockVotes = [];
     const now = Date.now();
@@ -1882,8 +1883,8 @@ fastify.get('/api/poll/history', async (request, reply) => {
       }
     }
     mockVotes.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-    await seedVoteEvents(trend, mockVotes);
-    events = await getVoteEvents(trend);
+    await seedVoteEvents(normalizedTrend, mockVotes);
+    events = await getVoteEvents(normalizedTrend);
   }
 
   const nowMs = events.length > 0
