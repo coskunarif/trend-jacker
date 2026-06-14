@@ -720,6 +720,7 @@ function initApp() {
     demographicSelector.addEventListener('click', async (e) => {
       const pill = e.target.closest('.demo-pill');
       if (!pill) return;
+      if (pill.classList.contains('active')) return;
       const targetVal = pill.getAttribute('data-val');
       localStorage.setItem('selected-demographic', targetVal);
       updateDemographicPills(targetVal);
@@ -1004,8 +1005,11 @@ function initApp() {
   const langSelect = document.getElementById('lang-select');
   if (langSelect) {
     langSelect.value = initialLang;
+    let currentLang = initialLang;
     langSelect.addEventListener('change', async (e) => {
       const selectedLang = e.target.value;
+      if (selectedLang === currentLang) return;
+      currentLang = selectedLang;
       translateUI(selectedLang);
       
       if (currentTrend) {
@@ -1148,9 +1152,27 @@ function initApp() {
     sharePreviewText.addEventListener('input', updatePreviewAndValidation);
   }
 
+  let lastGenerateParams = { trend: '', platform: '', context: '', score: null };
+
   // Generate social media post using backend API
   async function generatePost() {
     if (!currentTrend) return;
+    const currentScore = activeShareContext === 'trivia' ? userScore : null;
+    if (
+      lastGenerateParams.trend === currentTrend.title &&
+      lastGenerateParams.platform === activeSharePlatform &&
+      lastGenerateParams.context === activeShareContext &&
+      lastGenerateParams.score === currentScore
+    ) {
+      return;
+    }
+    lastGenerateParams = {
+      trend: currentTrend.title,
+      platform: activeSharePlatform,
+      context: activeShareContext,
+      score: currentScore
+    };
+
     sharePreviewText.value = 'Generating post...';
     updatePreviewAndValidation();
     try {
@@ -1243,6 +1265,7 @@ function initApp() {
 
   platformPills.forEach(pill => {
     pill.addEventListener('click', () => {
+      if (pill.classList.contains('active')) return;
       platformPills.forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
       activeSharePlatform = pill.getAttribute('data-platform');
