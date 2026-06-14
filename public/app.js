@@ -1,3 +1,5 @@
+window.explanationCache = new Map();
+
 function initApp() {
   window.onerror = function(message, source, lineno, colno, error) {
     const errDiv = document.createElement('div');
@@ -976,6 +978,13 @@ function initApp() {
   if (preloadedDataEl) {
     try {
       preloadedData = JSON.parse(preloadedDataEl.textContent);
+      if (preloadedData && preloadedData.trend && preloadedData.explanation) {
+        const seedTrend = preloadedData.trend;
+        const seedLang = preloadedData.lang || 'en';
+        const seedBracket = localStorage.getItem('selected-demographic') || 'adults';
+        const seedKey = `${seedTrend}:${seedLang}:${seedBracket}`.toLowerCase();
+        window.explanationCache.set(seedKey, preloadedData.explanation);
+      }
     } catch (err) {
       console.error('Error parsing preloaded data:', err);
     }
@@ -1020,22 +1029,11 @@ function initApp() {
         
         window.history.pushState({ path: newUrl }, '', newUrl);
         
-        // Fetch localized explanation using POST /api/explain
-        try {
-          const res = await fetch('/api/explain', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              trend: currentTrend.title,
-              snippet: currentTrend.news ? currentTrend.news.snippet : '',
-              headline: currentTrend.news ? currentTrend.news.headline : '',
-              lang: selectedLang,
-              bracket: localStorage.getItem('selected-demographic') || 'adults'
-            })
-          });
-          
-          if (!res.ok) throw new Error('API failed to explain');
-          const data = await res.json();
+        const currentDemo = localStorage.getItem('selected-demographic') || 'adults';
+        const cacheKey = `${currentTrend.title}:${selectedLang}:${currentDemo}`.toLowerCase();
+
+        if (window.explanationCache.has(cacheKey)) {
+          const data = window.explanationCache.get(cacheKey);
           
           // Update details in DOM
           detailHook.textContent = data.hook;
@@ -1053,8 +1051,45 @@ function initApp() {
           
           // Update SEO
           updateSEO(currentTrend, data);
-        } catch (err) {
-          console.error('Failed to load localized details:', err);
+        } else {
+          // Fetch localized explanation using POST /api/explain
+          try {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            const res = await fetch('/api/explain', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trend: currentTrend.title,
+                snippet: currentTrend.news ? currentTrend.news.snippet : '',
+                headline: currentTrend.news ? currentTrend.news.headline : '',
+                lang: selectedLang,
+                bracket: currentDemo
+              })
+            });
+            
+            if (!res.ok) throw new Error('API failed to explain');
+            const data = await res.json();
+            window.explanationCache.set(cacheKey, data);
+            
+            // Update details in DOM
+            detailHook.textContent = data.hook;
+            detailWhat.textContent = data.whatIsIt;
+            detailTakeaway.textContent = data.takeaway;
+            
+            // Render viral tags
+            detailViralTags.innerHTML = '';
+            (data.whyIsItViral || []).forEach(reason => {
+              const span = document.createElement('span');
+              span.className = 'viral-tag';
+              span.textContent = reason;
+              detailViralTags.appendChild(span);
+            });
+            
+            // Update SEO
+            updateSEO(currentTrend, data);
+          } catch (err) {
+            console.error('Failed to load localized details:', err);
+          }
         }
       }
     });
@@ -1728,13 +1763,18 @@ function initApp() {
     
     try {
       let data;
-      // Hydrate explanation if preloadedData matches
       const currentDemo = localStorage.getItem('selected-demographic') || 'adults';
-      if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && currentDemo === 'adults' && !navigator.webdriver) {
+      const selectedLang = document.getElementById('lang-select')?.value || 'en';
+      const cacheKey = `${trend.title}:${selectedLang}:${currentDemo}`.toLowerCase();
+
+      if (window.explanationCache.has(cacheKey)) {
+        data = window.explanationCache.get(cacheKey);
+      } else if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && currentDemo === 'adults' && !navigator.webdriver) {
         data = preloadedData.explanation;
         preloadedData = null; // Clear to allow future live fetches
+        window.explanationCache.set(cacheKey, data);
       } else {
-        const selectedLang = document.getElementById('lang-select')?.value || 'en';
+        await new Promise(resolve => setTimeout(resolve, 50));
         const res = await fetch('/api/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1749,6 +1789,7 @@ function initApp() {
         
         if (!res.ok) throw new Error('API failed to explain');
         data = await res.json();
+        window.explanationCache.set(cacheKey, data);
       }
       
       if (loadId !== activeLoadId) return;
