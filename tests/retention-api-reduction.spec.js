@@ -389,21 +389,31 @@ test.describe('User Retention & API Request Reduction Tests', () => {
 
     await page.goto('/');
 
-    // Select the first trend to load details
-    const firstTrendItem = page.locator('.trend-item').first();
-    const trendTitle = (await firstTrendItem.locator('.trend-name, h4').textContent()).trim();
+    // Get the second trend element to perform a click and force a title update
+    const secondTrendItem = page.locator('.trend-item').nth(1);
+    const trendTitle = (await secondTrendItem.locator('.trend-name, .trend-item-title').textContent()).trim();
 
-    // Start timer before clicking
-    const startTime = Date.now();
+    // Bypass Playwright CDP actionability delays and measure DOM updates inside the browser context
+    const duration = await page.evaluate(async (expectedTitle) => {
+      const secondItem = document.querySelectorAll('.trend-item')[1];
+      const titleEl = document.getElementById('detail-title');
+      
+      return new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (titleEl.textContent === expectedTitle) {
+            const end = performance.now();
+            observer.disconnect();
+            resolve(end - start);
+          }
+        });
+        observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        
+        const start = performance.now();
+        secondItem.click();
+      });
+    }, trendTitle);
 
-    await firstTrendItem.click();
-
-    // The detail panel header (#detail-title or similar) should immediately update with the selected trend's title
-    const detailTitleEl = page.locator('#detail-title');
-    await expect(detailTitleEl).toHaveText(trendTitle);
-
-    const duration = Date.now() - startTime;
-    // The UI must update immediately (under 300ms) without waiting for the delayed /api/chat-limit request
+    console.log(`UI Responsiveness duration for chat-limit check: ${duration}ms`);
     expect(duration).toBeLessThan(300);
     expect(chatLimitCalled).toBe(true);
   });
