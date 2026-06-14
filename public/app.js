@@ -3537,6 +3537,35 @@ function initApp() {
     
     // Add user bubble
     appendBubble(query, 'user');
+
+    if (chatMessages.length > 4) {
+      chatMessages = chatMessages.slice(-4);
+    }
+
+    let historyForCache = chatMessages;
+    if (chatMessages.length >= 2) {
+      const lastUserMsg = chatMessages[chatMessages.length - 2];
+      const lastBotMsg = chatMessages[chatMessages.length - 1];
+      if (lastUserMsg.role === 'user' && lastBotMsg.role === 'assistant') {
+        if (lastUserMsg.content.toLowerCase() === query.toLowerCase()) {
+          historyForCache = chatMessages.slice(0, -2);
+        }
+      }
+    }
+
+    const trendLower = currentTrend.title.toLowerCase();
+    const queryLower = query.toLowerCase();
+    const historyKey = JSON.stringify(historyForCache).toLowerCase();
+    const cacheKey = `chat_cache:${trendLower}:${queryLower}:${historyKey}`;
+
+    const cachedReply = sessionStorage.getItem(cacheKey);
+    if (cachedReply) {
+      appendBubble(cachedReply, 'bot');
+      chatMessages.push({ role: 'user', content: query });
+      chatMessages.push({ role: 'assistant', content: cachedReply });
+      checkChatLimit(currentTrend.title);
+      return;
+    }
     
     // Add temporary loading indicator bubble
     const loadingBubble = appendBubble('Thinking...', 'bot loading-bubble');
@@ -3572,6 +3601,9 @@ function initApp() {
       
       // Add assistant bubble
       appendBubble(data.reply, 'bot');
+      
+      // Save in sessionStorage cache
+      sessionStorage.setItem(cacheKey, data.reply);
       
       // Update history reference
       chatMessages.push({ role: 'user', content: query });
