@@ -693,9 +693,15 @@ export async function setLocalizedExplanation(trend, lang, data) {
 }
 
 function getChatCacheKey(trend, query, history) {
-  const serializedHistory = JSON.stringify(history || []);
+  const normalizedHistory = (history || []).map(msg => ({
+    role: (msg.role || '').toLowerCase(),
+    content: (msg.content || '').toLowerCase()
+  }));
+  const serializedHistory = JSON.stringify(normalizedHistory);
   const hash = crypto.createHash('sha256').update(serializedHistory).digest('hex');
-  return `${trend || ''}:${query || ''}:${hash}`.toLowerCase();
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const normalizedQuery = (query || '').trim().toLowerCase();
+  return `${normalizedTrend}:${normalizedQuery}:${hash}`;
 }
 
 function getPostCacheKey(trendTitle, platform, contextType) {
