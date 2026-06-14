@@ -3410,6 +3410,45 @@ function initApp() {
     });
   }
 
+  // Handle referral share link clipboard copy
+  document.addEventListener('click', async (e) => {
+    const linkEl = e.target.closest('#referral-share-link');
+    if (linkEl) {
+      e.preventDefault();
+      if (linkEl.textContent === 'Link Copied!') return;
+      const textToCopy = linkEl.href || linkEl.textContent;
+      let copied = false;
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(textToCopy);
+          copied = true;
+        }
+      } catch (err) {
+        console.warn('navigator.clipboard failed, trying fallback:', err);
+      }
+      
+      if (!copied) {
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = textToCopy;
+          textArea.style.position = "fixed";  // Avoid scrolling to bottom
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr);
+        }
+      }
+
+      const originalText = linkEl.textContent;
+      linkEl.textContent = 'Link Copied!';
+      setTimeout(() => {
+        linkEl.textContent = originalText;
+      }, 2000);
+    }
+  });
+
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const query = chatInput.value.trim();
