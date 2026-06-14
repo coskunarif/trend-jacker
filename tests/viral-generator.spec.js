@@ -203,7 +203,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(clipboardText).toBe('Awesome Gemini post!');
   });
 
-  // [AC-1] Unified Modal Component Structure
+  // [AC-2] [AC-3] Unified Modal Component Structure
   test('6. Verify Outbound Sharing Intent', async ({ page, context }) => {
     // Intercept POST /api/generate-post
     await page.route('**/api/generate-post', async (route) => {
@@ -231,9 +231,12 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
       page.locator('#btn-post-share').click() // This should trigger window.open
     ]);
 
-    await newPage.waitForLoadState();
-    expect(newPage.url()).toMatch(/x\.com.*intent.*tweet/);
-    expect(newPage.url()).toMatch(/Awesome.*Gemini.*post/);
+    await expect(async () => {
+      const url = newPage.url();
+      expect(url).toContain('https://x.com/intent/tweet?text=');
+      expect(url).toMatch(/x\.com.*intent.*tweet/);
+      expect(url).toMatch(/Awesome.*Gemini.*post/);
+    }).toPass();
   });
 
   // [AC-3] Redundant Button Removal
