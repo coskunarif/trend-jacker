@@ -291,7 +291,11 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
     const riseBtn = card.locator('.btn-predict-rise');
     
     chatLimitCalled = false;
+    
+    // Wait for the async chat-limit route to be called to prevent race condition
+    const chatLimitPromise = page.waitForResponse(response => response.url().includes('/api/chat-limit'));
     await riseBtn.click();
+    await chatLimitPromise;
 
     expect(chatLimitCalled).toBe(true);
 
@@ -332,8 +336,6 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
     const dropdown = page.locator('#share-context-select, .share-context-dropdown');
     await expect(dropdown).toBeVisible();
 
-    await dropdown.selectOption('prediction');
-
     let generatePostPayload = null;
     await page.route('**/api/generate-post', async (route) => {
       generatePostPayload = route.request().postDataJSON();
@@ -346,7 +348,10 @@ test.describe('TJ-XXX: Gamified Trend Predictions Tests', () => {
       });
     });
 
-    await page.locator('.platform-pill[data-platform="x"]').click();
+    await dropdown.selectOption('prediction');
+
+    // Select a non-active platform first (linkedin) to trigger generatePost and avoid deduplication
+    await page.locator('.platform-pill[data-platform="linkedin"]').click();
 
     expect(generatePostPayload).toBeDefined();
     expect(generatePostPayload.contextType || generatePostPayload.context).toBe('prediction');

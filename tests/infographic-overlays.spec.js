@@ -251,7 +251,7 @@ test.describe('Infographic Overlay Customization E2E Tests', () => {
   // [AC-1] [AC-3] [AC-4] [AC-6] [AC-7] Scenario 3: Infographic card layout with long subtitle and long hook text
   test('Verify infographic bounds reduction loop with long custom subtitle and long hook text', async ({ page }) => {
     // Override the explain endpoint before page load for this test specifically to return a very long hook text
-    const longHook = "This is an extremely long AI hook designed to stress test the layout bounds logic of the sharing card. It contains multiple lines of text that will easily exceed the default height and push the community sentiment labels and footer out of bounds if not properly scaled and constrained by the dynamic font size and line height reduction loop. We want to see it shrink down to 12px and still fit within the maximum allowed y coordinate of 540.";
+    const longHook = "This is an extremely long AI hook designed to stress test the layout bounds logic of the sharing card. ".repeat(6) + "It contains multiple lines of text that will easily exceed the default height and push the community sentiment labels and footer out of bounds if not properly scaled and constrained by the dynamic font size and line height reduction loop. We want to see it shrink down to 12px and still fit within the maximum allowed y coordinate of 540. ".repeat(4);
     
     await page.route('**/api/explain', async (route) => {
       await route.fulfill({
@@ -271,7 +271,7 @@ test.describe('Infographic Overlay Customization E2E Tests', () => {
     await expect(page.locator('#card-snapshot-share')).toBeVisible();
 
     // Fill extremely long multi-line custom subtitle
-    const longSubtitle = "This is a custom infographic subtitle designed to test word wrap, but with even more words to make it span multiple lines, push the layout down, and verify that the layout bounds loop works under high stress! Yes, this is very long.";
+    const longSubtitle = "This is a custom infographic subtitle designed to test word wrap, but with even more words to make it span multiple lines, push the layout down, and verify that the layout bounds loop works under high stress! Yes, this is very long. ".repeat(4);
     await page.locator('#info-custom-text-input').fill(longSubtitle);
 
     // Click download infographic card button
