@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import sharp from 'sharp';
 
 import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
@@ -40,6 +41,46 @@ function titleToSlug(title) {
     .replace(/\s+/g, '-')
     .replace(/-+/g, '-');
 }
+
+function getTrendCategoryMeta(title) {
+  const lowerTitle = title.toLowerCase();
+  
+  if (/\b(tech|ai|apple|google|openai|gpt|gemini|claude|nvidia|phone|software|computer|digital|code|developer|web)\b/.test(lowerTitle)) {
+    return {
+      category: 'Tech',
+      emoji: '🤖',
+      badge: 'Cutting Edge',
+      gradientStart: '#8b5cf6',
+      gradientEnd: '#06b6d4'
+    };
+  }
+  if (/\b(work|job|career|office|employee|employer|remote|hybrid|team|business|meeting|manager)\b/.test(lowerTitle)) {
+    return {
+      category: 'Workplace',
+      emoji: '💼',
+      badge: 'Future of Work',
+      gradientStart: '#f97316',
+      gradientEnd: '#ec4899'
+    };
+  }
+  if (/\b(innovation|green|solar|energy|sustainable|electric|climate|future|science|smart|battery)\b/.test(lowerTitle)) {
+    return {
+      category: 'Innovation',
+      emoji: '⚡',
+      badge: 'Green Tech',
+      gradientStart: '#10b981',
+      gradientEnd: '#06b6d4'
+    };
+  }
+  return {
+    category: 'Trending',
+    emoji: '🔥',
+    badge: 'Hot Vibe',
+    gradientStart: '#3b82f6',
+    gradientEnd: '#8b5cf6'
+  };
+}
+
 
 const apiKey = getApiKey();
 if (!apiKey) {
@@ -234,6 +275,7 @@ const DEFAULT_TRENDS = [
 ];
 
 let latestTrends = [];
+const ogImageCache = new Map();
 const pingedSlugs = new Set();
 let recentActivityLog = [];
 const MAX_ACTIVITY_LOG_SIZE = 15;
@@ -1283,14 +1325,24 @@ fastify.get('/api/topic-image/:slug', async (request, reply) => {
     fastify.log.error('Cache read error for topic image: ' + err.message);
   }
 
+  const catMeta = getTrendCategoryMeta(trendName);
+
   let svgContent = '';
   // Check if test or dev mode
   if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || !genAI) {
     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-      <rect width="800" height="600" fill="#2d1b4e"/>
-      <circle cx="400" cy="300" r="150" fill="#705af8" opacity="0.3"/>
-      <text x="400" y="310" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
-      <text x="400" y="360" font-family="sans-serif" font-size="20" fill="#a599e8" text-anchor="middle">Topic Image Placeholder</text>
+      <defs>
+        <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+          <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="600" fill="url(#bgGrad)"/>
+      <circle cx="400" cy="300" r="150" fill="#ffffff" opacity="0.1"/>
+      <text x="400" y="250" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+      <text x="400" y="320" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+      <text x="400" y="380" font-family="sans-serif" font-size="24" fill="#ffffff" opacity="0.8" text-anchor="middle">${catMeta.badge}</text>
+      <text x="400" y="430" font-family="sans-serif" font-size="20" fill="#ffffff" opacity="0.6" text-anchor="middle">Topic Image Placeholder</text>
     </svg>`;
   } else {
     // Production Mode: Generate custom topic SVG using Gemini API
@@ -1314,7 +1366,11 @@ fastify.get('/api/topic-image/:slug', async (request, reply) => {
 Requirements:
 1. The output must be valid SVG code.
 2. It should have a width of 800 and height of 600.
-3. The design should be modern, clean, and visually represent the topic "${trendName}". Use appropriate colors, shapes, and minimal text if necessary.
+3. The design should be modern, clean, and visually represent the topic "${trendName}". You must incorporate the theme for the category "${catMeta.category}".
+Specifically:
+- Use the badge text "${catMeta.badge}" somewhere in the graphic or badge.
+- Include the emoji "${catMeta.emoji}" as a prominent graphic element.
+- Use a background gradient or design colors matching the range from "${catMeta.gradientStart}" to "${catMeta.gradientEnd}".
 4. Keep the output clean and return it inside the JSON response matching the schema.`;
 
       const result = await model.generateContent(prompt);
@@ -1328,8 +1384,16 @@ Requirements:
     } catch (err) {
       fastify.log.error('Gemini SVG generation failed: ' + err.message);
       svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-        <rect width="800" height="600" fill="#2d1b4e"/>
-        <text x="400" y="300" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+            <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="600" fill="url(#bgGrad)"/>
+        <text x="400" y="260" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+        <text x="400" y="340" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+        <text x="400" y="400" font-family="sans-serif" font-size="24" fill="#ffffff" opacity="0.8" text-anchor="middle">${catMeta.badge}</text>
       </svg>`;
     }
   }
@@ -1362,12 +1426,24 @@ async function serveOgImage(request, reply, slug, lang) {
   if (slug.endsWith('.md')) {
     cleanSlug = slug.slice(0, -3);
   }
+  let cleanLang = (lang || 'en').toLowerCase().trim();
+
+  // Normalize lookup keys to lowercase to satisfy [AC-2]
+  const lowercaseSlug = cleanSlug.toLowerCase();
+  const lowercaseLang = cleanLang.toLowerCase();
+  const cacheKey = `${lowercaseSlug}:${lowercaseLang}`;
+
+  if (ogImageCache.has(cacheKey)) {
+    reply.header('Content-Type', 'image/png');
+    return reply.send(ogImageCache.get(cacheKey));
+  }
+
   let trendName = '';
   try {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
-    const match = latestTrends.find(item => titleToSlug(item.title) === cleanSlug);
+    const match = latestTrends.find(item => titleToSlug(item.title) === lowercaseSlug);
     if (match) {
       trendName = match.title;
     }
@@ -1380,24 +1456,50 @@ async function serveOgImage(request, reply, slug, lang) {
   const genius = polls ? polls.genius : 0;
   const overrated = polls ? polls.overrated : 0;
 
+  const catMeta = getTrendCategoryMeta(trendName);
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-    <rect width="1200" height="630" fill="#1e1e2e"/>
-    <text x="600" y="150" font-family="sans-serif" font-size="54" fill="#cdd6f4" font-weight="bold" text-anchor="middle">${trendName}</text>
+    <defs>
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+        <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="630" fill="url(#bgGrad)"/>
+    <rect x="50" y="50" width="1100" height="530" rx="20" fill="#1e1e2e" opacity="0.9"/>
+    
+    <!-- Emoji & Title -->
+    <text x="600" y="120" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+    <text x="600" y="200" font-family="sans-serif" font-size="54" fill="#cdd6f4" font-weight="bold" text-anchor="middle">${trendName}</text>
+    
+    <!-- Vibe Badge -->
     <g class="vibe-badge" id="category-badge">
-      <rect x="500" y="220" width="200" height="50" rx="25" fill="#f5c2e7"/>
-      <text x="600" y="252" font-family="sans-serif" font-size="20" fill="#11111b" text-anchor="middle" font-weight="bold">Vibe Badge: AI/Tech</text>
+      <rect x="450" y="240" width="300" height="50" rx="25" fill="${catMeta.gradientStart}"/>
+      <text x="600" y="272" font-family="sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" font-weight="bold">${catMeta.badge}</text>
     </g>
+    
+    <!-- Sentiment Gauges -->
     <g class="sentiment-gauge">
-      <circle cx="450" cy="400" r="80" fill="none" stroke="#a6e3a1" stroke-width="20" class="genius-gauge"/>
-      <text x="450" y="405" font-family="sans-serif" font-size="24" fill="#a6e3a1" text-anchor="middle" font-weight="bold">Genius: ${genius}</text>
-      <circle cx="750" cy="400" r="80" fill="none" stroke="#f38ba8" stroke-width="20" class="overrated-gauge"/>
-      <text x="750" y="405" font-family="sans-serif" font-size="24" fill="#f38ba8" text-anchor="middle" font-weight="bold">Overrated: ${overrated}</text>
+      <circle cx="450" cy="420" r="80" fill="none" stroke="#a6e3a1" stroke-width="20" class="genius-gauge"/>
+      <text x="450" y="425" font-family="sans-serif" font-size="24" fill="#a6e3a1" text-anchor="middle" font-weight="bold">Genius: ${genius}</text>
+      <circle cx="750" cy="420" r="80" fill="none" stroke="#f38ba8" stroke-width="20" class="overrated-gauge"/>
+      <text x="750" y="425" font-family="sans-serif" font-size="24" fill="#f38ba8" text-anchor="middle" font-weight="bold">Overrated: ${overrated}</text>
     </g>
-    <text x="600" y="580" font-family="sans-serif" font-size="24" fill="#6c7086" text-anchor="middle">viraljacker.com</text>
+    <text x="600" y="550" font-family="sans-serif" font-size="24" fill="#6c7086" text-anchor="middle">viraljacker.com</text>
   </svg>`;
 
-  reply.header('Content-Type', 'image/svg+xml');
-  return svg;
+  try {
+    const pngBuffer = await sharp(Buffer.from(svg))
+      .png()
+      .toBuffer();
+
+    ogImageCache.set(cacheKey, pngBuffer);
+    reply.header('Content-Type', 'image/png');
+    return reply.send(pngBuffer);
+  } catch (err) {
+    fastify.log.error('Failed to convert SVG to PNG: ' + err.message);
+    reply.status(500).send({ error: 'Failed to render PNG preview' });
+  }
 }
 
 // GET /t/:slug - Dynamically renders a trend explainer page
