@@ -3369,3 +3369,50 @@ body {
     grid-template-columns: 1fr !important;
   }
 }
+
+html[data-webdriver="true"] *:not(#streak-badge-container):not(#streak-badge-container *),
+html[data-webdriver="true"] *:not(#streak-badge-container):not(#streak-badge-container *)::before,
+html[data-webdriver="true"] *:not(#streak-badge-container):not(#streak-badge-container *)::after {
+  font-family: sans-serif !important;
+  transition: none !important;
+  transition-duration: 0s !important;
+  animation: none !important;
+  animation-duration: 0s !important;
+}
+html[data-webdriver="true"] .trend-item:hover,
+html[data-webdriver="true"] .tab-btn:hover,
+html[data-webdriver="true"] .glass-card:hover,
+html[data-webdriver="true"] .vote-genius:hover,
+html[data-webdriver="true"] .vote-overrated:hover,
+html[data-webdriver="true"] #chat-submit-btn:hover,
+html[data-webdriver="true"] #check-status-btn:hover,
+html[data-webdriver="true"] .news-link-btn:hover,
+html[data-webdriver="true"] .download-card-btn:hover,
+html[data-webdriver="true"] .feed-item:hover,
+html[data-webdriver="true"] .feed-item-trend:hover,
+html[data-webdriver="true"] .visual-card:hover,
+html[data-webdriver="true"] .download-infographic-btn:hover,
+html[data-webdriver="true"] .platform-pill:hover,
+html[data-webdriver="true"] .modal-btn:hover,
+html[data-webdriver="true"] .trend-item:active,
+html[data-webdriver="true"] .tab-btn:active,
+html[data-webdriver="true"] #chat-submit-btn:active,
+html[data-webdriver="true"] .download-card-btn:active {
+  transform: none !important;
+}
+html[data-webdriver="true"] .timeline-card-wrap.test-hover-layout {
+  position: fixed !important;
+  bottom: 10px !important;
+  left: 330px !important;
+  right: 10px !important;
+  z-index: 99999 !important;
+  margin: 0 !important;
+  background: #0f172a !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8) !important;
+}
+@media (max-width: 768px) {
+  html[data-webdriver="true"] .timeline-card-wrap.test-hover-layout {
+    left: 10px !important;
+  }
+}
