@@ -500,6 +500,8 @@ export async function getCachedExplanation(trend) {
           whatIsIt: data.whatIsIt,
           whyIsItViral: data.whyIsItViral || [],
           takeaway: data.takeaway,
+          continuationProbability: data.continuationProbability,
+          continuationRationale: data.continuationRationale,
           created_at: data.created_at
         };
       }
@@ -539,7 +541,7 @@ export async function getCachedExplanation(trend) {
 /**
  * Stores the trend explanation in the cache.
  * @param {string} trend 
- * @param {{hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string}} explanation 
+ * @param {{hook: string, whatIsIt: string, whyIsItViral: string[], takeaway: string, continuationProbability?: number, continuationRationale?: string}} explanation 
  * @returns {Promise<void>}
  */
 export async function setCachedExplanation(trend, explanation) {
@@ -549,7 +551,9 @@ export async function setCachedExplanation(trend, explanation) {
     hook: explanation.hook,
     whatIsIt: explanation.whatIsIt,
     whyIsItViral: explanation.whyIsItViral || [],
-    takeaway: explanation.takeaway
+    takeaway: explanation.takeaway,
+    continuationProbability: explanation.continuationProbability,
+    continuationRationale: explanation.continuationRationale
   };
 
   if (firestore) {
