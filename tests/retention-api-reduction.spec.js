@@ -367,4 +367,162 @@ test.describe('User Retention & API Request Reduction Tests', () => {
     await expect(shareLink).toHaveText(originalText);
   });
 
+  // =========================================================================
+  // [AC-3] Non-Blocking UI Updates and Event Loop Yields
+  // =========================================================================
+  test('AC-3: Asynchronous checks (such as /api/chat-limit) are non-blocking and do not delay UI detail rendering', async ({ page }) => {
+    // Intercept /api/chat-limit and delay the response by 3 seconds
+    let chatLimitCalled = false;
+    await page.route('**/api/chat-limit*', async (route) => {
+      chatLimitCalled = true;
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          allowedLimit: 3,
+          currentCount: 0,
+          limitReached: false
+        })
+      });
+    });
+
+    await page.goto('/');
+
+    // Select the first trend to load details
+    const firstTrendItem = page.locator('.trend-item').first();
+    const trendTitle = (await firstTrendItem.locator('.trend-name, h4').textContent()).trim();
+
+    // Start timer before clicking
+    const startTime = Date.now();
+
+    await firstTrendItem.click();
+
+    // The detail panel header (#detail-title or similar) should immediately update with the selected trend's title
+    const detailTitleEl = page.locator('#detail-title');
+    await expect(detailTitleEl).toHaveText(trendTitle);
+
+    const duration = Date.now() - startTime;
+    // The UI must update immediately (under 300ms) without waiting for the delayed /api/chat-limit request
+    expect(duration).toBeLessThan(300);
+    expect(chatLimitCalled).toBe(true);
+  });
+
+  // =========================================================================
+  // [AC-1] Client-Side Chat History Truncation (Sliding Window)
+  // =========================================================================
+  test('AC-1: Conversation history sent to server is truncated to the last 4 messages, while all bubbles remain in the DOM', async ({ page }) => {
+    // Track outgoing history payloads
+    const outgoingHistories = [];
+    await page.route('**/api/chat', async (route) => {
+      const postData = route.request().postDataJSON();
+      outgoingHistories.push(postData.history || []);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ reply: `Mock reply for ${postData.query}` })
+      });
+    });
+
+    await page.goto('/');
+    await page.locator('.trend-item').first().click();
+
+    const chatInput = page.locator('#chat-input');
+    const chatForm = page.locator('#chat-form');
+
+    // Send 5 messages in sequence
+    for (let i = 1; i <= 5; i++) {
+      await chatInput.fill(`Message ${i}`);
+      await page.locator('#chat-submit-btn').click();
+      // Wait for the response bubble to appear
+      await expect(page.locator(`.chat-bubble.bot`, { hasText: `Mock reply for Message ${i}` })).toBeVisible();
+    }
+
+    // Outgoing payloads logic:
+    // Request 1: history = []
+    // Request 2: history = [M1, R1]
+    // Request 3: history = [M1, R1, M2, R2]
+    // Request 4: history = [M2, R2, M3, R3] (truncated to last 4)
+    // Request 5: history = [M3, R3, M4, R4] (truncated to last 4)
+    expect(outgoingHistories.length).toBe(5);
+    
+    // Check request 4
+    expect(outgoingHistories[3].length).toBe(4);
+    expect(outgoingHistories[3][0].content).toBe('Message 2');
+    
+    // Check request 5
+    expect(outgoingHistories[4].length).toBe(4);
+    expect(outgoingHistories[4][0].content).toBe('Message 3');
+
+    // Verify all 10 bubbles + the initial greeting bubble are in the DOM (total 11 bubbles)
+    const bubblesCount = await page.locator('.chat-bubble').count();
+    expect(bubblesCount).toBe(11); // 1 greeting + 5 user messages + 5 assistant replies
+  });
+
+  // =========================================================================
+  // [AC-2] Browser-Side sessionStorage Chat Caching
+  // =========================================================================
+  test('AC-2: Chat queries and responses are cached client-side in sessionStorage and retrieved case-insensitively', async ({ page }) => {
+    // Intercept /api/chat to count requests
+    let chatRequestsCount = 0;
+    await page.route('**/api/chat', async (route) => {
+      chatRequestsCount++;
+      const postData = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ reply: `Mock reply for ${postData.query}` })
+      });
+    });
+
+    await page.goto('/');
+
+    const firstTrendItem = page.locator('.trend-item').first();
+    const trendTitle = (await firstTrendItem.locator('.trend-name, h4').textContent()).trim();
+    await firstTrendItem.click();
+
+    // Clear sessionStorage at the start
+    await page.evaluate(() => sessionStorage.clear());
+
+    const chatInput = page.locator('#chat-input');
+    const chatForm = page.locator('#chat-form');
+
+    // 1. Submit Query A in lowercase
+    const queryA = 'is this trend legit?';
+    await chatInput.fill(queryA);
+    await page.locator('#chat-submit-btn').click();
+    await expect(page.locator(`.chat-bubble.bot`, { hasText: `Mock reply for ${queryA}` })).toBeVisible();
+
+    expect(chatRequestsCount).toBe(1);
+
+    // Verify key in sessionStorage
+    const storageKeys = await page.evaluate(() => Object.keys(sessionStorage));
+    const cacheKey = storageKeys.find(key => key.startsWith('chat_cache:'));
+    expect(cacheKey).toBeDefined();
+
+    // Key format: chat_cache:${trend}:${query}:${historyKey} (all in lowercase)
+    const expectedPrefix = `chat_cache:${trendTitle.toLowerCase()}:${queryA.toLowerCase()}:`;
+    expect(cacheKey.startsWith(expectedPrefix)).toBe(true);
+
+    const cachedVal = await page.evaluate((k) => sessionStorage.getItem(k), cacheKey);
+    expect(cachedVal).toContain(`Mock reply for ${queryA}`);
+
+    // Reset counter
+    chatRequestsCount = 0;
+
+    // 2. Submit identical query A with different casing (e.g. UPPERCASE)
+    const queryAUpper = queryA.toUpperCase();
+    await chatInput.fill(queryAUpper);
+    await page.locator('#chat-submit-btn').click();
+
+    // Verify it renders the response but does NOT send a network request
+    await expect(page.locator(`.chat-bubble.bot`).last()).toBeVisible();
+    await page.waitForTimeout(500); // Wait short time to ensure no network call is fired
+    expect(chatRequestsCount).toBe(0);
+
+    // Verify the response content in the bubble matches the cached reply
+    const lastBubbleText = await page.locator(`.chat-bubble.bot`).last().textContent();
+    expect(lastBubbleText).toContain(`Mock reply for ${queryA}`);
+  });
+
 });
