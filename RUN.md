@@ -1,5 +1,5 @@
 task: Objective: Ensure correct display of social media preview images and search engine indexing coverage to maximize organic click-through rate and search ranking visibility. Metric: organic click-through rate. Why now: Currently, social preview metadata tags serve SVGs which are ignored by major social and search platforms, breaking preview cards. Runner-up: Establish a public forecast dashboard for trend predictions to improve user retention.             tier: T2   creativity: 0.5
-state: VERIFIER             budget: repairs 0/3
+state: SHIPPER              budget: repairs 0/3
 branch: asf/20260614-og-preview          checkpoint: none
 caps: agents,ui,web,human
 
@@ -10,6 +10,7 @@ caps: agents,ui,web,human
 - 2026-06-14: Builder disputed test 'Verify GET /api/og/:slug returns valid SVG with elements' in tests/pinterest-sharing-suite.spec.js. Conductor ruled test wrong against SPEC.md [AC-1]. Starting Tester phase to amend the test.
 - 2026-06-14: Tester completed test amendment. Observed state: green. Conductor starting Verifier phase.
 - 2026-06-14: Verifier starting dev server on port 3001 for behavioral dogfooding.
+- 2026-06-14: Verifier completed. Conductor starting Shipper phase.
 ## Disputes
 - `Verify GET /api/og/:slug returns valid SVG with elements` in `tests/pinterest-sharing-suite.spec.js` contradicts SPEC.md [AC-1] which requires `/api/og/:slug` to return rasterized PNG with Content-Type `image/png`.
 
