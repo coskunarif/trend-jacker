@@ -73,7 +73,7 @@ test.describe('Achievements Dashboard Spec Verification Tests', () => {
     // Mobile viewport stacking layout
     await page.setViewportSize({ width: 375, height: 667 });
     const statsGrid = page.locator('.achievements-stats-grid');
-    await expect(statsGrid).toHaveCSS('grid-template-columns', /1fr/);
+    await expect(statsGrid).toHaveCSS('grid-template-columns', /^\d+(?:\.\d+)?px$/);
   });
 
   // =========================================================================
@@ -155,7 +155,7 @@ test.describe('Achievements Dashboard Spec Verification Tests', () => {
     // Explorer (activity > 0) -> Unlocked
     const explorerBadge = badges.filter({ hasText: 'Explorer' });
     await expect(explorerBadge).toHaveClass(/unlocked/);
-    await expect(explorerBadge).not.toHaveClass(/locked/);
+    await expect(explorerBadge).not.toHaveClass(/\blocked\b/);
     await expect(explorerBadge).not.toHaveCSS('opacity', '0.4');
 
     // Streak Starter (streak >= 1) -> Unlocked
@@ -343,8 +343,8 @@ test.describe('Achievements Dashboard Spec Verification Tests', () => {
       db.exec('PRAGMA busy_timeout = 5000;');
       db.exec('PRAGMA journal_mode = WAL;');
       try {
-        db.prepare('INSERT INTO client_streaks (client_id, streak_count, last_active_date) VALUES (?, 4, "2026-06-13")').run(normalizedClientId);
-        db.prepare('INSERT INTO client_referrals (client_id, referee_id) VALUES (?, "ref-1")').run(normalizedClientId);
+        db.prepare("INSERT INTO client_streaks (client_id, streak_count, last_active_date) VALUES (?, 4, '2026-06-13')").run(normalizedClientId);
+        db.prepare("INSERT INTO client_referrals (client_id, referee_id) VALUES (?, 'ref-1')").run(normalizedClientId);
       } finally {
         db.close();
       }
