@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import fastifyStatic from '@fastify/static';
 import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import sharp from 'sharp';
 
 import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
@@ -274,6 +275,7 @@ const DEFAULT_TRENDS = [
 ];
 
 let latestTrends = [];
+const ogImageCache = new Map();
 const pingedSlugs = new Set();
 let recentActivityLog = [];
 const MAX_ACTIVITY_LOG_SIZE = 15;
@@ -1424,12 +1426,24 @@ async function serveOgImage(request, reply, slug, lang) {
   if (slug.endsWith('.md')) {
     cleanSlug = slug.slice(0, -3);
   }
+  let cleanLang = (lang || 'en').toLowerCase().trim();
+
+  // Normalize lookup keys to lowercase to satisfy [AC-2]
+  const lowercaseSlug = cleanSlug.toLowerCase();
+  const lowercaseLang = cleanLang.toLowerCase();
+  const cacheKey = `${lowercaseSlug}:${lowercaseLang}`;
+
+  if (ogImageCache.has(cacheKey)) {
+    reply.header('Content-Type', 'image/png');
+    return reply.send(ogImageCache.get(cacheKey));
+  }
+
   let trendName = '';
   try {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
-    const match = latestTrends.find(item => titleToSlug(item.title) === cleanSlug);
+    const match = latestTrends.find(item => titleToSlug(item.title) === lowercaseSlug);
     if (match) {
       trendName = match.title;
     }
@@ -1442,24 +1456,50 @@ async function serveOgImage(request, reply, slug, lang) {
   const genius = polls ? polls.genius : 0;
   const overrated = polls ? polls.overrated : 0;
 
+  const catMeta = getTrendCategoryMeta(trendName);
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
-    <rect width="1200" height="630" fill="#1e1e2e"/>
-    <text x="600" y="150" font-family="sans-serif" font-size="54" fill="#cdd6f4" font-weight="bold" text-anchor="middle">${trendName}</text>
+    <defs>
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+        <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="630" fill="url(#bgGrad)"/>
+    <rect x="50" y="50" width="1100" height="530" rx="20" fill="#1e1e2e" opacity="0.9"/>
+    
+    <!-- Emoji & Title -->
+    <text x="600" y="120" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+    <text x="600" y="200" font-family="sans-serif" font-size="54" fill="#cdd6f4" font-weight="bold" text-anchor="middle">${trendName}</text>
+    
+    <!-- Vibe Badge -->
     <g class="vibe-badge" id="category-badge">
-      <rect x="500" y="220" width="200" height="50" rx="25" fill="#f5c2e7"/>
-      <text x="600" y="252" font-family="sans-serif" font-size="20" fill="#11111b" text-anchor="middle" font-weight="bold">Vibe Badge: AI/Tech</text>
+      <rect x="450" y="240" width="300" height="50" rx="25" fill="${catMeta.gradientStart}"/>
+      <text x="600" y="272" font-family="sans-serif" font-size="20" fill="#ffffff" text-anchor="middle" font-weight="bold">${catMeta.badge}</text>
     </g>
+    
+    <!-- Sentiment Gauges -->
     <g class="sentiment-gauge">
-      <circle cx="450" cy="400" r="80" fill="none" stroke="#a6e3a1" stroke-width="20" class="genius-gauge"/>
-      <text x="450" y="405" font-family="sans-serif" font-size="24" fill="#a6e3a1" text-anchor="middle" font-weight="bold">Genius: ${genius}</text>
-      <circle cx="750" cy="400" r="80" fill="none" stroke="#f38ba8" stroke-width="20" class="overrated-gauge"/>
-      <text x="750" y="405" font-family="sans-serif" font-size="24" fill="#f38ba8" text-anchor="middle" font-weight="bold">Overrated: ${overrated}</text>
+      <circle cx="450" cy="420" r="80" fill="none" stroke="#a6e3a1" stroke-width="20" class="genius-gauge"/>
+      <text x="450" y="425" font-family="sans-serif" font-size="24" fill="#a6e3a1" text-anchor="middle" font-weight="bold">Genius: ${genius}</text>
+      <circle cx="750" cy="420" r="80" fill="none" stroke="#f38ba8" stroke-width="20" class="overrated-gauge"/>
+      <text x="750" y="425" font-family="sans-serif" font-size="24" fill="#f38ba8" text-anchor="middle" font-weight="bold">Overrated: ${overrated}</text>
     </g>
-    <text x="600" y="580" font-family="sans-serif" font-size="24" fill="#6c7086" text-anchor="middle">viraljacker.com</text>
+    <text x="600" y="550" font-family="sans-serif" font-size="24" fill="#6c7086" text-anchor="middle">viraljacker.com</text>
   </svg>`;
 
-  reply.header('Content-Type', 'image/svg+xml');
-  return svg;
+  try {
+    const pngBuffer = await sharp(Buffer.from(svg))
+      .png()
+      .toBuffer();
+
+    ogImageCache.set(cacheKey, pngBuffer);
+    reply.header('Content-Type', 'image/png');
+    return reply.send(pngBuffer);
+  } catch (err) {
+    fastify.log.error('Failed to convert SVG to PNG: ' + err.message);
+    reply.status(500).send({ error: 'Failed to render PNG preview' });
+  }
 }
 
 // GET /t/:slug - Dynamically renders a trend explainer page
