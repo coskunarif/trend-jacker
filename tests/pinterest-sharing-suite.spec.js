@@ -113,20 +113,19 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
   });
 
   // [AC-2] Dynamic OpenGraph Image Route
-  test('Verify GET /api/og/:slug returns valid SVG with elements', async ({ request }) => {
+  test('Verify GET /api/og/:slug returns valid PNG preview image', async ({ request }) => {
     const response = await request.get('/api/og/google-gemini');
     expect(response.status()).toBe(200);
-    expect(response.headers()['content-type']).toContain('image/svg+xml');
+    expect(response.headers()['content-type']).toBe('image/png');
 
-    const svgText = await response.text();
-    // Verify SVG requirements
-    expect(svgText).toContain('<svg');
-    expect(svgText).toContain('Google Gemini');
-    expect(svgText).toContain('viraljacker.com');
-    // Vibe badge / category representation
-    expect(svgText).toMatch(/(badge|icon|category|vibe)/i);
-    // Sentiment Split gauge or circular elements
-    expect(svgText).toMatch(/(circle|gauge|path|rect|genius|overrated|sentiment)/i);
+    const body = await response.body();
+    const pngSignature = body.slice(0, 8).toString('hex');
+    expect(pngSignature).toBe('89504e470d0a1a0a');
+
+    const width = body.readUInt32BE(16);
+    const height = body.readUInt32BE(20);
+    expect(width).toBe(1200);
+    expect(height).toBe(630);
   });
 
   // [AC-2] Meta Tags Injection for Pinterest Rich Pins
