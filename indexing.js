@@ -13,9 +13,12 @@ export async function pingSearchEngines(slugs) {
   const isTest = process.env.NODE_ENV === 'test';
   const protocol = APP_HOST.includes('localhost') || APP_HOST.includes('127.0.0.1') ? 'http' : 'https';
   
+  // Normalize and deduplicate slugs
+  const normalizedSlugs = [...new Set(slugs.map(s => s.trim().toLowerCase()))];
+  
   // Format full URLs with all localized language variants
   const urlList = [];
-  for (const slug of slugs) {
+  for (const slug of normalizedSlugs) {
     urlList.push(`${protocol}://${APP_HOST}/t/${slug}`);
     urlList.push(`${protocol}://${APP_HOST}/t/${slug}/es`);
     urlList.push(`${protocol}://${APP_HOST}/t/${slug}/fr`);
