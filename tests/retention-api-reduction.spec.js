@@ -271,6 +271,12 @@ test.describe('User Retention & API Request Reduction Tests', () => {
   // [AC-6] Lock Screen Prediction CTA (Already Predicted State)
   // =========================================================================
   test('AC-6: Lock Screen Prediction CTA displays already predicted message if client has predicted today', async ({ page }) => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    const todayStr = `${year}-${month}-${day}`;
+
     // 1. Mock api/chat-limit to return limit reached
     await page.route('**/api/chat-limit*', async (route) => {
       await route.fulfill({
@@ -294,7 +300,7 @@ test.describe('User Retention & API Request Reduction Tests', () => {
           {
             trend: 'google gemini',
             prediction: 'fall',
-            prediction_date: '2026-06-13',
+            prediction_date: todayStr,
             status: 'pending'
           }
         ])
