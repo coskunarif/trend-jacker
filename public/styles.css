@@ -606,6 +606,9 @@ body {
   font-weight: 700;
   color: var(--text-heading);
   letter-spacing: -0.03em;
+  line-height: 1.2;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 /* The Hook Card */
@@ -1301,6 +1304,9 @@ body {
 
   .trend-title {
     font-size: clamp(1.6rem, 5vw, 2.25rem);
+    line-height: 1.2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
   }
 
   .hook-box {
