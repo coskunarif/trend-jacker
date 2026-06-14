@@ -1476,6 +1476,21 @@ function initApp() {
       });
     }
 
+    const refreshBtn = document.getElementById('btn-refresh-trends');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', async () => {
+        refreshBtn.classList.add('loading');
+        preloadedData = null; // Clear preloaded data on manual refresh
+        try {
+          await fetchTrends();
+        } catch (err) {
+          console.error('Error refreshing trends:', err);
+        } finally {
+          refreshBtn.classList.remove('loading');
+        }
+      });
+    }
+
     window.addEventListener('resize', () => {
       renderTrends();
     });
@@ -1800,6 +1815,11 @@ function initApp() {
     hasVotedCurrent = false;
     userPollVote = null;
     
+    const probScoreEl = document.querySelector('.continuation-probability-score');
+    const probRationaleEl = document.querySelector('.continuation-rationale-text');
+    if (probScoreEl) probScoreEl.textContent = '--%';
+    if (probRationaleEl) probRationaleEl.textContent = 'Loading continuation details...';
+    
     // Smooth fade transition
     const achievementsView = document.getElementById('achievements-view');
     if (achievementsView) {
@@ -2033,6 +2053,18 @@ function initApp() {
         detailHook.textContent = data.hook;
         detailWhat.textContent = data.whatIsIt;
         detailTakeaway.textContent = data.takeaway;
+
+        // Render continuation probability and rationale
+        const probScoreEl = document.querySelector('.continuation-probability-score');
+        const probRationaleEl = document.querySelector('.continuation-rationale-text');
+        
+        if (probScoreEl) {
+          const prob = data.continuationProbability !== undefined ? data.continuationProbability : '--';
+          probScoreEl.textContent = prob !== '--' ? `${prob}%` : '--%';
+        }
+        if (probRationaleEl) {
+          probRationaleEl.textContent = data.continuationRationale || 'No continuation rationale provided.';
+        }
 
         // Update SEO tags and structured data
         updateSEO(trend, data);

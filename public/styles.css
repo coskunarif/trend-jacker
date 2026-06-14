@@ -3440,3 +3440,13 @@ html[data-webdriver="true"] .timeline-card-wrap.test-hover-layout {
     left: 10px !important;
   }
 }
+
+/* [AC-6] Refresh Trends spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.refresh-trends-btn.loading svg {
+  animation: spin 1s linear infinite;
+}
+
