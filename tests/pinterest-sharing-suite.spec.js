@@ -78,7 +78,7 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
     await expect(previewTextarea).toHaveValue(/Pin Title: Google Gemini/);
   });
 
-  // [AC-1] Outbound Link Intent for Pinterest
+  // [AC-1] [AC-3] Outbound Link Intent for Pinterest
   test('Verify Pinterest Outbound Intent Link Formatting', async ({ page, context }) => {
     await page.goto('/');
     await page.locator('#btn-share-trend').click();
@@ -103,12 +103,13 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
       page.locator('#btn-post-share').click()
     ]);
 
-    await newPage.waitForLoadState();
-    const url = newPage.url();
-    expect(url).toContain('https://www.pinterest.com/pin/create/button/');
-    expect(url).toContain('url=https%3A%2F%2Fviraljacker.com%2Ft%2Fgoogle-gemini');
-    expect(url).toContain('media=https%3A%2F%2Fviraljacker.com%2Fapi%2Fog%2Fgoogle-gemini');
-    expect(url).toContain('description=Pin%20Title%3A%20Google%20Gemini');
+    await expect(async () => {
+      const url = newPage.url();
+      expect(url).toContain('https://www.pinterest.com/pin/create/button/');
+      expect(url).toContain('url=https%3A%2F%2Fviraljacker.com%2Ft%2Fgoogle-gemini');
+      expect(url).toContain('media=https%3A%2F%2Fviraljacker.com%2Fapi%2Fog%2Fgoogle-gemini');
+      expect(url).toContain('description=Pin%20Title%3A%20Google%20Gemini');
+    }).toPass();
   });
 
   // [AC-2] Dynamic OpenGraph Image Route
