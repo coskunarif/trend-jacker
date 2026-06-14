@@ -170,16 +170,26 @@ test.describe('UI Detail Panel Responsiveness', () => {
 
     await page.goto('/');
 
-    const secondTrend = page.locator('.trend-item').nth(1);
+    // Bypass Playwright CDP actionability delays and measure DOM updates inside the browser context
+    const duration = await page.evaluate(async () => {
+      const secondTrendItem = document.querySelectorAll('.trend-item')[1];
+      const titleEl = document.getElementById('detail-title');
+      
+      return new Promise((resolve) => {
+        const observer = new MutationObserver(() => {
+          if (titleEl.textContent === 'Fastify framework') {
+            const end = performance.now();
+            observer.disconnect();
+            resolve(end - start);
+          }
+        });
+        observer.observe(titleEl, { childList: true, characterData: true, subtree: true });
+        
+        const start = performance.now();
+        secondTrendItem.click();
+      });
+    });
 
-    const start = await page.evaluate(() => performance.now());
-    await secondTrend.click();
-
-    // The detail-title should update under 300ms. Playwright expects can be configured or we assert using performance timing
-    await expect(page.locator('#detail-title')).toHaveText('Fastify framework');
-    const end = await page.evaluate(() => performance.now());
-
-    const duration = end - start;
     console.log(`UI Responsiveness duration: ${duration}ms`);
     expect(duration).toBeLessThan(300);
   });
