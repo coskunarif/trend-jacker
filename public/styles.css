@@ -2505,6 +2505,7 @@ body {
 /* Demographic Selector & Theme Customizations */
 .demographic-selector {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-2);
   margin-top: var(--space-3);
   margin-bottom: var(--space-3);
