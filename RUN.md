@@ -1,5 +1,5 @@
 task: Reduce LLM operational API cost and query response latency.              tier: T2   creativity: 0.5
-state: SHIPPER                budget: repairs 0/3
+state: complete                budget: repairs 0/3
 branch: asf/20260613-cost-latency          checkpoint: none
 caps: agents,ui,web,human
 
@@ -28,3 +28,22 @@ caps: agents,ui,web,human
 - **Dogfooding**: Performed exploratory testing of the chat sliding-window, client-side sessionStorage, and casing-agnostic DB schema. Detailed results and screenshots stored in `dogfood-output/20260613-cost-latency/`.
 
 ## Done
+- **What Shipped**: Client & Server Chat History Truncation (Sliding Window), Browser-Side `sessionStorage` Chat Caching, Non-Blocking UI Updates for event-loop yield safety, and Casing-Agnostic Database Cache with Case-Insensitive keys.
+- **Integration PR**: [PR #44](https://github.com/coskunarif/trend-jacker/pull/44)
+- **Integration Method**: Local Git Merge (`git merge --no-ff`)
+
+### Acceptance Criteria Verification Table
+
+| Acceptance Criteria | Verification Status | Evidence / Verification Method |
+|---------------------|---------------------|--------------------------------|
+| **[AC-1] Client & Server Chat History Truncation** | **PASS** | Capped history transmission to a sliding window of the last 4 messages. Verified via Playwright E2E tests (`llm-caching-optimization.spec.js`) and dogfood payload inspection. |
+| **[AC-2] Browser-Side `sessionStorage` Chat Caching** | **PASS** | Implemented lowercased key format `chat_cache:${trend}:${query}:${historyKey}` inside sessionStorage. Intercepts duplicates client-side, verified via `retention-api-reduction.spec.js`. |
+| **[AC-3] Non-Blocking UI Updates and Event Loop Yields** | **PASS** | Intercepted detail render pathways to fire `/api/chat-limit` as an un-awaited background promise to prevent yielding of the main event loop. |
+| **[AC-4] Casing-Agnostic Database Cache & Schema Safety** | **PASS** | Implemented casing-agnostic checks with `COLLATE NOCASE` constraints on SQLite schema and key hashing. |
+
+### Verification Artifacts
+- **Dogfood Report**: [Dogfood Report](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260613-cost-latency/report.md)
+- **Visuals**:
+  - Initial View: ![Initial View](dogfood-output/20260613-cost-latency/screenshots/initial.png)
+  - First Chat Query: ![First Query](dogfood-output/20260613-cost-latency/screenshots/chat-first-query.png)
+  - Scrolled Chat History: ![Chat Scrolled](dogfood-output/20260613-cost-latency/screenshots/chat-scrolled.png)
