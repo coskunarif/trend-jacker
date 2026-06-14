@@ -1,68 +1,62 @@
-task: Ensure immediate UI detail panel responsiveness under 300ms to increase user retention.              tier: T2   creativity: 0.5
-state: complete              budget: repairs 0/3
-branch: asf/20260613-ui-responsiveness          checkpoint: none
+task: Eliminate localization test flakiness to guarantee E2E build reliability.              tier: T2   creativity: 0.5
+state: complete            budget: repairs 0/3
+branch: asf/20260614-localization-flakiness          checkpoint: asf/20260614-localization-flakiness/green-1
 caps: agents,ui,web,human
 
 ## Task
-- Objective: Ensure immediate UI detail panel responsiveness under 300ms to increase user retention.
-- Metric: User retention and UI response latency.
-- Why now: The current E2E test suite fails due to event loop blocking delays during detail panel rendering, causing slow user response times.
-- Runner-up: Refactor and consolidate fragmented sharing interfaces into a unified modal to improve mobile virality.
+- **Objective**: Eliminate localization test flakiness to guarantee E2E build reliability.
+- **Metric**: E2E build reliability.
+- **Why Now**: The E2E localization test suite has intermittent race conditions when selecting languages on page load, causing parallel test execution to flake and block developer velocity.
+- **Runner-up**: Implement client-side sessionStorage caching for chat queries to minimize redundant API calls and reduce infrastructure costs.
 
 ## Log
-- 2026-06-13: Conductor starting Scout phase.
-- 2026-06-13: Scout started dev server on port 3005.
-- 2026-06-13: Scout finished exploration. Observed failing test suite. Selected winner: Ensure immediate UI detail panel responsiveness under 300ms to increase user retention.
-- 2026-06-13: Conductor starting Architect phase.
-- 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
-- 2026-06-13: Conductor ruled test wrong. Tester amending the responsiveness test.
-- 2026-06-13: Tester completed amendment. Observed state: green. Conductor starting Verifier phase.
-- 2026-06-14: Verifier started dev server on port 3005.
-- 2026-06-14: Verifier executed full test suite. 226/227 tests passed.
-- 2026-06-14: Verifier performed behavioral dogfooding and visual checks, capturing screenshots under `dogfood-output/20260613-ui-responsiveness/`.
-- 2026-06-14: Conductor ruled second test wrong (same signature). Tester amending the second responsiveness test.
-- 2026-06-14: Tester completed second amendment. Observed state: green. Conductor starting Verifier phase.
-- 2026-06-14: Verifier executed full test suite again. All 227/227 tests passed.
+- 2026-06-14: Conductor starting Scout phase.
+- 2026-06-14: Scout identified flaky test in localization.spec.js and selected repair task.
+- 2026-06-14: Conductor starting Architect phase.
+- 2026-06-14: Architect completed SPEC.md. Conductor starting Tester phase.
+- 2026-06-14: Tester completed test suite. Observed state: green. Conductor starting Verifier phase.
 - 2026-06-14: Verifier completed. Conductor starting Shipper phase.
-
-## Processes
-- Dev Server: port 3005 (pid: 619346)
+- 2026-06-14: Shipper tagged green-1 state, opened PR #46, closed ledger, and merged the branch.
 
 ## Verdict
-- PASS: `tests/responsiveness.spec.js:160:3` (amended to measure browser-side DOM responsiveness, passes under 300ms).
-- PASS: `tests/retention-api-reduction.spec.js:373:3` (amended to measure browser-side DOM responsiveness, passes under 300ms).
-- PASS: [AC-1] Synchronous UI Initialization. Verified via E2E test suite and behavioral dogfooding.
-- PASS: [AC-2] Non-Blocking Background API Fetching. Verified via E2E test suite and behavioral dogfooding.
-- PASS: [AC-3] UI Detail Panel Responsiveness. Verified via E2E test suite (using browser-side MutationObserver) and manual dogfooding, showing instant DOM updating under 300ms.
-- PASS: [AC-4] Post-API Loading & Cache Preservation. Verified via E2E test suite showing correct caching in `explanationCache`.
+- **Check E2E Test Suite Run**: PASS
+  - Executed all 227 tests in the Playwright suite. Status: green (all passed).
+- **Check Flakiness Repetitive Run**: PASS
+  - Executed `tests/localization.spec.js` 10 times repeatedly using `--repeat-each 10`. Status: 140/140 passed successfully. Zero flakiness or SQLite locked errors observed.
+- **Check [AC-1] Playwright Configuration**: PASS
+  - Confirmed `workers: 1` is explicitly set in `playwright.config.js` to ensure sequential execution and avoid SQLite database locking.
+- **Check [AC-2] Async Request Await**: PASS
+  - Confirmed `tests/localization.spec.js` utilizes `page.waitForResponse(...)` before asserting API details.
+- **Check [AC-3] Polling Assertions**: PASS
+  - Confirmed `tests/localization.spec.js` uses retry/polling assertions like `expect().toContainText()` and `expect().toPass()`.
+- **Dogfooding & Screenshots**: PASS
+  - Manually started server and automated language selection (en, es, fr, ja) on both desktop and mobile viewports.
+  - Visual verification confirms no layout overflow, text clipping, or broken layout.
+  - Screenshots saved to:
+    - [desktop_en.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/desktop_en.png)
+    - [desktop_es.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/desktop_es.png)
+    - [desktop_fr.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/desktop_fr.png)
+    - [desktop_ja.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/desktop_ja.png)
+    - [mobile_en.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/mobile_en.png)
+    - [mobile_es.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/mobile_es.png)
+    - [mobile_fr.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/mobile_fr.png)
+    - [mobile_ja.png](file:///home/ubuntuadmin/projects/trend-jacker/dogfood-output/20260614-localization-flakiness/screenshots/mobile_ja.png)
 
 ## Done
-### Summary of Changes
-Shipped UI detail panel responsiveness optimizations to guarantee immediate (sub-300ms) panel updates upon user interactions:
-1. **Immediate Synchronous UI Initialization**: Refactored `loadTrendDetails` to synchronously update all static detail components (title, traffic, velocity needle, sparkline, vibe category/emoji, news footer elements, and initial chatbot greeting) on the same tick of the event loop.
-2. **Non-Blocking Background API Fetching**: Concurrently executed background API requests (`/api/explain`, `/api/chat-limit`, and `/api/predictions`) as un-awaited background promises.
-3. **Post-API Loading & Cache Preservation**: Added skeleton loaders for asynchronous content and cached fetched explanations in client-side memory (`explanationCache`) to prevent redundant future fetches.
+### Shipped Features
+Fixed E2E test suite flakiness and synchronization issues within the localization switcher tests, and restricted Playwright runner execution to a single worker to prevent concurrent SQLite write locks on `polls.db`.
 
-### Acceptance Criteria & Evidence
-| Acceptance Criterion | Verification Method / Evidence | Status |
+### Acceptance Criteria & Verification Evidence
+
+| Acceptance Criteria (AC) | Verification Method | Evidence (Relative Link / Result) |
 |---|---|---|
-| **[AC-1] Synchronous UI Initialization** | `tests/responsiveness.spec.js` (synchronous elements updated before explain API resolves) | PASS |
-| **[AC-2] Non-Blocking Background Fetching** | `tests/responsiveness.spec.js` (concurrent APIs triggered in background) | PASS |
-| **[AC-3] UI Detail Panel Responsiveness** | `tests/responsiveness.spec.js` (DOM update under 300ms evaluated inside browser) | PASS |
-| **[AC-4] Post-API Loading & Caching** | `tests/responsiveness.spec.js` (explanation rendered post-resolve and cached) & `tests/retention-api-reduction.spec.js` | PASS |
+| `[AC-1]` Sequential Test Execution | Checked `playwright.config.js` config | `workers: 1` set. [playwright.config.js](file:///home/ubuntuadmin/projects/trend-jacker/playwright.config.js) |
+| `[AC-2]` Async Request Synchronization | Verified `page.waitForResponse` usage in E2E switcher test | POST to `/api/explain` is awaited. [tests/localization.spec.js](file:///home/ubuntuadmin/projects/trend-jacker/tests/localization.spec.js#L287) |
+| `[AC-3]` Polling Assertions | Verified `expect().toPass()` and retry assertions used for DOM updates | Retrying assertions are active. [tests/localization.spec.js](file:///home/ubuntuadmin/projects/trend-jacker/tests/localization.spec.js#L301) |
 
-### Artifacts and Links
-- **Pull Request**: [coskunarif/trend-jacker#45](https://github.com/coskunarif/trend-jacker/pull/45)
-- **Tag**: `asf/20260613-ui-responsiveness/green-1`
-- **Integration Method**: Standard merge commit (`gh pr merge --merge`)
+### Pull Request & Integration Details
+- **Pull Request**: [coskunarif/trend-jacker/pull/46](https://github.com/coskunarif/trend-jacker/pull/46)
+- **Integration Method**: Standard Merge (via `gh pr merge --merge`)
+- **Deployment Pipeline**: GitHub Actions deploy run triggered by merge on `main` branch.
 
-### Visual Evidence
-#### Desktop Interaction Flow
-![Desktop Initial State](dogfood-output/20260613-ui-responsiveness/screenshots/desktop-initial.png)
-![Desktop Clicked (Immediate Static Details)](dogfood-output/20260613-ui-responsiveness/screenshots/desktop-clicked.png)
-![Desktop Fully Loaded](dogfood-output/20260613-ui-responsiveness/screenshots/desktop-details-loaded.png)
 
-#### Mobile Interaction Flow
-![Mobile Clicked](dogfood-output/20260613-ui-responsiveness/screenshots/mobile-clicked.png)
-![Mobile Fully Loaded](dogfood-output/20260613-ui-responsiveness/screenshots/mobile-details-loaded.png)

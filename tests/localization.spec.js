@@ -252,6 +252,8 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
     });
   });
 
+  // [AC-2] Async Request Synchronization in E2E Switcher Test
+  // [AC-3] Polling Assertions for DOM State Updates
   test.describe('[AC-6] Client UI Translation & Interactive Switcher', () => {
     test('should load dropdown in navbar, switch languages without full reload, update URL, and translate UI elements', async ({ page }) => {
       await page.goto('/t/google-gemini');
@@ -282,7 +284,13 @@ test.describe('Gemini AI Multi-Language Localization Engine', () => {
         });
       });
 
+      const responsePromise = page.waitForResponse(
+        (response) => response.url().includes('/api/explain') && response.request().method() === 'POST'
+      );
+
       await select.selectOption('es');
+
+      await responsePromise;
 
       await expect(page).toHaveURL(/\/t\/google-gemini\/es$/);
 
