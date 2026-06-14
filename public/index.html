@@ -35,6 +35,9 @@
       </div>
     </div>
     <div class="navbar-actions" style="display: flex; align-items: center; gap: var(--space-2);">
+      <button id="btn-show-achievements" class="lang-select" style="cursor: pointer; padding: 6px 12px; border-radius: 4px; display: flex; align-items: center; gap: var(--space-1); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); font-size: 0.85rem; font-weight: 500;">
+        <span>🏆 Achievements</span>
+      </button>
       <select id="lang-select" class="lang-select" aria-label="Select language">
         <option value="en">English</option>
         <option value="es">Español</option>
@@ -64,7 +67,9 @@
               <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="close-icon"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>
-
+          <button id="sidebar-show-achievements" class="sidebar-achievements-btn" style="width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border-color); background: rgba(59, 130, 246, 0.15); color: #fff; cursor: pointer; font-size: 0.9rem; font-weight: 600; transition: all 0.2s;">
+            <span>🏆 View Achievements</span>
+          </button>
         </div>
         <div class="trends-controls-wrapper" style="padding: var(--space-2) var(--space-4); display: flex; flex-direction: column; gap: var(--space-2); border-bottom: 1px solid var(--border-color);">
           <input type="text" id="trends-search" placeholder="Search trends..." class="search-input" style="width: 100%; padding: var(--space-2); border-radius: var(--radius-md); border: 1px solid var(--border-color); background: rgba(255, 255, 255, 0.05); color: var(--text-color); outline: none; font-size: 0.9rem;" />
@@ -573,6 +578,117 @@
             <!-- History feed items will be rendered here -->
           </div>
         </details>
+      </div>
+
+      <!-- Achievements View -->
+      <div id="achievements-view" class="hidden">
+        <div class="achievements-scrollable-container">
+          <!-- Stats Grid -->
+          <div class="achievements-stats-grid">
+            <div class="stats-card">
+              <span class="card-icon">🔥</span>
+              <h4>Streak Stats</h4>
+              <div class="stats-value" id="stats-streak-count">0-Day Streak</div>
+              <p class="stats-sub">Message Capacity Bonus: <strong id="stats-streak-bonus">+0</strong></p>
+            </div>
+            <div class="stats-card">
+              <span class="card-icon">🏆</span>
+              <h4>Trivia Stats</h4>
+              <div class="stats-value" id="stats-trivia-count">0</div>
+              <p class="stats-sub">Avg Score: <strong id="stats-trivia-avg">0</strong>/3</p>
+            </div>
+            <div class="stats-card">
+              <span class="card-icon">🔮</span>
+              <h4>Prediction Stats</h4>
+              <div class="stats-value"><span id="stats-predict-correct">0</span>/<span id="stats-predict-total">0</span></div>
+              <p class="stats-sub">Accuracy: <strong id="stats-predict-accuracy">0%</strong></p>
+            </div>
+            <div class="stats-card">
+              <span class="card-icon">👥</span>
+              <h4>Referral Stats</h4>
+              <div class="stats-value" id="stats-referral-count">0</div>
+              <p class="stats-sub">Capacity Bonus: <strong id="stats-referral-bonus">+0</strong></p>
+            </div>
+          </div>
+
+          <!-- Badges Gallery -->
+          <div class="badges-gallery-section">
+            <h4>Milestone Badges</h4>
+            <div class="badges-gallery-grid">
+              <!-- 1. Explorer -->
+              <div class="badge-card locked" id="badge-explorer">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">🧭</div>
+                <h5 class="badge-title">Explorer</h5>
+                <p class="badge-desc">Trivia or predictions > 0</p>
+              </div>
+              <!-- 2. Streak Starter -->
+              <div class="badge-card locked" id="badge-streak-starter">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">🌱</div>
+                <h5 class="badge-title">Streak Starter</h5>
+                <p class="badge-desc">Daily streak >= 1</p>
+              </div>
+              <!-- 3. Consistent Reader -->
+              <div class="badge-card locked" id="badge-consistent-reader">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">📚</div>
+                <h5 class="badge-title">Consistent Reader</h5>
+                <p class="badge-desc">Daily streak >= 3</p>
+              </div>
+              <!-- 4. Weekly Legend -->
+              <div class="badge-card locked" id="badge-weekly-legend">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">👑</div>
+                <h5 class="badge-title">Weekly Legend</h5>
+                <p class="badge-desc">Daily streak >= 7</p>
+              </div>
+              <!-- 5. Sharp Challenger -->
+              <div class="badge-card locked" id="badge-sharp-challenger">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">⚡</div>
+                <h5 class="badge-title">Sharp Challenger</h5>
+                <p class="badge-desc">Trivia max score >= 2</p>
+              </div>
+              <!-- 6. Brainiac Mastermind -->
+              <div class="badge-card locked" id="badge-brainiac-mastermind">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">🧠</div>
+                <h5 class="badge-title">Brainiac Mastermind</h5>
+                <p class="badge-desc">Trivia max score = 3</p>
+              </div>
+              <!-- 7. Apprentice Oracle -->
+              <div class="badge-card locked" id="badge-apprentice-oracle">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">🌟</div>
+                <h5 class="badge-title">Apprentice Oracle</h5>
+                <p class="badge-desc">Predictions made >= 1</p>
+              </div>
+              <!-- 8. Ultimate Seer -->
+              <div class="badge-card locked" id="badge-ultimate-seer">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">👁️</div>
+                <h5 class="badge-title">Ultimate Seer</h5>
+                <p class="badge-desc">Correct predictions >= 3</p>
+              </div>
+              <!-- 9. Viral Pioneer -->
+              <div class="badge-card locked" id="badge-viral-pioneer">
+                <div class="badge-status">🔒</div>
+                <div class="badge-emoji">🚀</div>
+                <h5 class="badge-title">Viral Pioneer</h5>
+                <p class="badge-desc">Referrals >= 1</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Activity History -->
+          <div class="achievements-history-container">
+            <h4>Activity History Log</h4>
+            <div class="achievements-history-list" id="achievements-history-list">
+              <p class="history-fallback">No achievements recorded yet. View a trend to start your journey!</p>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   </main>

@@ -1994,3 +1994,166 @@ export async function getPredictionBonus(clientId) {
   return correctCount * 3;
 }
 
+/**
+ * Retrieves the aggregated achievements stats, badges, and history log for a client.
+ * @param {string} clientId
+ * @returns {Promise<object>}
+ */
+export async function getClientAchievements(clientId) {
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  
+  // Initialize default structure
+  const result = {
+    streak: { count: 0, bonus: 0 },
+    trivia: { count: 0, averageScore: 0, maxScore: 0 },
+    predictions: { correct: 0, total: 0, accuracy: 0, incorrect: 0, pending: 0 },
+    referrals: { count: 0, bonus: 0 },
+    history: []
+  };
+
+  if (!normalizedClientId) {
+    return result;
+  }
+
+  // 1. Fetch Streak
+  try {
+    const streakObj = await getClientStreak(normalizedClientId);
+    if (streakObj) {
+      const count = streakObj.streak_count || 0;
+      result.streak.count = count;
+      result.streak.bonus = count * 2;
+    }
+  } catch (e) {
+    console.error('Error in getClientAchievements - streak:', e);
+  }
+
+  // 2. Fetch Trivia
+  const triviaScores = [];
+  if (firestore) {
+    try {
+      const snapshot = await firestore.collection('client_trivia_scores')
+        .where('client_id', '==', normalizedClientId)
+        .get();
+      snapshot.forEach(doc => {
+        const d = doc.data();
+        triviaScores.push({
+          score: d.score,
+          trend: d.trend,
+          completed_at: d.completed_at
+        });
+      });
+    } catch (e) {
+      console.error('Error in getClientAchievements - firestore trivia:', e);
+    }
+  } else if (sqliteDb) {
+    try {
+      const rows = sqliteDb.prepare('SELECT score, trend, completed_at FROM client_trivia_scores WHERE client_id = ?').all(normalizedClientId);
+      for (const row of rows) {
+        triviaScores.push({
+          score: row.score,
+          trend: row.trend,
+          completed_at: row.completed_at
+        });
+      }
+    } catch (e) {
+      console.error('Error in getClientAchievements - sqlite trivia:', e);
+    }
+  } else {
+    for (const [key, value] of inMemoryClientTriviaScores.entries()) {
+      const firstColonIndex = key.indexOf(':');
+      if (firstColonIndex !== -1) {
+        const cid = key.slice(0, firstColonIndex);
+        if (cid === normalizedClientId) {
+          const trend = key.slice(firstColonIndex + 1);
+          triviaScores.push({
+            score: value.score,
+            trend: trend,
+            completed_at: value.completed_at
+          });
+        }
+      }
+    }
+  }
+
+  if (triviaScores.length > 0) {
+    result.trivia.count = triviaScores.length;
+    const avg = triviaScores.reduce((sum, s) => sum + s.score, 0) / triviaScores.length;
+    result.trivia.averageScore = Number(avg.toFixed(1));
+    result.trivia.maxScore = Math.max(...triviaScores.map(s => s.score));
+  }
+
+  // 3. Fetch Predictions
+  try {
+    const preds = await getClientPredictions(normalizedClientId);
+    let correct = 0;
+    let incorrect = 0;
+    let pending = 0;
+    for (const p of preds) {
+      if (p.status === 'correct') correct++;
+      else if (p.status === 'incorrect') incorrect++;
+      else if (p.status === 'pending') pending++;
+    }
+    const total = preds.length;
+    result.predictions.correct = correct;
+    result.predictions.incorrect = incorrect;
+    result.predictions.pending = pending;
+    result.predictions.total = total;
+    result.predictions.accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+    
+    // Add predictions to history
+    for (const p of preds) {
+      result.history.push({
+        type: 'prediction',
+        trend: p.trend,
+        outcome: p.prediction,
+        status: p.status,
+        date: p.prediction_date
+      });
+    }
+  } catch (e) {
+    console.error('Error in getClientAchievements - predictions:', e);
+  }
+
+  // 4. Add Trivia to history
+  for (const t of triviaScores) {
+    result.history.push({
+      type: 'trivia',
+      trend: t.trend,
+      score: t.score,
+      date: t.completed_at
+    });
+  }
+
+  // 5. Add Streak to history if exists and active
+  try {
+    const streakObj = await getClientStreak(normalizedClientId);
+    if (streakObj && streakObj.streak_count > 0) {
+      result.history.push({
+        type: 'streak',
+        count: streakObj.streak_count,
+        date: streakObj.last_active_date
+      });
+    }
+  } catch (e) {
+    console.error('Error in getClientAchievements - streak history:', e);
+  }
+
+  // Sort history in reverse chronological order
+  result.history.sort((a, b) => {
+    const dateA = new Date(a.date);
+    const dateB = new Date(b.date);
+    return dateB - dateA;
+  });
+
+  // 6. Fetch Referrals
+  try {
+    const refCount = await getReferralCount(normalizedClientId);
+    result.referrals.count = refCount;
+    result.referrals.bonus = refCount * 5;
+  } catch (e) {
+    console.error('Error in getClientAchievements - referrals:', e);
+  }
+
+  return result;
+}
+
