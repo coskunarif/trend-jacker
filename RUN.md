@@ -12,7 +12,20 @@ caps: agents,ui,web,human
 - 2026-06-14: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-14: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
 - 2026-06-14: Builder completed all slices. Observed state: green. Conductor starting Verifier phase.
+- 2026-06-14: Verifier started development server on port 3005 (Task ID: 208d4c48-c3d2-467e-8101-fba943f85354/task-45).
 
 ## Verdict
+- **[AC-1] Lowercase Case-Insensitive Cache & DB Lookups**: PASS
+  - Evidence: Direct API validation using curl showed identical sorted output for mixed casing parameters. Tested and verified in `sentiment-comparison.spec.js`.
+- **[AC-2] Sentiment Comparison Selector in UI**: PASS
+  - Evidence: Dropdown element `#compare-trend-select` is populated dynamically with non-active trends. Guard prevents redundant fetch on duplicate selection. Verified in E2E tests and dogfooding.
+- **[AC-3] Overlay Comparative Sentiment Chart Canvas**: PASS
+  - Evidence: Dual lines and fills render correctly (emerald `#10b981` and purple `#a855f7`). Verified in E2E canvas tests and captured in screenshots.
+- **[AC-4] Comparative Interactive Tooltip**: PASS
+  - Evidence: Tooltip displays formatted data for both trends side-by-side on hover, positioned dynamically to prevent boundaries overflow. Verified in E2E tests and dogfood-output.
+- **[AC-5] Event Loop Yield Safety & Async Limit Updates**: PASS
+  - Evidence: E2E test confirmed that UI detail rendering does not block on hanging non-critical endpoints (`/api/chat-limit` and `/api/predictions`).
+- **Linter, Types, Build**: SKIPPED
+  - Evidence: Repository does not contain npm scripts or configuration files for linting, typing, or building.
 
 ## Done
