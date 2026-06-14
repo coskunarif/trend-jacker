@@ -1,3 +1,5 @@
+window.explanationCache = new Map();
+
 function initApp() {
   window.onerror = function(message, source, lineno, colno, error) {
     const errDiv = document.createElement('div');
@@ -73,6 +75,7 @@ function initApp() {
     localStorage.setItem('clientId', storedClientId);
   }
   const localClientId = storedClientId;
+  const sessionPredictions = new Map();
 
   // Capture referral
   const urlParams = new URLSearchParams(window.location.search);
@@ -720,6 +723,7 @@ function initApp() {
     demographicSelector.addEventListener('click', async (e) => {
       const pill = e.target.closest('.demo-pill');
       if (!pill) return;
+      if (pill.classList.contains('active')) return;
       const targetVal = pill.getAttribute('data-val');
       localStorage.setItem('selected-demographic', targetVal);
       updateDemographicPills(targetVal);
@@ -975,6 +979,13 @@ function initApp() {
   if (preloadedDataEl) {
     try {
       preloadedData = JSON.parse(preloadedDataEl.textContent);
+      if (preloadedData && preloadedData.trend && preloadedData.explanation) {
+        const seedTrend = preloadedData.trend;
+        const seedLang = preloadedData.lang || 'en';
+        const seedBracket = localStorage.getItem('selected-demographic') || 'adults';
+        const seedKey = `${seedTrend}:${seedLang}:${seedBracket}`.toLowerCase();
+        window.explanationCache.set(seedKey, preloadedData.explanation);
+      }
     } catch (err) {
       console.error('Error parsing preloaded data:', err);
     }
@@ -1004,8 +1015,11 @@ function initApp() {
   const langSelect = document.getElementById('lang-select');
   if (langSelect) {
     langSelect.value = initialLang;
+    let currentLang = initialLang;
     langSelect.addEventListener('change', async (e) => {
       const selectedLang = e.target.value;
+      if (selectedLang === currentLang) return;
+      currentLang = selectedLang;
       translateUI(selectedLang);
       
       if (currentTrend) {
@@ -1016,22 +1030,11 @@ function initApp() {
         
         window.history.pushState({ path: newUrl }, '', newUrl);
         
-        // Fetch localized explanation using POST /api/explain
-        try {
-          const res = await fetch('/api/explain', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              trend: currentTrend.title,
-              snippet: currentTrend.news ? currentTrend.news.snippet : '',
-              headline: currentTrend.news ? currentTrend.news.headline : '',
-              lang: selectedLang,
-              bracket: localStorage.getItem('selected-demographic') || 'adults'
-            })
-          });
-          
-          if (!res.ok) throw new Error('API failed to explain');
-          const data = await res.json();
+        const currentDemo = localStorage.getItem('selected-demographic') || 'adults';
+        const cacheKey = `${currentTrend.title}:${selectedLang}:${currentDemo}`.toLowerCase();
+
+        if (window.explanationCache.has(cacheKey)) {
+          const data = window.explanationCache.get(cacheKey);
           
           // Update details in DOM
           detailHook.textContent = data.hook;
@@ -1049,8 +1052,45 @@ function initApp() {
           
           // Update SEO
           updateSEO(currentTrend, data);
-        } catch (err) {
-          console.error('Failed to load localized details:', err);
+        } else {
+          // Fetch localized explanation using POST /api/explain
+          try {
+            await new Promise(resolve => setTimeout(resolve, 50));
+            const res = await fetch('/api/explain', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                trend: currentTrend.title,
+                snippet: currentTrend.news ? currentTrend.news.snippet : '',
+                headline: currentTrend.news ? currentTrend.news.headline : '',
+                lang: selectedLang,
+                bracket: currentDemo
+              })
+            });
+            
+            if (!res.ok) throw new Error('API failed to explain');
+            const data = await res.json();
+            window.explanationCache.set(cacheKey, data);
+            
+            // Update details in DOM
+            detailHook.textContent = data.hook;
+            detailWhat.textContent = data.whatIsIt;
+            detailTakeaway.textContent = data.takeaway;
+            
+            // Render viral tags
+            detailViralTags.innerHTML = '';
+            (data.whyIsItViral || []).forEach(reason => {
+              const span = document.createElement('span');
+              span.className = 'viral-tag';
+              span.textContent = reason;
+              detailViralTags.appendChild(span);
+            });
+            
+            // Update SEO
+            updateSEO(currentTrend, data);
+          } catch (err) {
+            console.error('Failed to load localized details:', err);
+          }
         }
       }
     });
@@ -1148,9 +1188,27 @@ function initApp() {
     sharePreviewText.addEventListener('input', updatePreviewAndValidation);
   }
 
+  let lastGenerateParams = { trend: '', platform: '', context: '', score: null };
+
   // Generate social media post using backend API
   async function generatePost() {
     if (!currentTrend) return;
+    const currentScore = activeShareContext === 'trivia' ? userScore : null;
+    if (
+      lastGenerateParams.trend === currentTrend.title &&
+      lastGenerateParams.platform === activeSharePlatform &&
+      lastGenerateParams.context === activeShareContext &&
+      lastGenerateParams.score === currentScore
+    ) {
+      return;
+    }
+    lastGenerateParams = {
+      trend: currentTrend.title,
+      platform: activeSharePlatform,
+      context: activeShareContext,
+      score: currentScore
+    };
+
     sharePreviewText.value = 'Generating post...';
     updatePreviewAndValidation();
     try {
@@ -1243,6 +1301,7 @@ function initApp() {
 
   platformPills.forEach(pill => {
     pill.addEventListener('click', () => {
+      if (pill.classList.contains('active')) return;
       platformPills.forEach(p => p.classList.remove('active'));
       pill.classList.add('active');
       activeSharePlatform = pill.getAttribute('data-platform');
@@ -1575,7 +1634,7 @@ function initApp() {
         <div class="trend-item-info">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span class="trend-category-emoji" style="font-size: 1.2rem;">${emoji}</span>
-            <span class="trend-item-title">${trend.title}</span>
+            <span class="trend-item-title trend-name">${trend.title}</span>
           </div>
           <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
             ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none';" />` : ''}
@@ -1705,13 +1764,18 @@ function initApp() {
     
     try {
       let data;
-      // Hydrate explanation if preloadedData matches
       const currentDemo = localStorage.getItem('selected-demographic') || 'adults';
-      if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && currentDemo === 'adults' && !navigator.webdriver) {
+      const selectedLang = document.getElementById('lang-select')?.value || 'en';
+      const cacheKey = `${trend.title}:${selectedLang}:${currentDemo}`.toLowerCase();
+
+      if (window.explanationCache.has(cacheKey)) {
+        data = window.explanationCache.get(cacheKey);
+      } else if (preloadedData && preloadedData.slug === titleToSlug(trend.title) && currentDemo === 'adults' && !navigator.webdriver) {
         data = preloadedData.explanation;
         preloadedData = null; // Clear to allow future live fetches
+        window.explanationCache.set(cacheKey, data);
       } else {
-        const selectedLang = document.getElementById('lang-select')?.value || 'en';
+        await new Promise(resolve => setTimeout(resolve, 50));
         const res = await fetch('/api/explain', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1726,6 +1790,7 @@ function initApp() {
         
         if (!res.ok) throw new Error('API failed to explain');
         data = await res.json();
+        window.explanationCache.set(cacheKey, data);
       }
       
       if (loadId !== activeLoadId) return;
@@ -1951,6 +2016,15 @@ function initApp() {
       predictionStatusMsg.textContent = `You predicted this trend will ${prediction === 'rise' ? 'Rise' : 'Fall'} tomorrow.`;
     }
 
+    const predictMsgEl = document.getElementById('chat-lock-prediction-message');
+    const predictBtnEl = document.getElementById('chat-lock-predict-btn');
+    if (predictMsgEl) {
+      predictMsgEl.textContent = `You predicted this trend will ${prediction.toLowerCase()} tomorrow. Correct predictions unlock +3 capacity!`;
+    }
+    if (predictBtnEl) {
+      predictBtnEl.style.display = 'none';
+    }
+
     if (prediction === 'rise') {
       if (btnPredictRise) btnPredictRise.classList.add('selected-rise');
       if (btnPredictFall) btnPredictFall.classList.remove('selected-fall');
@@ -1959,8 +2033,13 @@ function initApp() {
       if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
     }
 
-    // [AC-4] Lock prediction triggers immediate un-awaited call to checkChatLimit
-    checkChatLimit(currentTrend.title);
+    // Save prediction locally to merge with fetched results
+    sessionPredictions.set(currentTrend.title.toLowerCase(), {
+      trend: currentTrend.title,
+      prediction,
+      prediction_date: getLocalDateString(),
+      status: 'pending'
+    });
 
     try {
       const localDate = getLocalDateString();
@@ -1977,8 +2056,9 @@ function initApp() {
         })
       });
       
-      // Update history
+      // Update history and chat limit in proper order
       await fetchPredictionHistory();
+      await checkChatLimit(currentTrend.title);
     } catch (err) {
       console.error('Error submitting prediction:', err);
     }
@@ -1989,7 +2069,16 @@ function initApp() {
     try {
       const res = await fetch(`/api/predictions?clientId=${localClientId}`);
       if (res.ok) {
-        const predictions = await res.json();
+        let predictions = await res.json();
+        
+        // Merge with session predictions
+        const todayStr = getLocalDateString();
+        for (const [key, value] of sessionPredictions.entries()) {
+          const alreadyExists = predictions.some(p => p.trend.toLowerCase() === key && p.prediction_date === value.prediction_date);
+          if (!alreadyExists) {
+            predictions.push(value);
+          }
+        }
         
         // Update correct count
         const correctCount = predictions.filter(p => p.status === 'correct').length;
@@ -2032,9 +2121,11 @@ function initApp() {
         }
         
         // Check if prediction is already made today for the active trend
-        const todayStr = getLocalDateString();
         const activeTrendPrediction = predictions.find(p => p.trend.toLowerCase() === currentTrend.title.toLowerCase() && p.prediction_date === todayStr);
         
+        const predictMsgEl = document.getElementById('chat-lock-prediction-message');
+        const predictBtnEl = document.getElementById('chat-lock-predict-btn');
+
         if (activeTrendPrediction) {
           if (btnPredictRise) btnPredictRise.disabled = true;
           if (btnPredictFall) btnPredictFall.disabled = true;
@@ -2048,6 +2139,12 @@ function initApp() {
             if (btnPredictFall) btnPredictFall.classList.add('selected-fall');
             if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
           }
+          if (predictMsgEl) {
+            predictMsgEl.textContent = `You predicted this trend will ${activeTrendPrediction.prediction.toLowerCase()} tomorrow. Correct predictions unlock +3 capacity!`;
+          }
+          if (predictBtnEl) {
+            predictBtnEl.style.display = 'none';
+          }
         } else {
           if (btnPredictRise) {
             btnPredictRise.disabled = false;
@@ -2059,6 +2156,12 @@ function initApp() {
           }
           if (predictionStatusMsg) {
             predictionStatusMsg.textContent = '';
+          }
+          if (predictMsgEl) {
+            predictMsgEl.textContent = "Predict if this trend will Rise or Fall tomorrow to earn +3 capacity when correct!";
+          }
+          if (predictBtnEl) {
+            predictBtnEl.style.display = 'inline-block';
           }
         }
       }
@@ -3342,6 +3445,59 @@ function initApp() {
       const startTriviaBtn = document.getElementById('btn-start-trivia');
       if (startTriviaBtn) {
         startTriviaBtn.focus();
+      }
+    });
+  }
+
+  // Handle referral share link clipboard copy
+  document.addEventListener('click', async (e) => {
+    const linkEl = e.target.closest('#referral-share-link');
+    if (linkEl) {
+      e.preventDefault();
+      if (linkEl.textContent === 'Link Copied!') return;
+      const textToCopy = linkEl.href || linkEl.textContent;
+      let copied = false;
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(textToCopy);
+          copied = true;
+        }
+      } catch (err) {
+        console.warn('navigator.clipboard failed, trying fallback:', err);
+      }
+      
+      if (!copied) {
+        try {
+          const textArea = document.createElement("textarea");
+          textArea.value = textToCopy;
+          textArea.style.position = "fixed";  // Avoid scrolling to bottom
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand("copy");
+          document.body.removeChild(textArea);
+        } catch (fallbackErr) {
+          console.error('Fallback copy failed:', fallbackErr);
+        }
+      }
+
+      const originalText = linkEl.textContent;
+      linkEl.textContent = 'Link Copied!';
+      setTimeout(() => {
+        linkEl.textContent = originalText;
+      }, 2000);
+    }
+  });
+
+  const chatLockPredictBtn = document.getElementById('chat-lock-predict-btn');
+  if (chatLockPredictBtn) {
+    chatLockPredictBtn.addEventListener('click', () => {
+      const predictionContainer = document.getElementById('prediction-card-container');
+      if (predictionContainer) {
+        predictionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const riseBtn = document.querySelector('#prediction-card-container .btn-predict-rise');
+      if (riseBtn) {
+        riseBtn.focus();
       }
     });
   }
