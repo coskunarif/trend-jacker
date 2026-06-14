@@ -1773,15 +1773,17 @@ fastify.post('/api/chat', async (request, reply) => {
     await incrementChatCount(normalizedClientId, normalizedTrend);
   }
 
+  const truncatedHistory = Array.isArray(history) ? history.slice(-4) : [];
+
   // Check cache first
-  const cachedResponse = await getCachedChatResponse(normalizedTrend, query, history);
+  const cachedResponse = await getCachedChatResponse(normalizedTrend, query, truncatedHistory);
   if (cachedResponse !== null) {
     return { reply: cachedResponse };
   }
 
   if (process.env.NODE_ENV === 'test') {
     const mockReply = 'This is a mock reply for: ' + query;
-    await setCachedChatResponse(normalizedTrend, query, history, mockReply);
+    await setCachedChatResponse(normalizedTrend, query, truncatedHistory, mockReply);
     return { reply: mockReply };
   }
 
@@ -1798,7 +1800,7 @@ fastify.post('/api/chat', async (request, reply) => {
     });
 
     // Format chat history for prompt context
-    const historyText = (history || [])
+    const historyText = (truncatedHistory || [])
       .map(msg => `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`)
       .join('\n');
 
@@ -1819,7 +1821,7 @@ Response:`;
     const result = await model.generateContent(prompt);
     const replyText = result.response.text();
     const finalReply = replyText.trim();
-    await setCachedChatResponse(normalizedTrend, query, history, finalReply);
+    await setCachedChatResponse(normalizedTrend, query, truncatedHistory, finalReply);
     return { reply: finalReply };
   } catch (err) {
     fastify.log.error(err);

@@ -476,4 +476,100 @@ test.describe('LLM Caching and Content Optimization Tests', () => {
     const svg2 = await res2.text();
     expect(svg2).toBe(hijackedSvg);
   });
+
+  // [AC-1] Server-Side History Truncation: /api/chat must truncate history to the last 4 messages prior to prompt formulation and cache key generation
+  test('should truncate incoming chat history to the last 4 messages on server', async ({ request }) => {
+    const testTrend = `trunc-trend-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const testQuery = `trunc-query-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+    const longHistory = [
+      { role: 'user', content: 'message 1' },
+      { role: 'assistant', content: 'reply 1' },
+      { role: 'user', content: 'message 2' },
+      { role: 'assistant', content: 'reply 2' },
+      { role: 'user', content: 'message 3' },
+      { role: 'assistant', content: 'reply 3' }
+    ];
+    // Expected truncated history (last 4 messages)
+    const expectedTruncated = longHistory.slice(-4);
+    
+    // Call the server API
+    const res = await request.post('/api/chat', {
+      data: { trend: testTrend, query: testQuery, history: longHistory }
+    });
+    expect(res.ok()).toBe(true);
+
+    // Compute expected hash of the truncated history in lowercase
+    const crypto = await import('node:crypto');
+    const serializedTruncated = JSON.stringify(expectedTruncated);
+    const expectedHash = crypto.createHash('sha256').update(serializedTruncated).digest('hex').toLowerCase();
+    const expectedKey = `${testTrend}:${testQuery}:${expectedHash}`.toLowerCase();
+
+    // Query SQLite database chat_cache to verify the row exists under the expectedKey
+    const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
+    try {
+      const checkStmt = db.prepare('SELECT reply FROM chat_cache WHERE key = ?');
+      const row = checkStmt.get(expectedKey);
+      expect(row).toBeDefined();
+      expect(row.reply).toBeDefined();
+
+      // Also ensure that the full history key does NOT exist
+      const serializedFull = JSON.stringify(longHistory);
+      const fullHash = crypto.createHash('sha256').update(serializedFull).digest('hex').toLowerCase();
+      const fullKey = `${testTrend}:${testQuery}:${fullHash}`.toLowerCase();
+      const fullRow = checkStmt.get(fullKey);
+      expect(fullRow).toBeUndefined();
+    } finally {
+      db.close();
+    }
+  });
+
+  // [AC-4] Casing-Agnostic Database Cache & Schema Safety: POST /api/chat with differing case formats must resolve to the same database cache line
+  test('should serve case-insensitive chat response from database cache', async ({ request }) => {
+    const testTrendUpper = `CASE-CHAT-TREND-${Date.now()}`;
+    const testTrendLower = testTrendUpper.toLowerCase();
+    const testQueryUpper = `CASE-CHAT-QUERY-${Date.now()}`;
+    const testQueryLower = testQueryUpper.toLowerCase();
+    const testHistoryUpper = [{ role: 'USER', content: 'HELLO' }];
+    const testHistoryLower = [{ role: 'user', content: 'hello' }];
+
+    // 1. First request with uppercase casing
+    const res1 = await request.post('/api/chat', {
+      data: { trend: testTrendUpper, query: testQueryUpper, history: testHistoryUpper }
+    });
+    expect(res1.ok()).toBe(true);
+    const data1 = await res1.json();
+    expect(data1.reply).toBeDefined();
+
+    // 2. Direct database modification: modify the cached entry to a unique value
+    const db = new DatabaseSync(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
+    const customReply = `custom-casing-reply-${Date.now()}`;
+    try {
+      // The key should have been saved in all lowercase: trend, query, and history values
+      const crypto = await import('node:crypto');
+      const serializedHistoryLower = JSON.stringify(testHistoryLower);
+      const expectedHash = crypto.createHash('sha256').update(serializedHistoryLower).digest('hex').toLowerCase();
+      const expectedKey = `${testTrendLower}:${testQueryLower}:${expectedHash}`;
+
+      const checkStmt = db.prepare('SELECT reply FROM chat_cache WHERE key = ?');
+      const row = checkStmt.get(expectedKey);
+      expect(row).toBeDefined();
+
+      const updateStmt = db.prepare('UPDATE chat_cache SET reply = ? WHERE key = ?');
+      updateStmt.run(customReply, expectedKey);
+    } finally {
+      db.close();
+    }
+
+    // 3. Second request with lowercase casing: must return the custom cache value
+    const res2 = await request.post('/api/chat', {
+      data: { trend: testTrendLower, query: testQueryLower, history: testHistoryLower }
+    });
+    expect(res2.ok()).toBe(true);
+    const data2 = await res2.json();
+    expect(data2.reply).toBe(customReply);
+  });
 });
