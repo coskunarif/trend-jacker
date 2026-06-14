@@ -1,108 +1,73 @@
-# Specification — Gamified User Achievement Dashboard
+# Specification — LLM Operational Cost Reduction and Latency Optimization
 
-This specification defines the requirements, acceptance criteria, test strategy, and implementation slices to build a unified **Gamified User Achievement Dashboard** within TrendJacker. This dashboard will consolidate daily streaks, trivia milestones, and trend predictions into a single interactive view to drive repeat visits and viral retention.
+This specification outlines the requirements and implementation slices to optimize LLM query response times, enforce prompt safety, and decrease Gemini token usage through sliding-window history truncation and browser-side `sessionStorage` caching.
 
 ---
 
 ## 🎯 Acceptance Criteria
 
-### [AC-1] Toggleable Achievements Dashboard View
-* **Trigger**: Clicking the top navbar button (`#btn-show-achievements`) or the sidebar link (`#sidebar-show-achievements`) must transition the main explainer panel to the achievements dashboard view (`#achievements-view`).
-* **Transition**: The toggle must occur synchronously in the event handler (no awaiting of API requests before toggling visibility class `hidden`) to prevent yielding the event loop and E2E race conditions.
-* **Exit**: Clicking any trend item in the left sidebar (`#trends-list .trend-item`) must immediately hide `#achievements-view` and show `#explainer-view` or `#explainer-skeleton`.
-* **Responsive Layout**: The dashboard grid must align with the `320px 1fr` responsive grid layout on desktop and stack to `1fr` on mobile. Side panels must prevent scrollbar clutter and outer layout leakage by isolating with `overflow: hidden` and applying `overflow-y: auto` to the inner scrollable container.
+### `[AC-1]` Client & Server Chat History Truncation (Sliding Window)
+- **Requirement**: The follow-up chat integration must cap conversation history to a sliding window of the last 4 messages (representing the last 2 user-assistant turns).
+- **Client implementation**: `public/app.js` must truncate `chatMessages` array to the last 4 elements prior to transmitting it to the server. All chat bubble DOM elements must remain visible to the user.
+- **Server implementation**: `server.js` `/api/chat` route must truncate any incoming `history` array to the last 4 messages prior to cache key generation and prompt formulation.
+- **How to verify**: 
+  - Send 6 chat messages sequentially. Verify in network payloads that the `history` parameter contains only the last 4 messages.
+  - Verify that the SQLite `chat_cache` table is populated using keys computed from the truncated history.
 
-### [AC-2] Unified Stats Room Grid
-* **UI**: The achievements dashboard must display a responsive grid (`.achievements-stats-grid`) consisting of 4 stats cards:
-  1. **Streak Stats**: Displays the active daily streak count (e.g. `🔥 3-Day Streak`) and the total message capacity bonus unlocked.
-  2. **Trivia Stats**: Displays the total completed quizzes count and average score out of 3.
-  3. **Prediction Stats**: Displays the correct prediction count, total predictions made, and the accuracy percentage.
-  4. **Referral Stats**: Displays the total number of referrals and the total referral capacity bonus.
+### `[AC-2]` Browser-Side `sessionStorage` Chat Caching
+- **Requirement**: Chat queries and responses must be cached client-side in `sessionStorage` to allow instantaneous responses for duplicate queries in the same context.
+- **Key format**: The key must be `chat_cache:${trend}:${query}:${historyKey}` where:
+  - `trend` is the current trend title in lowercase.
+  - `query` is the user query in lowercase.
+  - `historyKey` is the JSON stringified representation of the truncated `chatMessages` array (lowercased).
+- **How to verify**:
+  - Open a trend and submit query `A`. Verify a network call is made.
+  - Submit the identical query `A` again. Verify the response is returned instantly without hitting `/api/chat`.
+  - Inspect browser `sessionStorage` to confirm the key follows the lowercase pattern.
 
-### [AC-3] Interactive Badges Gallery
-* **UI**: The dashboard must display a visual grid of 9 milestone badges, each styled as a modern glass-card with a themed emoji/badge graphics, title, and unlock criteria.
-* **States**:
-  * **Unlocked**: Styled with full color opacity, glowing borders, and an unlocked indicator.
-  * **Locked**: Styled with `opacity: 0.4`, grayed-out colors, a lock emoji/badge, and the criteria instructions.
-* **Badge Matrix**:
-  1. **Explorer**: Total activity (trivia quizzes + predictions) > 0.
-  2. **Streak Starter**: Daily streak >= 1.
-  3. **Consistent Reader**: Daily streak >= 3.
-  4. **Weekly Legend**: Daily streak >= 7.
-  5. **Sharp Challenger**: Maximum score on any trivia challenge >= 2.
-  6. **Brainiac Mastermind**: Maximum score on any trivia challenge = 3.
-  7. **Apprentice Oracle**: Total predictions made >= 1.
-  8. **Ultimate Seer**: Total resolved correct predictions >= 3.
-  9. **Viral Pioneer**: Total referrals >= 1.
+### `[AC-3]` Non-Blocking UI Updates and Event Loop Yields
+- **Requirement**: Asynchronous checks (such as fetching `/api/chat-limit`) must not be awaited inside UI detail rendering or event handlers. They must run as un-awaited background promises to prevent event loop yielding and subsequent E2E test race conditions.
+- **How to verify**:
+  - Run the Playwright test suite. Verify that switching demographics/languages executes synchronous DOM updates immediately, and the test assertions do not fail due to network delays or event loop delays.
 
-### [AC-4] Unified Activity History Log
-* **UI**: Displays a reverse-chronological scrollable list of the user's completed milestones (trivia challenges, resolved predictions, active streaks).
-* **Format**:
-  * Trivia: "Completed trivia for **[Trend]** with score [Score]/3 on [Date]"
-  * Prediction: "Predicted **[Outcome]** on **[Trend]** - [Resolved Status] on [Date]"
-* **Edge Case**: If the history is empty, a clean fallback text "No achievements recorded yet. View a trend to start your journey!" must be rendered.
-
-### [AC-5] Asynchronous Data Hydration
-* **Behavior**: Stats, badge states, and history logs must load asynchronously in the background. The frontend must hit `GET /api/achievements?clientId=<id>` to retrieve the user's stats dynamically.
-* **Instant Update**: Completing a trivia challenge, placing a prediction, or logging a streak update must asynchronously trigger an immediate cache invalidation and reload of the achievements data to keep the UI synchronized without requiring a page reload.
-
-### [AC-6] Casing & Caching Robustness
-* **Database & Server**: The `GET /api/achievements` endpoint and all underlying helper queries must trim and lowercase the incoming `clientId` to prevent duplication of streaks or trivia stats.
-* **Compatibility**: Must work correctly with SQLite, Firestore, and Memory fallback layers.
+### `[AC-4]` Casing-Agnostic Database Cache & Schema Safety
+- **Requirement**: Ensure database queries for cached explanations/chats normalize search terms to lowercase to prevent casing-based cache misses. Verify SQLite tables `trend_explanations` and `localized_explanations` maintain `COLLATE NOCASE` settings.
+- **How to verify**:
+  - Query `sqlite_master` in `polls.db` and assert the schema constraints are active.
+  - POST requests with differing case formats (e.g. `GOOGLE GEMINI` vs `google gemini`) must hit the same database cache line.
 
 ---
 
 ## 🚫 Out of Scope
-* Creating or editing custom image assets or media files (uses standard emojis and SVG icons).
-* Implementing global leaderboards for predictions or streaks (only localized trivia leaderboard is in scope).
-* Awaiting third-party integrations or external APIs.
+- Server-side persistence of chat session histories across app instances.
+- Adding custom settings/UI controls to adjust the sliding window size.
+- Restructuring the database schemas or introducing non-relational database dependencies.
 
 ---
 
-## 🚀 Slices
+## 🛠️ Implementation Slices
 
-### [S-1] Backend API & Database Helpers
-* **Objective**: Define DB queries and backend routes for user achievement aggregation.
-* **Files**: `db.js`, `server.js`
-* **ACs Mapped**: `[AC-6]`
-* **Tasks**:
-  * Implement `getClientAchievements(clientId)` in `db.js`. It must normalize `clientId` (trim, lowercase) and query:
-    * Streaks count from `client_streaks`.
-    * Trivia score statistics (count, average score, maximum score) from `client_trivia_scores`.
-    * Predictions count categorized by status (correct, incorrect, pending) from `client_predictions`.
-    * Referral count from `client_referrals`.
-  * Support both SQLite, Firestore, and InMemory mock pathways.
-  * Define `GET /api/achievements` in `server.js`, validating and normalizing `clientId` from request queries and returning the aggregated payload.
+### `[S-1]` Server-Side Chat History Truncation
+- **Description**: Truncate the incoming chat history to the last 4 messages inside `POST /api/chat` in `server.js`. The truncated history is passed to `getCachedChatResponse`, `setCachedChatResponse`, and the Gemini model generator prompt.
+- **Task Type**: Refinement (Update tests / database checks)
+- **Target Files**: 
+  - `server.js`
+  - `db.js`
+- **AC Mapping**: `[AC-1]`, `[AC-4]`
+- **Verification**: Run `npx playwright test tests/llm-caching-optimization.spec.js` to ensure the chat caching layer aligns with casing rules and successfully caches the responses.
 
-### [S-2] Dashboard HTML & CSS Layout
-* **Objective**: Build the dashboard container structure, navigation entry points, and responsive styling.
-* **Files**: `public/index.html`, `public/styles.css`
-* **ACs Mapped**: `[AC-1]`, `[AC-2]`, `[AC-3]`
-* **Tasks**:
-  * Insert `#achievements-view` inside `<section class="main-panel">` in `public/index.html` as a sibling to `#explainer-view`.
-  * Add navigation buttons: `#btn-show-achievements` in the header navbar and `#sidebar-show-achievements` in the sidebar.
-  * Define CSS grid layouts for `.achievements-stats-grid`, `.badges-gallery-grid`, and scrollable `.achievements-history-list` inside `public/styles.css`. Ensure no scrollbar duplication and double overflow.
+### `[S-2]` Client-Side Chat History Truncation & `sessionStorage` Cache
+- **Description**: Limit the frontend `chatMessages` array to the last 4 entries. Before dispatching the `/api/chat` network fetch, check `sessionStorage` using the lowercase key format `chat_cache:${trend}:${query}:${historyKey}`. If cached, append the reply synchronously. Otherwise, fetch, append, and save the result into `sessionStorage`.
+- **Task Type**: Refinement (Update tests)
+- **Target Files**:
+  - `public/app.js`
+- **AC Mapping**: `[AC-1]`, `[AC-2]`
+- **Verification**: Run `npx playwright test tests/retention-api-reduction.spec.js` to verify client-side caching behaves properly and reduces API query counts.
 
-### [S-3] Frontend State, Toggles, and Hydration
-* **Objective**: Drive view toggles and render the stats, badge unlocks, and history dynamically on the client.
-* **Files**: `public/app.js`
-* **ACs Mapped**: `[AC-1]`, `[AC-4]`, `[AC-5]`
-* **Tasks**:
-  * Bind click listeners to navbar/sidebar achievement buttons to synchronously toggle active panel view (`.classList.add('hidden')` and `.classList.remove('hidden')`).
-  * Ensure selecting a trend in the sidebar closes the achievements dashboard and displays the explainer skeleton.
-  * Fire off asynchronous background promise to fetch `/api/achievements?clientId=${localClientId}` and hydrate the stats cards, badge state rules, and list items.
-  * Hook into trivia submissions, prediction submissions, and page load routines to fetch latest limits and achievements stats asynchronously.
-
----
-
-## 🧪 Test Strategy
-* **Task Type**: Additive
-* **Strategy**: Tests First (Tester writes specification verification tests before implementation begins).
-* **Test Plan**:
-  * Unit/Integration: Verify `getClientAchievements` returns normalized casing counts correctly under SQLite and memory fallbacks. Test the API endpoint returns 200 with the aggregated payload.
-  * E2E:
-    * Assert clicking achievements buttons toggles `#achievements-view` visible and hides active explainer/welcome views immediately.
-    * Assert selecting a trend switches back to the explainer view.
-    * Verify that stats cards populate with correct values retrieved from route mocks.
-    * Verify badge colors/opacities and locks display correctly based on mocks (e.g. `Weekly Legend` is locked at 2-day streak, unlocked at 7-day streak).
-    * Verify the history log lists items correctly or shows the fallback message when empty.
+### `[S-3]` Non-blocking UI Alignment
+- **Description**: Inspect and ensure that all detail renders or demographic/language switches do not await network calls like limit checks or streak fetches. Ensure they run as un-awaited background promises.
+- **Task Type**: Refinement (Update tests)
+- **Target Files**:
+  - `public/app.js`
+- **AC Mapping**: `[AC-3]`
+- **Verification**: Confirm E2E test runs for responsiveness and UI rendering execute reliably without timing out or racing.
