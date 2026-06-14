@@ -1,5 +1,5 @@
 task: Build a gamified user achievement dashboard to increase visitor retention and return rate.              tier: T2   creativity: 0.5
-state: BUILD                budget: repairs 0/3
+state: TEST                 budget: repairs 0/3
 branch: asf/20260613-gamified-dashboard          checkpoint: none
 caps: agents,ui,web,human
 
@@ -16,6 +16,7 @@ caps: agents,ui,web,human
 - 2026-06-13: Scout completed. Selected task: Build a gamified user achievement dashboard to increase visitor retention and return rate. Conductor starting Architect phase.
 - 2026-06-13: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-13: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
+- 2026-06-13: Builder reported disputes. Conductor ruled tests wrong. Starting Tester amendment phase.
 
 ## Disputes
 - achievements-dashboard.spec.js [AC-1] Achievements layout is responsive and prevents scrollbar duplication: uses toHaveCSS('grid-template-columns', /1fr/) on computed style, which returns a pixel size (e.g., "325px") instead of the literal declaration "1fr".
