@@ -17,5 +17,13 @@ caps: agents,ui,web,human
 **Runner-up**: Subtraction of redundant LLM demographic query invocations when selection is unchanged.
 
 ## Verdict
+- **[AC-1] Client & Server Chat History Truncation**: PASS
+- **[AC-2] Browser-Side sessionStorage Chat Caching**: PASS
+- **[AC-3] Non-Blocking UI Updates and Event Loop Yields**: PASS
+- **[AC-4] Casing-Agnostic Database Cache & Schema Safety**: PASS
+
+### Verification Summary
+- **Automated Tests**: Ran Playwright test suite (`npx playwright test --workers=1`), all 223 tests passed.
+- **Dogfooding**: Performed exploratory testing of the chat sliding-window, client-side sessionStorage, and casing-agnostic DB schema. Detailed results and screenshots stored in `dogfood-output/20260613-cost-latency/`.
 
 ## Done
