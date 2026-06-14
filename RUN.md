@@ -20,4 +20,6 @@ caps: agents,ui,web,human
 ## Processes
 
 ## Verdict
+- DISPUTED: `tests/responsiveness.spec.js:160:3` (should update detail title in less than 300ms even when explain API is slow) contradicts the spec by measuring Playwright CDP mouse-click simulation and network roundtrip latency instead of browser-side DOM rendering responsiveness.
+
 ## Done
