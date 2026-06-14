@@ -41,6 +41,46 @@ function titleToSlug(title) {
     .replace(/-+/g, '-');
 }
 
+function getTrendCategoryMeta(title) {
+  const lowerTitle = title.toLowerCase();
+  
+  if (/\b(tech|ai|apple|google|openai|gpt|gemini|claude|nvidia|phone|software|computer|digital|code|developer|web)\b/.test(lowerTitle)) {
+    return {
+      category: 'Tech',
+      emoji: '🤖',
+      badge: 'Cutting Edge',
+      gradientStart: '#8b5cf6',
+      gradientEnd: '#06b6d4'
+    };
+  }
+  if (/\b(work|job|career|office|employee|employer|remote|hybrid|team|business|meeting|manager)\b/.test(lowerTitle)) {
+    return {
+      category: 'Workplace',
+      emoji: '💼',
+      badge: 'Future of Work',
+      gradientStart: '#f97316',
+      gradientEnd: '#ec4899'
+    };
+  }
+  if (/\b(innovation|green|solar|energy|sustainable|electric|climate|future|science|smart|battery)\b/.test(lowerTitle)) {
+    return {
+      category: 'Innovation',
+      emoji: '⚡',
+      badge: 'Green Tech',
+      gradientStart: '#10b981',
+      gradientEnd: '#06b6d4'
+    };
+  }
+  return {
+    category: 'Trending',
+    emoji: '🔥',
+    badge: 'Hot Vibe',
+    gradientStart: '#3b82f6',
+    gradientEnd: '#8b5cf6'
+  };
+}
+
+
 const apiKey = getApiKey();
 if (!apiKey) {
   console.warn('WARNING: No Google Gemini API key found. AI features will fail.');
@@ -1283,14 +1323,24 @@ fastify.get('/api/topic-image/:slug', async (request, reply) => {
     fastify.log.error('Cache read error for topic image: ' + err.message);
   }
 
+  const catMeta = getTrendCategoryMeta(trendName);
+
   let svgContent = '';
   // Check if test or dev mode
   if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || !genAI) {
     svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-      <rect width="800" height="600" fill="#2d1b4e"/>
-      <circle cx="400" cy="300" r="150" fill="#705af8" opacity="0.3"/>
-      <text x="400" y="310" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
-      <text x="400" y="360" font-family="sans-serif" font-size="20" fill="#a599e8" text-anchor="middle">Topic Image Placeholder</text>
+      <defs>
+        <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+          <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+        </linearGradient>
+      </defs>
+      <rect width="800" height="600" fill="url(#bgGrad)"/>
+      <circle cx="400" cy="300" r="150" fill="#ffffff" opacity="0.1"/>
+      <text x="400" y="250" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+      <text x="400" y="320" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+      <text x="400" y="380" font-family="sans-serif" font-size="24" fill="#ffffff" opacity="0.8" text-anchor="middle">${catMeta.badge}</text>
+      <text x="400" y="430" font-family="sans-serif" font-size="20" fill="#ffffff" opacity="0.6" text-anchor="middle">Topic Image Placeholder</text>
     </svg>`;
   } else {
     // Production Mode: Generate custom topic SVG using Gemini API
@@ -1314,7 +1364,11 @@ fastify.get('/api/topic-image/:slug', async (request, reply) => {
 Requirements:
 1. The output must be valid SVG code.
 2. It should have a width of 800 and height of 600.
-3. The design should be modern, clean, and visually represent the topic "${trendName}". Use appropriate colors, shapes, and minimal text if necessary.
+3. The design should be modern, clean, and visually represent the topic "${trendName}". You must incorporate the theme for the category "${catMeta.category}".
+Specifically:
+- Use the badge text "${catMeta.badge}" somewhere in the graphic or badge.
+- Include the emoji "${catMeta.emoji}" as a prominent graphic element.
+- Use a background gradient or design colors matching the range from "${catMeta.gradientStart}" to "${catMeta.gradientEnd}".
 4. Keep the output clean and return it inside the JSON response matching the schema.`;
 
       const result = await model.generateContent(prompt);
@@ -1328,8 +1382,16 @@ Requirements:
     } catch (err) {
       fastify.log.error('Gemini SVG generation failed: ' + err.message);
       svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
-        <rect width="800" height="600" fill="#2d1b4e"/>
-        <text x="400" y="300" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+        <defs>
+          <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${catMeta.gradientStart}"/>
+            <stop offset="100%" stop-color="${catMeta.gradientEnd}"/>
+          </linearGradient>
+        </defs>
+        <rect width="800" height="600" fill="url(#bgGrad)"/>
+        <text x="400" y="260" font-family="sans-serif" font-size="72" fill="#ffffff" text-anchor="middle">${catMeta.emoji}</text>
+        <text x="400" y="340" font-family="sans-serif" font-size="48" fill="#ffffff" text-anchor="middle" font-weight="bold">${trendName}</text>
+        <text x="400" y="400" font-family="sans-serif" font-size="24" fill="#ffffff" opacity="0.8" text-anchor="middle">${catMeta.badge}</text>
       </svg>`;
     }
   }
