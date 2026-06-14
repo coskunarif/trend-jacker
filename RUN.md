@@ -7,6 +7,9 @@ caps: agents,ui,web,human
 - 2026-06-14: Scout completed. Selected task for social media preview images and search engine indexing coverage. Conductor starting Architect phase.
 - 2026-06-14: Architect completed SPEC.md. Conductor starting Tester phase.
 - 2026-06-14: Tester completed test suite. Observed state: red. Conductor starting Builder phase.
+## Disputes
+- `Verify GET /api/og/:slug returns valid SVG with elements` in `tests/pinterest-sharing-suite.spec.js` contradicts SPEC.md [AC-1] which requires `/api/og/:slug` to return rasterized PNG with Content-Type `image/png`.
+
 ## Verdict
 ## Done
 
