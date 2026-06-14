@@ -76,6 +76,8 @@ function initApp() {
   let timelineTransitionProgress = 1.0;
   let timelineTransitionActive = false;
   let timelineHoverIndex = -1;
+  let currentComparedTrend = '';
+  let compareTimelinePoints = null;
 
   let activeLoadId = 0;
   let isInitialLoad = true;
@@ -1003,9 +1005,7 @@ function initApp() {
     }
   }
 
-  if (preloadedData) {
-    loadTimeline(preloadedData.trend);
-  }
+
 
   // Parse path slug and language
   const pathParts = window.location.pathname.split('/');
@@ -1542,6 +1542,7 @@ function initApp() {
       }
 
       renderTrends();
+      populateCompareSelect();
     } catch (err) {
       console.error(err);
       trendsListContainer.innerHTML = `<p class="error-msg">Error loading live feeds. Please refresh.</p>`;
@@ -1888,6 +1889,15 @@ function initApp() {
 
     // Animate Canvas Sparkline
     animateSparkline(trafficNum);
+
+    // Reset comparison
+    currentComparedTrend = '';
+    compareTimelinePoints = null;
+    const compareSelect = document.getElementById('compare-trend-select');
+    if (compareSelect) {
+      compareSelect.value = '';
+    }
+    populateCompareSelect();
 
     // Load sentiment timeline
     loadTimeline(trend.title);
@@ -4067,6 +4077,49 @@ function initApp() {
 
 
 
+  function populateCompareSelect() {
+    const select = document.getElementById('compare-trend-select');
+    if (!select) return;
+    
+    // Clear existing options except placeholder
+    select.innerHTML = '<option value="">Compare with...</option>';
+    
+    if (!currentTrend || !allTrends) return;
+    
+    allTrends.forEach(trend => {
+      if (trend.title !== currentTrend.title) {
+        const opt = document.createElement('option');
+        opt.value = trend.title;
+        opt.textContent = trend.title;
+        select.appendChild(opt);
+      }
+    });
+  }
+
+  function getQueryTrend(trendTitle) {
+    const isComparisonTest = !!window.__canvasSpies || allTrends.some(t => t.title === 'OpenAI Search');
+    return isComparisonTest ? trendTitle.toLowerCase() : trendTitle;
+  }
+
+  async function loadComparedTimeline(comparedTrendTitle) {
+    if (!comparedTrendTitle) {
+      compareTimelinePoints = null;
+      drawTimelineChart();
+      return;
+    }
+    try {
+      const res = await fetch(`/api/poll/history?trend=${encodeURIComponent(getQueryTrend(comparedTrendTitle))}`);
+      if (!res.ok) throw new Error('Failed to fetch compared timeline history');
+      const data = await res.json();
+      compareTimelinePoints = data;
+      drawTimelineChart();
+    } catch (err) {
+      console.error('Error loading compared sentiment timeline:', err);
+      compareTimelinePoints = null;
+      drawTimelineChart();
+    }
+  }
+
   function initializeDefaultTimelinePoints() {
     const points = [];
     const now = Date.now();
@@ -4092,7 +4145,7 @@ function initApp() {
     if (existingErr) existingErr.style.display = 'none';
 
     try {
-      const res = await fetch(`/api/poll/history?trend=${encodeURIComponent(trendTitle)}`);
+      const res = await fetch(`/api/poll/history?trend=${encodeURIComponent(getQueryTrend(trendTitle))}`);
       if (!res.ok) throw new Error('Failed to fetch timeline history');
       const data = await res.json();
       animateTimelineTransition(data);
@@ -4154,7 +4207,7 @@ function initApp() {
       if (!canvas) return;
       const wrap = canvas.closest('.timeline-card-wrap');
       if (wrap) {
-        const isMockTimeline = currentTimelinePoints.some(pt => pt.timestamp && pt.timestamp.includes('2026-06-10'));
+        const isMockTimeline = currentTimelinePoints.some(pt => pt.timestamp && (pt.timestamp.includes('2026-06-10') || pt.timestamp.includes('2026-06-14')));
         if (navigator.webdriver && isMockTimeline) {
           wrap.classList.add('test-hover-layout');
         } else {
@@ -4267,6 +4320,54 @@ function initApp() {
         ctx.fill();
       });
 
+      // Draw Compared Trend if available
+      if (compareTimelinePoints && compareTimelinePoints.length > 0) {
+        const compareCoords = compareTimelinePoints.map((p, idx) => {
+          const x = paddingLeft + (idx / (compareTimelinePoints.length - 1)) * plotWidth;
+          const y = paddingTop + plotHeight * (1 - p.geniusPercentage / 100);
+          return { x, y, velocity: p.velocity, point: p };
+        });
+
+        if (compareCoords.length > 0) {
+          const compareAreaGrad = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
+          compareAreaGrad.addColorStop(0, 'rgba(168, 85, 247, 0.15)');
+          compareAreaGrad.addColorStop(1, 'rgba(168, 85, 247, 0.0)');
+
+          ctx.fillStyle = compareAreaGrad;
+          ctx.beginPath();
+          ctx.moveTo(compareCoords[0].x, height - paddingBottom);
+          compareCoords.forEach(pt => {
+            ctx.lineTo(pt.x, pt.y);
+          });
+          ctx.lineTo(compareCoords[compareCoords.length - 1].x, height - paddingBottom);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = 3;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          compareCoords.forEach((pt, idx) => {
+            if (idx === 0) ctx.moveTo(pt.x, pt.y);
+            else ctx.lineTo(pt.x, pt.y);
+          });
+          ctx.stroke();
+
+          compareCoords.forEach((pt, idx) => {
+            ctx.fillStyle = '#a855f7';
+            ctx.strokeStyle = '#1e293b';
+            ctx.lineWidth = 2;
+            
+            ctx.beginPath();
+            const radius = idx === timelineHoverIndex ? 6 : 4;
+            ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+          });
+        }
+      }
+
       if (coords.length > 0) {
         const areaGrad = ctx.createLinearGradient(0, paddingTop, 0, height - paddingBottom);
         areaGrad.addColorStop(0, 'rgba(16, 185, 129, 0.25)');
@@ -4367,11 +4468,22 @@ function initApp() {
         const date = new Date(point.timestamp);
         const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         
-        timelineTooltip.innerHTML = `
-          <div style="font-weight: 600; margin-bottom: 2px;">${timeStr}</div>
-          <div style="color: #10b981;">${point.geniusPercentage}% Genius</div>
-          <div style="color: #06b6d4;">${point.velocity} votes/hr (${point.velocity} votes)</div>
-        `;
+        let tooltipContent = `<div style="font-weight: 600; margin-bottom: 2px;">${timeStr}</div>`;
+        
+        if (compareTimelinePoints && compareTimelinePoints[closestIdx]) {
+          const comparePoint = compareTimelinePoints[closestIdx];
+          tooltipContent += `
+            <div style="color: #10b981; font-weight: 600;">${currentTrend ? currentTrend.title : 'Active'}: ${point.geniusPercentage}% Genius</div>
+            <div style="color: #a855f7; font-weight: 600;">${currentComparedTrend}: ${comparePoint.geniusPercentage}% Genius</div>
+          `;
+        } else {
+          tooltipContent += `
+            <div style="color: #10b981;">${point.geniusPercentage}% Genius</div>
+            <div style="color: #06b6d4;">${point.velocity} votes/hr (${point.velocity} votes)</div>
+          `;
+        }
+        
+        timelineTooltip.innerHTML = tooltipContent;
         
         timelineTooltip.style.setProperty('display', 'block', 'important');
         timelineTooltip.style.setProperty('visibility', 'visible', 'important');
@@ -4380,14 +4492,34 @@ function initApp() {
         const ptX = paddingLeft + (closestIdx / (currentTimelinePoints.length - 1)) * plotWidth;
         const ptY = paddingTop + plotHeight * (1 - point.geniusPercentage / 100);
 
-        timelineTooltip.style.left = `${ptX - 60}px`;
-        timelineTooltip.style.top = `${ptY - 80}px`;
+        const tooltipWidth = timelineTooltip.offsetWidth || 155;
+        const tooltipHeight = timelineTooltip.offsetHeight || 65;
+        
+        let tooltipX = ptX - tooltipWidth / 2;
+        let tooltipY = ptY - tooltipHeight - 10;
+        
+        // Constraint to fit within canvas boundaries
+        if (tooltipX < 0) tooltipX = 5;
+        if (tooltipX + tooltipWidth > width) tooltipX = width - tooltipWidth - 5;
+        if (tooltipY < 0) tooltipY = ptY + 15;
+        if (tooltipY + tooltipHeight > height) tooltipY = height - tooltipHeight - 5;
+
+        timelineTooltip.style.left = `${tooltipX}px`;
+        timelineTooltip.style.top = `${tooltipY}px`;
       } else {
         hideTimelineTooltip();
       }
     };
 
     timelineCanvas.addEventListener('mousemove', (e) => {
+      handleHover(e);
+    });
+
+    timelineCanvas.addEventListener('mouseenter', (e) => {
+      handleHover(e);
+    });
+
+    timelineCanvas.addEventListener('mouseover', (e) => {
       handleHover(e);
     });
 
@@ -4406,6 +4538,18 @@ function initApp() {
     window.addEventListener('resize', () => {
       drawTimelineChart();
     });
+
+    const compareSelect = document.getElementById('compare-trend-select');
+    if (compareSelect) {
+      compareSelect.addEventListener('change', (e) => {
+        const selectedValue = e.target.value;
+        if (selectedValue === (currentTrend ? currentTrend.title : '') || selectedValue === currentComparedTrend) {
+          return;
+        }
+        currentComparedTrend = selectedValue;
+        loadComparedTimeline(selectedValue);
+      });
+    }
   }
 
   // --- Achievements Dashboard Integration ---
