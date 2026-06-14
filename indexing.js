@@ -13,14 +13,20 @@ export async function pingSearchEngines(slugs) {
   const isTest = process.env.NODE_ENV === 'test';
   const protocol = APP_HOST.includes('localhost') || APP_HOST.includes('127.0.0.1') ? 'http' : 'https';
   
-  // Format full URLs
-  const urlList = slugs.map(slug => `${protocol}://${APP_HOST}/t/${slug}`);
+  // Format full URLs with all localized language variants
+  const urlList = [];
+  for (const slug of slugs) {
+    urlList.push(`${protocol}://${APP_HOST}/t/${slug}`);
+    urlList.push(`${protocol}://${APP_HOST}/t/${slug}/es`);
+    urlList.push(`${protocol}://${APP_HOST}/t/${slug}/fr`);
+    urlList.push(`${protocol}://${APP_HOST}/t/${slug}/ja`);
+  }
   
   console.log(`[Indexing] Attempting to ping ${urlList.length} URL(s) to IndexNow:`, urlList);
 
   if (isTest) {
     console.log('[Indexing] Running in test mode. Skipping actual external HTTP pings.');
-    return { success: true, mocked: true };
+    return { success: true, mocked: true, urls: urlList };
   }
 
   try {
@@ -60,10 +66,10 @@ export async function pingSearchEngines(slugs) {
         console.warn('[Indexing] Google Sitemap ping failed:', err.message);
       });
 
-    return { success: response.ok };
+    return { success: response.ok, urls: urlList };
   } catch (err) {
     console.error('[Indexing] Error pinging search engines:', err.message);
-    return { success: false, error: err.message };
+    return { success: false, error: err.message, urls: urlList };
   }
 }
 
