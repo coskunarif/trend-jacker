@@ -1,72 +1,61 @@
-# Specification: Test Suite Reliability under Concurrent Execution
+# Specification: User Retention & API Request Reduction
 
 ## Acceptance Criteria
 
-- **`[AC-1] Concurrency Configuration`**
-  - Playwright configuration (`playwright.config.js`) is updated to run with concurrent workers by setting `workers` to `undefined` (or omitting it) instead of constraining execution to `workers: 1`.
-  - When the test suite runs, multiple workers execute tests in parallel.
+### [AC-1] Prevent Redundant Demographic Selector Calls
+- **Description**: Clicking the already active demographic pill (e.g., "Adult (Default)" when it is already active) must not trigger any API calls to `/api/explain`.
+- **Verification**: In browser developer tools or test logs, verify that clicking the active demographic button results in zero network request changes and keeps UI state unchanged.
 
-- **`[AC-2] E2E Direct SQLite Connection WAL Mode & Timeout`**
-  - Every direct database connection instantiated in the E2E test files (`new DatabaseSync(dbPath)`) must immediately run:
-    ```javascript
-    db.exec('PRAGMA journal_mode = WAL;');
-    db.exec('PRAGMA busy_timeout = 5000;');
-    ```
-    This matches the backend configurations in `db.js`.
-  - Applies to the following spec files:
-    - `tests/caching.spec.js`
-    - `tests/chat-limit-referral.spec.js`
-    - `tests/daily-streaks-rewards.spec.js`
-    - `tests/demographic-presentation.spec.js`
-    - `tests/gamified-milestones.spec.js`
-    - `tests/llm-caching-optimization.spec.js`
-    - `tests/localization.spec.js`
-    - `tests/seo-visibility.spec.js`
-    - `tests/trend-predictions.spec.js`
-    - `tests/trivia-challenge.spec.js`
-    - `tests/trivia-chat-rewards.spec.js`
-    - `tests/trivia-leaderboard.spec.js`
+### [AC-2] Prevent Redundant Language Selector Calls
+- **Description**: Triggering a change event on the language select dropdown `#lang-select` with the current language value (e.g. re-selecting the active language) must not fire a POST request to `/api/explain`.
+- **Verification**: Select the currently active language and verify no network requests are sent.
 
-- **`[AC-3] Database Connection Scoping and Leak Prevention`**
-  - Every database connection opened in the test suite must be scoped cleanly using `try { ... } finally { db.close(); }` blocks to ensure the connection is closed even if assertions fail or errors are thrown.
-  - Connections must be closed before initiating API/network requests to avoid holding locks during asynchronous network calls.
+### [AC-3] Prevent Redundant Platform Pill Calls in Post Generator
+- **Description**: Clicking the already active platform pill (e.g. X/Twitter, LinkedIn) must not send any POST requests to `/api/generate-post`.
+- **Verification**: Click the active platform pill and verify no `/api/generate-post` request is made.
 
-- **`[AC-4] E2E Async Testing Race Condition Prevention`**
-  - For tests verifying asynchronous page actions, tests must await page load network responses via `page.waitForResponse` before making assertions on counts or state to ensure stability under concurrent load.
+### [AC-4] Client-Side Explanation Caching
+- **Description**: Implement a clientside in-memory Map cache (`explanationCache`) to store trend explanations. The cache key must be constructed as `${trendTitle}:${lang}:${bracket}`, normalized to lowercase.
+- **Verification**: On first request to explain a trend for a demographic and language, the client fetches from `/api/explain` and caches the result. Subsequent toggling back to this demographic/language combination retrieves the data synchronously from cache without hitting `/api/explain`.
 
-- **`[AC-5] 100% Pass Rate`**
-  - Under concurrent execution (multiple workers, e.g., `--workers=4`), the complete test suite runs and achieves a 100% pass rate with zero transient database locking or race condition failures.
+### [AC-5] Initial Cache Seeding
+- **Description**: Seed the client-side explanation cache with `preloadedData` on page load, matching the current trend, initial language, and active demographic.
+- **Verification**: Toggling away from the default demographic/language and back does not trigger any `/api/explain` requests, as the default state is already cached.
+
+### [AC-6] Lock Screen Prediction CTA
+- **Description**: Add a dedicated Prediction CTA section inside `#chat-lock-container`. If the user has not predicted today, show "Predict if this trend will Rise or Fall tomorrow to earn +3 capacity when correct!" along with a button `#chat-lock-predict-btn` ("Predict Trend's Next Move"). Clicking it scrolls smoothly to `#prediction-card-container` and focuses the rise prediction button. If already predicted, replace with: "You predicted this trend will [Rise/Fall] tomorrow. Correct predictions unlock +3 capacity!".
+- **Verification**: Verify CTA display inside the lock container, click behavior (smooth scroll + focus), and status update immediately after submitting a prediction.
+
+### [AC-7] Invite Link Clipboard Action
+- **Description**: Enhance the `#referral-share-link` element in the lock container. Clicking it must prevent default browser navigation, copy the unique referral link to the clipboard, and temporarily change the element text to "Link Copied!" for 2000ms.
+- **Verification**: Click the referral link element in the locked UI, check clipboard content, and verify the text change reverts after 2000ms.
 
 ## Out of Scope
-
-- Modifying the SQLite database schema, table structures, or keys.
-- Implementing client-side response caching or other feature additions from the backlog.
-- Any UI/UX changes on the website itself.
+- Adding any new server-side database tables or changing DB schema.
+- Implementing social media posting API integration (leveraging existing mock post generator).
 
 ## Slices
 
-- **`[S-1] Playwright Concurrency Configuration`**
-  - **Files**: `playwright.config.js`
-  - **ACs**: `[AC-1]`
-  - **Description**: Modify the Playwright configuration file to remove `workers: 1` or change it to `workers: undefined` to enable concurrent execution of tests across multiple workers.
-  - **Verification**: Run `npx playwright test` to verify that Playwright initializes multiple workers in parallel.
-  - **Dependency**: None.
+### [S-1] Clientside Toggle Deduplication
+- **Description**: Prevent redundant network requests when clicking active demographic pills, re-selecting the active language, or clicking active platform pills.
+- **Files**: `public/app.js`
+- **AC Mapping**: `[AC-1]`, `[AC-2]`, `[AC-3]`
+- **Independent**: Yes
 
-- **`[S-2] Direct SQLite Connections Refinement in E2E Tests`**
-  - **Files**:
-    - `tests/caching.spec.js`
-    - `tests/chat-limit-referral.spec.js`
-    - `tests/daily-streaks-rewards.spec.js`
-    - `tests/demographic-presentation.spec.js`
-    - `tests/gamified-milestones.spec.js`
-    - `tests/llm-caching-optimization.spec.js`
-    - `tests/localization.spec.js`
-    - `tests/seo-visibility.spec.js`
-    - `tests/trend-predictions.spec.js`
-    - `tests/trivia-challenge.spec.js`
-    - `tests/trivia-chat-rewards.spec.js`
-    - `tests/trivia-leaderboard.spec.js`
-  - **ACs**: `[AC-2]`, `[AC-3]`, `[AC-4]`, `[AC-5]`
-  - **Description**: Add WAL mode and busy timeout configuration to all instances of `new DatabaseSync` in the test files. Wrap the connections in `try/finally` blocks ensuring `db.close()` is called correctly, and verify that no connections are held open during network API calls.
-  - **Verification**: Run the full E2E test suite concurrently using parallel workers (e.g. `npx playwright test --workers=4`) and confirm a 100% pass rate.
-  - **Dependency**: `[S-1]`.
+### [S-2] Client-Side Explanation Caching & Seeding
+- **Description**: Implement the client-side explanation Map cache, check cache before `/api/explain` fetch, retrieve and render synchronously, and seed cache on initialization.
+- **Files**: `public/app.js`
+- **AC Mapping**: `[AC-4]`, `[AC-5]`
+- **Independent**: Yes
+
+### [S-3] Invite Referral Link Clipboard copy
+- **Description**: Update `#referral-share-link` behavior to copy to clipboard with a temporary "Link Copied!" text state.
+- **Files**: `public/app.js`
+- **AC Mapping**: `[AC-7]`
+- **Independent**: Yes
+
+### [S-4] Lock Screen Prediction CTA Widget
+- **Description**: Update `#chat-lock-container` HTML to add the prediction CTA section and button. Wire up the click listener for scrolling/focusing and update status text based on prediction state inside `public/app.js`. Add styling in `public/styles.css` if necessary.
+- **Files**: `public/index.html`, `public/app.js`, `public/styles.css`
+- **AC Mapping**: `[AC-6]`
+- **Independent**: No (depends on S-1 for DOM layout structure)
