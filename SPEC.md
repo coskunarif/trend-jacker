@@ -1,40 +1,64 @@
-# Specification: Trend Details View Typographic and Layout Polish
+# Specification: Search Index Consolidation and Canonicalization
+
+Improve search engine indexing coverage and rank by consolidating duplicate entries in the sitemap and indexing modules, and injecting canonical link tags and HTTP headers to prevent page authority division across host variants.
 
 ## Acceptance Criteria
 
-- **[AC-1] Demographic Selector Flex Wrapping**
-  - **Description**: The demographic selection container `#demographic-selector` must allow its children pills (`.demo-pill`) to wrap onto multiple lines when horizontal viewport space is restricted (e.g., <= 375px wide).
-  - **Verification**: In Playwright tests (viewport width 320px and 375px), assert that no demographic pill overflows the viewport or clipping boundary, and that the container's height adjusts dynamically to fit wrapped children.
+### [AC-1] HTML Head Canonical Tags
+- **Requirement**: The homepage `/` must render `<link rel="canonical" href="https://viraljacker.com/" />` (or the configured host variant from `process.env.APP_HOST`) in its HTML `<head>`.
+- **Requirement**: The trend page `/t/:slug` must render `<link rel="canonical" href="https://viraljacker.com/t/:slug" />` (using lowercase slug) in its HTML `<head>`.
+- **Requirement**: The localized trend page `/t/:slug/:lang` must render `<link rel="canonical" href="https://viraljacker.com/t/:slug/:lang" />` (using lowercase slug and lang) in its HTML `<head>`.
+- **Verification**: Use Playwright to fetch `/`, `/t/google-gemini`, and `/t/google-gemini/es`, parse the HTML, and assert that the `<link rel="canonical">` tag is present in the `<head>` with the correct `href` values.
 
-- **[AC-2] Trend Title Flow and Spacing**
-  - **Description**: The trend title `#detail-title` must always flow vertically below `#demographic-selector` without overlapping it.
-  - **Verification**: Assert that the bounding box top of `#detail-title` is strictly greater than or equal to the bounding box bottom of `#demographic-selector` + 8px across all viewports (320px, 375px, 1280px).
+### [AC-2] HTTP Link Canonical Response Headers
+- **Requirement**: GET requests to `/`, `/t/:slug`, and `/t/:slug/:lang` must return a response with a `Link` header containing `<canonicalUrl>; rel="canonical"`.
+- **Requirement**: This canonical relation must coexist alongside other link relations, such as alternate links for `/llms.txt`.
+- **Verification**: Send HTTP requests to `/`, `/t/google-gemini`, and `/t/google-gemini/es`, and assert that the response headers contain `Link` containing `rel="canonical"` pointing to the correct canonical URL.
 
-- **[AC-3] Multiline Title Formatting and Line Height**
-  - **Description**: Multi-line trend titles must wrap gracefully without clipping at the edges. Explicit, readable line-height (between `1.2` and `1.25`) must be enforced, and overflow-wrap/word-wrap rules must be active.
-  - **Verification**: Mock a long title (e.g., "This is an extremely long trend title that spans multiple lines to verify wrapping behavior") and assert in Playwright that all text wraps correctly and does not overflow horizontally.
+### [AC-3] Path Casing Normalization & 301 Redirects
+- **Requirement**: Accessing `/t/:slug` or `/t/:slug/:lang` with mixed-case parameters (e.g., `/t/Google-Gemini` or `/t/google-gemini/ES`) must trigger a 301 permanent redirect to the fully lowercased canonical route path.
+- **Verification**: Send HTTP requests to `/t/Google-Gemini` and `/t/google-gemini/ES` and assert that the status is 301, and the `Location` header is `/t/google-gemini` and `/t/google-gemini/es` respectively.
 
-- **[AC-4] Viewport Overflow Prevention**
-  - **Description**: Layout elements inside the main explainer panel must not trigger horizontal scrollbars or extend past the viewport boundary on narrow mobile sizes.
-  - **Verification**: In Playwright, verify `document.documentElement.scrollWidth <= window.innerWidth` is true on all viewports (320px, 375px, 1280px).
+### [AC-4] /index.html Redirect
+- **Requirement**: Accessing `/index.html` directly must trigger a 301 permanent redirect to `/`.
+- **Verification**: Send an HTTP request to `/index.html` and assert that the status is 301, and the `Location` header is `/`.
+
+### [AC-5] Sitemap /sitemap.xml Deduplication
+- **Requirement**: The generated `/sitemap.xml` must not contain any duplicate `<loc>` entries or duplicate localized alternate link definitions for the same trend slug, regardless of duplicates in cached trends.
+- **Verification**: Retrieve `/sitemap.xml`, parse the XML structure, and assert that all `<loc>` elements are unique.
+
+### [AC-6] IndexNow API Slugs and URL Deduplication
+- **Requirement**: The `pingSearchEngines` function in `indexing.js` must normalize incoming slugs (lowercased, trimmed) and deduplicate the list before formatting URLs for the IndexNow payload.
+- **Verification**: Unit test `pingSearchEngines` by passing duplicate, mixed-case, and whitespace-padded slugs (e.g., `['openai-gpt', ' OpenAI-GPT ', 'fastify']`) and assert that the returned `urls` array contains only unique, normalized URLs.
+
+### [AC-7] /llms.txt and /llms-full.txt Deduplication
+- **Requirement**: The `/llms.txt` and `/llms-full.txt` sitemap endpoints must display deduplicated trend lists.
+- **Verification**: Fetch `/llms.txt` and `/llms-full.txt` and assert that each trend slug appears exactly once.
 
 ## Out of Scope
-- Changing or adding API endpoints or demographic logic.
-- Redesigning other parts of the trend cards grid or the theme layout.
-
-## Test Strategy (Refinement)
-- Since this is a refinement task, we will update the existing E2E/responsive layout tests to assert strict boundary and overlap constraints (specifically checking `boundingBox` coordinates of `.demographic-selector` vs `.trend-title` and verifying that the page does not overflow on a 320px viewport).
+- Creating or editing client-side UI visual elements, sidebar views, or actual trend fetch schedules.
+- Setting up external IndexNow API keys or configuring external production DNS/SSL.
 
 ## Slices
 
-### [S-1] Demographic Selector Wrapping & Spacing
-- **Files**: `public/styles.css`
-- **ACs**: `[AC-1]`, `[AC-4]`
-- **Description**: Modify `.demographic-selector` styles to enable flex wrapping (`flex-wrap: wrap`), set appropriate gaps, and ensure no horizontal clipping or layout break on narrow screens.
-- **Independence**: Independent
+### [S-1] Casing & /index.html Permanent Redirects
+- **Description**: Add a 301 redirect handler for `/index.html` to `/` in `server.js`. Update `handleTrendRequest` in `server.js` to normalize request path casing and return a 301 redirect if the requested slug or language is not fully lowercased.
+- **ACs**: `[AC-3]`, `[AC-4]`
+- **Files**: `server.js`
+- **Dependency**: None (Independent)
 
-### [S-2] Trend Title Typographic Polish
-- **Files**: `public/styles.css`
-- **ACs**: `[AC-2]`, `[AC-3]`, `[AC-4]`
-- **Description**: Define explicit `line-height`, `word-wrap`, `overflow-wrap` on `.trend-title` in both base and mobile styles to support multi-line title wrapping without line or element collision.
-- **Independence**: Independent
+### [S-2] Canonical Link Tags & Response Headers
+- **Description**: Configure dynamic canonical hostname base in `server.js` using `process.env.APP_HOST`. Add canonical `<link>` tags to the rendered `<head>` templates and set HTTP response `Link` headers containing `rel="canonical"` for `/`, `/t/:slug`, and `/t/:slug/:lang`.
+- **ACs**: `[AC-1]`, `[AC-2]`
+- **Files**: `server.js`
+- **Dependency**: None (Independent)
+
+### [S-3] Sitemap, LLM Index, and IndexNow Deduplication
+- **Description**: Refactor `/sitemap.xml`, `/llms.txt`, and `/llms-full.txt` routes to deduplicate latest trend slugs before rendering. Update `pingSearchEngines` in `indexing.js` to normalize and deduplicate input slugs and the constructed `urlList` before dispatching.
+- **ACs**: `[AC-5]`, `[AC-6]`, `[AC-7]`
+- **Files**: `server.js`, `indexing.js`
+- **Dependency**: None (Independent)
+
+## Test Strategy
+- **Task Type**: Refinement
+- **Strategy**: Refinement/Update/Snapshot tests. The Tester must write new/updated E2E tests for these criteria and run them before implementation. Slices represent implementation only.
