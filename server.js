@@ -91,6 +91,11 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 const fastify = Fastify({ logger: true });
 
+// GET /index.html - Redirects to / with 301 status
+fastify.get('/index.html', async (request, reply) => {
+  return reply.redirect('/', 301);
+});
+
 // GET / - Serves the main page with the first trend preloaded for instant hydration
 fastify.get('/', async (request, reply) => {
   try {
@@ -901,6 +906,21 @@ Ensure all translated fields conform to the response schema and are in the langu
 }
 
 async function handleTrendRequest(request, reply, slug, lang) {
+  const paramSlug = request.params ? request.params.slug : undefined;
+  const paramLang = request.params ? request.params.lang : undefined;
+  const hasUppercaseSlug = paramSlug && /[A-Z]/.test(paramSlug);
+  const hasUppercaseLang = paramLang && /[A-Z]/.test(paramLang);
+
+  if (hasUppercaseSlug || hasUppercaseLang) {
+    const lowerSlug = (paramSlug || '').toLowerCase();
+    if (paramLang) {
+      const lowerLang = paramLang.toLowerCase();
+      return reply.redirect(`/t/${lowerSlug}/${lowerLang}`, 301);
+    } else {
+      return reply.redirect(`/t/${lowerSlug}`, 301);
+    }
+  }
+
   if (!slug) {
     return reply.redirect('/');
   }
