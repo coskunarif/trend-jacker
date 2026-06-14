@@ -75,6 +75,7 @@ function initApp() {
     localStorage.setItem('clientId', storedClientId);
   }
   const localClientId = storedClientId;
+  const sessionPredictions = new Map();
 
   // Capture referral
   const urlParams = new URLSearchParams(window.location.search);
@@ -1633,7 +1634,7 @@ function initApp() {
         <div class="trend-item-info">
           <div style="display: flex; align-items: center; gap: 6px;">
             <span class="trend-category-emoji" style="font-size: 1.2rem;">${emoji}</span>
-            <span class="trend-item-title">${trend.title}</span>
+            <span class="trend-item-title trend-name">${trend.title}</span>
           </div>
           <div class="trend-meta-row" style="display: flex; align-items: center; gap: 6px;">
             ${faviconUrl ? `<img class="publisher-favicon" src="${faviconUrl}" alt="" onerror="this.style.display='none';" />` : ''}
@@ -2015,6 +2016,15 @@ function initApp() {
       predictionStatusMsg.textContent = `You predicted this trend will ${prediction === 'rise' ? 'Rise' : 'Fall'} tomorrow.`;
     }
 
+    const predictMsgEl = document.getElementById('chat-lock-prediction-message');
+    const predictBtnEl = document.getElementById('chat-lock-predict-btn');
+    if (predictMsgEl) {
+      predictMsgEl.textContent = `You predicted this trend will ${prediction.toLowerCase()} tomorrow. Correct predictions unlock +3 capacity!`;
+    }
+    if (predictBtnEl) {
+      predictBtnEl.style.display = 'none';
+    }
+
     if (prediction === 'rise') {
       if (btnPredictRise) btnPredictRise.classList.add('selected-rise');
       if (btnPredictFall) btnPredictFall.classList.remove('selected-fall');
@@ -2023,8 +2033,13 @@ function initApp() {
       if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
     }
 
-    // [AC-4] Lock prediction triggers immediate un-awaited call to checkChatLimit
-    checkChatLimit(currentTrend.title);
+    // Save prediction locally to merge with fetched results
+    sessionPredictions.set(currentTrend.title.toLowerCase(), {
+      trend: currentTrend.title,
+      prediction,
+      prediction_date: getLocalDateString(),
+      status: 'pending'
+    });
 
     try {
       const localDate = getLocalDateString();
@@ -2041,8 +2056,9 @@ function initApp() {
         })
       });
       
-      // Update history
+      // Update history and chat limit in proper order
       await fetchPredictionHistory();
+      await checkChatLimit(currentTrend.title);
     } catch (err) {
       console.error('Error submitting prediction:', err);
     }
@@ -2053,7 +2069,16 @@ function initApp() {
     try {
       const res = await fetch(`/api/predictions?clientId=${localClientId}`);
       if (res.ok) {
-        const predictions = await res.json();
+        let predictions = await res.json();
+        
+        // Merge with session predictions
+        const todayStr = getLocalDateString();
+        for (const [key, value] of sessionPredictions.entries()) {
+          const alreadyExists = predictions.some(p => p.trend.toLowerCase() === key && p.prediction_date === value.prediction_date);
+          if (!alreadyExists) {
+            predictions.push(value);
+          }
+        }
         
         // Update correct count
         const correctCount = predictions.filter(p => p.status === 'correct').length;
@@ -2096,9 +2121,11 @@ function initApp() {
         }
         
         // Check if prediction is already made today for the active trend
-        const todayStr = getLocalDateString();
         const activeTrendPrediction = predictions.find(p => p.trend.toLowerCase() === currentTrend.title.toLowerCase() && p.prediction_date === todayStr);
         
+        const predictMsgEl = document.getElementById('chat-lock-prediction-message');
+        const predictBtnEl = document.getElementById('chat-lock-predict-btn');
+
         if (activeTrendPrediction) {
           if (btnPredictRise) btnPredictRise.disabled = true;
           if (btnPredictFall) btnPredictFall.disabled = true;
@@ -2112,6 +2139,12 @@ function initApp() {
             if (btnPredictFall) btnPredictFall.classList.add('selected-fall');
             if (btnPredictRise) btnPredictRise.classList.remove('selected-rise');
           }
+          if (predictMsgEl) {
+            predictMsgEl.textContent = `You predicted this trend will ${activeTrendPrediction.prediction.toLowerCase()} tomorrow. Correct predictions unlock +3 capacity!`;
+          }
+          if (predictBtnEl) {
+            predictBtnEl.style.display = 'none';
+          }
         } else {
           if (btnPredictRise) {
             btnPredictRise.disabled = false;
@@ -2123,6 +2156,12 @@ function initApp() {
           }
           if (predictionStatusMsg) {
             predictionStatusMsg.textContent = '';
+          }
+          if (predictMsgEl) {
+            predictMsgEl.textContent = "Predict if this trend will Rise or Fall tomorrow to earn +3 capacity when correct!";
+          }
+          if (predictBtnEl) {
+            predictBtnEl.style.display = 'inline-block';
           }
         }
       }
@@ -3448,6 +3487,20 @@ function initApp() {
       }, 2000);
     }
   });
+
+  const chatLockPredictBtn = document.getElementById('chat-lock-predict-btn');
+  if (chatLockPredictBtn) {
+    chatLockPredictBtn.addEventListener('click', () => {
+      const predictionContainer = document.getElementById('prediction-card-container');
+      if (predictionContainer) {
+        predictionContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+      const riseBtn = document.querySelector('#prediction-card-container .btn-predict-rise');
+      if (riseBtn) {
+        riseBtn.focus();
+      }
+    });
+  }
 
   chatForm.addEventListener('submit', async (e) => {
     e.preventDefault();
