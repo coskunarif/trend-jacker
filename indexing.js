@@ -56,19 +56,6 @@ export async function pingSearchEngines(slugs) {
       console.warn(`[Indexing] IndexNow submission returned error (Status: ${response.status}):`, errorText);
     }
 
-    // 2. Optional Sitemap Ping to Google
-    const sitemapUrl = encodeURIComponent(`${protocol}://${APP_HOST}/sitemap.xml`);
-    const googlePingUrl = `https://www.google.com/ping?sitemap=${sitemapUrl}`;
-    
-    // We fire and forget the Google ping since they deprecated it and it might return 404/warning
-    fetch(googlePingUrl)
-      .then(res => {
-        console.log(`[Indexing] Google Sitemap ping responded with status: ${res.status}`);
-      })
-      .catch(err => {
-        console.warn('[Indexing] Google Sitemap ping failed:', err.message);
-      });
-
     return { success: response.ok, urls: urlList };
   } catch (err) {
     console.error('[Indexing] Error pinging search engines:', err.message);
