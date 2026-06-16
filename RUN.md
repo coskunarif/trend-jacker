@@ -1,5 +1,5 @@
 task: Consolidate search authority and eliminate duplicate listings | moves Google Search Console indexation | split GSC impressions across HTTP/HTTPS/WWW dilute ranking | runner-up: Structure content for AI search engine citations
-state: SHIP                 budget: repairs 0/3
+state: complete                 budget: repairs 0/3
 branch: asf/20260616-consolidate-authority          checkpoint: none
 caps: agents,ui,web,human
 
@@ -27,5 +27,23 @@ caps: agents,ui,web,human
   - All 277 Playwright E2E and unit tests passed cleanly. Automated dogfooding verification with `agent-browser` confirmed localhost bypasses redirects successfully. Dogfood report compiled and saved to `dogfood-output/20260616-consolidate-authority/report.md`.
 
 ## Done
+### Shipped Features
+Implemented application-level SEO canonicalization redirects (HTTP to HTTPS, WWW to non-WWW) with query/path preservation and local development/testing bypass, and removed deprecated Google sitemap ping code blocks.
 
+### Acceptance Criteria & Verification Evidence
 
+| Acceptance Criteria (AC) | Verification Method | Evidence (Relative Link / Result) |
+|---|---|---|
+| `[AC-1]` Protocol Redirect (HTTP to HTTPS) | Request header validation testing that HTTP protocol triggers a 301 redirect to the HTTPS equivalent. | [tests/seo-canonical-redirects.spec.js#L17-L43](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js#L17-L43) |
+| `[AC-2]` Hostname Redirect (WWW to non-WWW) | Request header validation testing that requests to `www.viraljacker.com` trigger a 301 redirect to `viraljacker.com`. | [tests/seo-canonical-redirects.spec.js#L50-L74](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js#L50-L74) |
+| `[AC-3]` Combined Redirect with Path/Query | Validation that combining protocol and hostname redirects correctly redirects to canonical URL while preserving path and query. | [tests/seo-canonical-redirects.spec.js#L81-L91](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js#L81-L91) |
+| `[AC-4]` Local Development Bypass | Request validation checking that `localhost` and `127.0.0.1` bypass redirects for local testing and E2E suites. | [tests/seo-canonical-redirects.spec.js#L97-L126](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js#L97-L126) |
+| `[AC-5]` Google Sitemap Ping Removal | Static and child process mock invocation check verifying that `indexing.js` contains no Google sitemap ping reference or request/logs, keeping IndexNow intact. | [tests/seo-canonical-redirects.spec.js#L132-L283](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js#L132-L283) |
+
+### Pull Request & Integration Details
+- **Pull Request**: [coskunarif/trend-jacker/pull/52](https://github.com/coskunarif/trend-jacker/pull/52)
+- **Integration Method**: Standard Merge (via `gh pr merge --merge`)
+- **Deployment Pipeline**: GitHub Actions deploy run triggered by merge on `main` branch.
+- **Visual Evidence**:
+  - Desktop Viewport: ![Desktop Layout](dogfood-output/20260616-consolidate-authority/screenshots/desktop_layout.png)
+  - Mobile Viewport: ![Mobile Layout](dogfood-output/20260616-consolidate-authority/screenshots/mobile_layout.png)
