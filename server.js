@@ -97,6 +97,24 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
 const fastify = Fastify({ logger: true });
 
+fastify.addHook('onRequest', async (request, reply) => {
+  const host = request.headers.host || '';
+  if (/localhost|127\.0\.0\.1/.test(host)) {
+    return;
+  }
+
+  const protocol = request.headers['x-forwarded-proto'] || (request.raw.encrypted ? 'https' : 'http');
+  const isHttp = protocol === 'http';
+  const isWww = host.toLowerCase().startsWith('www.');
+
+  if (isHttp || isWww) {
+    const cleanHost = host.replace(/^www\./i, '') || 'viraljacker.com';
+    const redirectUrl = `https://${cleanHost}${request.raw.url}`;
+    reply.header('Location', redirectUrl);
+    return reply.status(301).send();
+  }
+});
+
 // GET /index.html - Redirects to / with 301 status
 fastify.get('/index.html', async (request, reply) => {
   return reply.redirect('/', 301);
