@@ -823,7 +823,8 @@ function initApp() {
       triviaScore: (score, total) => `You scored ${score} out of ${total}`,
       triviaPlayAgain: "Play Again",
       triviaShareScore: "Share Score",
-      triviaHeader: "Trivia Challenge"
+      triviaHeader: "Trivia Challenge",
+      directoryLinkText: "Historical Trends Directory"
     },
     es: {
       whatIsIt: "¿Qué es?",
@@ -843,7 +844,8 @@ function initApp() {
       triviaScore: (score, total) => `Tu puntuación es ${score} de ${total}`,
       triviaPlayAgain: "Jugar de Nuevo",
       triviaShareScore: "Compartir Puntuación",
-      triviaHeader: "Desafío de Trivia"
+      triviaHeader: "Desafío de Trivia",
+      directoryLinkText: "Directorio de Tendencias Históricas"
     },
     fr: {
       whatIsIt: "Qu'est-ce que c'est ?",
@@ -863,7 +865,8 @@ function initApp() {
       triviaScore: (score, total) => `Votre score est de ${score} sur ${total}`,
       triviaPlayAgain: "Rejouer",
       triviaShareScore: "Partager le Score",
-      triviaHeader: "Défi Trivia"
+      triviaHeader: "Défi Trivia",
+      directoryLinkText: "Annuaire des Tendances Historiques"
     },
     ja: {
       whatIsIt: "概要",
@@ -883,12 +886,23 @@ function initApp() {
       triviaScore: (score, total) => `${total}問中 ${score}問正解`,
       triviaPlayAgain: "もう一度プレイ",
       triviaShareScore: "スコアを共有",
-      triviaHeader: "トリビアチャレンジ"
+      triviaHeader: "トリビアチャレンジ",
+      directoryLinkText: "歴史的トレンドディレクトリ"
     }
   };
 
   function translateUI(lang) {
     const dict = UI_DICTIONARY[lang] || UI_DICTIONARY['en'];
+    
+    const directoryLink = document.getElementById('directory-link');
+    if (directoryLink) {
+      directoryLink.textContent = dict.directoryLinkText || "Historical Trends Directory";
+      if (lang === 'en') {
+        directoryLink.setAttribute('href', '/directory');
+      } else {
+        directoryLink.setAttribute('href', `/directory/${lang}`);
+      }
+    }
     
     const labelWhat = document.getElementById('label-what');
     if (labelWhat) labelWhat.textContent = dict.whatIsIt;
