@@ -8,7 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -98,6 +98,18 @@ const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 const fastify = Fastify({ logger: true });
 
 fastify.addHook('onRequest', async (request, reply) => {
+  const url = request.raw.url || '';
+  const [pathPart, queryPart] = url.split('?');
+  const pathname = pathPart;
+  const pathnameLower = pathname.toLowerCase();
+  
+  if (pathnameLower === '/directory' || pathnameLower.startsWith('/directory/')) {
+    if (/[A-Z]/.test(pathname)) {
+      const redirectUrl = queryPart ? `${pathnameLower}?${queryPart}` : pathnameLower;
+      return reply.redirect(redirectUrl, 301);
+    }
+  }
+
   const host = request.headers.host || '';
   if (/localhost|127\.0\.0\.1/.test(host)) {
     return;
@@ -1616,27 +1628,57 @@ fastify.get('/llms.txt', async (request, reply) => {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
+    const dbTrends = await getAllCachedExplanations();
+    
     let md = `# TrendJacker\n`;
     md += `> TrendJacker is a dynamic viral trend explainer platform summarizing what is trending and why.\n\n`;
     md += `## Trends\n`;
+    
     const seenSlugs = new Set();
-    const uniqueTrends = latestTrends.filter(trend => {
-      const slug = titleToSlug(trend.title);
-      if (seenSlugs.has(slug)) {
-        return false;
+    const uniqueSlugs = [];
+    
+    // Add live trends first to preserve their order and capitalization
+    for (const liveT of latestTrends) {
+      const slug = titleToSlug(liveT.title);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
       }
-      seenSlugs.add(slug);
-      return true;
-    });
-    for (const trend of uniqueTrends) {
-      const slug = titleToSlug(trend.title);
-      const desc = trend.description || 'No description available.';
+    }
+    
+    // Then add db trends
+    for (const dbT of dbTrends) {
+      const slug = titleToSlug(dbT.trend);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
+      }
+    }
+    
+    for (const slug of uniqueSlugs) {
+      const liveMatch = latestTrends.find(t => titleToSlug(t.title) === slug);
+      const dbMatch = dbTrends.find(dbT => titleToSlug(dbT.trend) === slug);
+      
+      let title = '';
+      let desc = '';
+      let news = null;
+      
+      if (liveMatch) {
+        title = liveMatch.title;
+        desc = liveMatch.description || 'No description available.';
+        news = liveMatch.news || null;
+      } else if (dbMatch) {
+        title = dbMatch.trend;
+        const expl = dbMatch.explanation || {};
+        desc = expl.whatIsIt || expl.hook || 'No description available.';
+      }
+      
       let citationPart = '';
-      if (trend.news && trend.news.url) {
-        citationPart = `(Source: [${trend.news.source || 'News Source'}](${trend.news.url}))`;
+      if (news && news.url) {
+        citationPart = `(Source: [${news.source || 'News Source'}](${news.url}))`;
       } else {
-        const titleLower = (trend.title || '').toLowerCase();
-        if (titleLower.includes('reddit') || trend.source === 'reddit') {
+        const titleLower = title.toLowerCase();
+        if (titleLower.includes('reddit')) {
           citationPart = '(Source: [Reddit - r/popular](https://reddit.com/r/popular))';
         } else {
           citationPart = '(Source: Google Trends Search Spike)';
@@ -1644,6 +1686,7 @@ fastify.get('/llms.txt', async (request, reply) => {
       }
       md += `- [/t/${slug}.md](/t/${slug}.md) - ${desc} ${citationPart}\n`;
     }
+    
     reply.header('Content-Type', 'text/plain');
     return md;
   } catch (err) {
@@ -1659,62 +1702,95 @@ fastify.get('/llms-full.txt', async (request, reply) => {
       await updateTrendsCache();
     }
     
-    let md = `# TrendJacker - Full Content\n\n`;
-    
+    const dbTrends = await getAllCachedExplanations();
     const seenSlugs = new Set();
-    const uniqueTrends = latestTrends.filter(trend => {
-      const slug = titleToSlug(trend.title);
-      if (seenSlugs.has(slug)) {
-        return false;
+    const uniqueSlugs = [];
+    
+    // Add live trends first to preserve order and capitalization
+    for (const liveT of latestTrends) {
+      const slug = titleToSlug(liveT.title);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
       }
-      seenSlugs.add(slug);
-      return true;
-    });
-
-    const trendsExplanations = await Promise.all(
-      uniqueTrends.map(async (trend) => {
-        const headline = trend.news?.headline || '';
-        const snippet = trend.news?.snippet || '';
-        let explanation;
+    }
+    
+    // Then add db trends
+    for (const dbT of dbTrends) {
+      const slug = titleToSlug(dbT.trend);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
+      }
+    }
+    
+    const combinedList = [];
+    for (const slug of uniqueSlugs) {
+      const liveMatch = latestTrends.find(t => titleToSlug(t.title) === slug);
+      const dbMatch = dbTrends.find(dbT => titleToSlug(dbT.trend) === slug);
+      
+      let title = '';
+      let snippet = '';
+      let news = null;
+      let explanation = null;
+      
+      if (liveMatch) {
+        title = liveMatch.title;
+        news = liveMatch.news || null;
+        snippet = news?.snippet || '';
+        
+        const headline = news?.headline || '';
         try {
-          explanation = await getTrendExplanation(trend.title, headline, snippet);
+          explanation = await getTrendExplanation(title, headline, snippet);
         } catch (err) {
           explanation = {
-            hook: `Why is everyone talking about ${trend.title}?`,
-            whatIsIt: `Trending search topic: ${trend.title}.`,
+            hook: `Why is everyone talking about ${title}?`,
+            whatIsIt: `Trending search topic: ${title}.`,
             whyIsItViral: [`High volume search interest on Google Trends.`],
             takeaway: `Keep an eye on this trend as it develops.`,
             polls: { overrated: 0, genius: 0 }
           };
         }
-        return { trend, explanation };
-      })
-    );
+      } else if (dbMatch) {
+        title = dbMatch.trend;
+        explanation = dbMatch.explanation || {};
+      }
+      
+      combinedList.push({
+        title,
+        explanation,
+        news,
+        snippet
+      });
+    }
     
-    for (const { trend, explanation } of trendsExplanations) {
+    let md = `# TrendJacker - Full Content\n\n`;
+    for (const item of combinedList) {
       let sourceLine = '';
-      if (trend.news && trend.news.url) {
-        sourceLine = `Source: [${trend.news.source || 'News Source'} - ${trend.news.headline || 'Headline'}](${trend.news.url})`;
+      if (item.news && item.news.url) {
+        sourceLine = `Source: [${item.news.source || 'News Source'} - ${item.news.headline || 'Headline'}](${item.news.url})`;
       } else {
-        const titleLower = (trend.title || '').toLowerCase();
-        if (titleLower.includes('reddit') || trend.source === 'reddit') {
+        const titleLower = (item.title || '').toLowerCase();
+        if (titleLower.includes('reddit')) {
           sourceLine = 'Source: [Reddit - r/popular](https://reddit.com/r/popular)';
         } else {
           sourceLine = 'Source: Google Trends Search Spike';
         }
       }
-
-      md += `## ${trend.title}\n`;
+      
+      const expl = item.explanation || {};
+      
+      md += `## ${item.title}\n`;
       md += `${sourceLine}\n\n`;
-      md += `Snippet: ${trend.news?.snippet || ''}\n`;
-      md += `Explanation: ${explanation.whatIsIt || ''}\n`;
+      md += `Snippet: ${item.snippet || ''}\n`;
+      md += `Explanation: ${expl.whatIsIt || ''}\n`;
       md += `Why it is viral:\n`;
-      if (explanation.whyIsItViral && Array.isArray(explanation.whyIsItViral)) {
-        for (const viralReason of explanation.whyIsItViral) {
+      if (expl.whyIsItViral && Array.isArray(expl.whyIsItViral)) {
+        for (const viralReason of expl.whyIsItViral) {
           md += `- ${viralReason}\n`;
         }
       }
-      md += `Takeaway: ${explanation.takeaway || ''}\n\n`;
+      md += `Takeaway: ${expl.takeaway || ''}\n\n`;
     }
     
     reply.header('Content-Type', 'text/plain');
@@ -1731,12 +1807,28 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     if (latestTrends.length === 0) {
       await updateTrendsCache();
     }
-    const slugs = [...new Set(latestTrends.map(item => titleToSlug(item.title)))];
+    const dbTrends = await getAllCachedExplanations();
+    
+    const seenSlugs = new Set();
+    const uniqueSlugs = [];
+    
+    for (const dbT of dbTrends) {
+      const slug = titleToSlug(dbT.trend);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
+      }
+    }
+    
+    for (const liveT of latestTrends) {
+      const slug = titleToSlug(liveT.title);
+      if (!seenSlugs.has(slug)) {
+        seenSlugs.add(slug);
+        uniqueSlugs.push(slug);
+      }
+    }
 
-    const host = process.env.APP_HOST || 'viraljacker.com';
-    const protocol = process.env.APP_PROTOCOL || (host.includes('localhost') || host.includes('127.0.0.1') ? 'http' : 'https');
-    const canonicalBase = `${protocol}://${host}`;
-
+    const canonicalBase = 'https://viraljacker.com';
     let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n`;
     
@@ -1747,9 +1839,27 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     xml += `    <priority>1.0</priority>\n`;
     xml += `  </url>\n`;
     
-    // Add trend pages for each locale (en, es, fr, ja)
+    // Add directory page entries for each language variant
     const locales = ['en', 'es', 'fr', 'ja'];
-    for (const slug of slugs) {
+    for (const lang of locales) {
+      const loc = lang === 'en'
+        ? `${canonicalBase}/directory`
+        : `${canonicalBase}/directory/${lang}`;
+      
+      xml += `  <url>\n`;
+      xml += `    <loc>${loc}</loc>\n`;
+      xml += `    <changefreq>daily</changefreq>\n`;
+      xml += `    <priority>0.8</priority>\n`;
+      xml += `    <xhtml:link rel="alternate" hreflang="x-default" href="${canonicalBase}/directory" />\n`;
+      xml += `    <xhtml:link rel="alternate" hreflang="en" href="${canonicalBase}/directory" />\n`;
+      xml += `    <xhtml:link rel="alternate" hreflang="es" href="${canonicalBase}/directory/es" />\n`;
+      xml += `    <xhtml:link rel="alternate" hreflang="fr" href="${canonicalBase}/directory/fr" />\n`;
+      xml += `    <xhtml:link rel="alternate" hreflang="ja" href="${canonicalBase}/directory/ja" />\n`;
+      xml += `  </url>\n`;
+    }
+    
+    // Add trend pages for each language variant
+    for (const slug of uniqueSlugs) {
       for (const lang of locales) {
         const loc = lang === 'en'
           ? `${canonicalBase}/t/${slug}`
@@ -1775,6 +1885,174 @@ fastify.get('/sitemap.xml', async (request, reply) => {
     fastify.log.error(err);
     return reply.status(500).send('Error generating sitemap');
   }
+});
+
+async function serveDirectory(request, reply, lang) {
+  try {
+    if (latestTrends.length === 0) {
+      await updateTrendsCache();
+    }
+    
+    const dbTrends = await getAllCachedExplanations();
+    
+    const seenSlugs = new Set();
+    const mergedTrends = [];
+    
+    function addTrend(title, slug) {
+      const lowerSlug = slug.toLowerCase();
+      if (!seenSlugs.has(lowerSlug)) {
+        seenSlugs.add(lowerSlug);
+        mergedTrends.push({ title, slug: lowerSlug });
+      }
+    }
+    
+    for (const dbT of dbTrends) {
+      const slug = titleToSlug(dbT.trend);
+      addTrend(dbT.trend, slug);
+    }
+    
+    for (const liveT of latestTrends) {
+      const slug = titleToSlug(liveT.title);
+      addTrend(liveT.title, slug);
+    }
+    
+    const locales = {
+      en: {
+        title: "Historical Trends Directory | TrendJacker",
+        description: "Discover the history and explanation of recent viral trends indexed by TrendJacker.",
+        headerTitle: "Historical Trends Directory",
+        descriptionText: "Browse our archive of historical search trends and topics explained by AI.",
+        footerLinkText: "Historical Trends Directory"
+      },
+      es: {
+        title: "Directorio de Tendencias Históricas | TrendJacker",
+        description: "Descubre la historia y explicación de las tendencias virales recientes indexadas por TrendJacker.",
+        headerTitle: "Directorio de Tendencias Históricas",
+        descriptionText: "Explore nuestro archivo de tendencias de búsqueda históricas explicadas por IA.",
+        footerLinkText: "Directorio de Tendencias Históricas"
+      },
+      fr: {
+        title: "Annuaire des Tendances Historiques | TrendJacker",
+        description: "Découvrez l'historique et l'explication des tendances virales récentes indexées par TrendJacker.",
+        headerTitle: "Annuaire des Tendances Historiques",
+        descriptionText: "Parcourez notre archive de tendances de recherche historiques expliquées par l'IA.",
+        footerLinkText: "Annuaire des Tendances Historiques"
+      },
+      ja: {
+        title: "歴史的トレンドディレクトリ | TrendJacker",
+        description: "TrendJackerがインデックスした最近のバイラルトレンドの歴史と解説をご覧ください。",
+        headerTitle: "歴史的トレンドディレクトリ",
+        descriptionText: "AIによって解説された過去の検索トレンドとトピックのアーカイブを閲覧する。",
+        footerLinkText: "歴史的トレンドディレクトリ"
+      }
+    };
+    
+    const content = locales[lang] || locales['en'];
+    const langSuffix = lang === 'en' ? '' : `/${lang}`;
+    const canonicalBase = 'https://viraljacker.com';
+    const canonicalUrl = `${canonicalBase}/directory${langSuffix}`;
+    
+    const jsonLd = {
+      "@context": "https://schema.org",
+      "@type": "CollectionPage",
+      "name": content.headerTitle,
+      "description": content.description,
+      "url": canonicalUrl,
+      "mainEntityOfPage": canonicalUrl,
+      "itemListElement": mergedTrends.map((t, idx) => ({
+        "@type": "ListItem",
+        "position": idx + 1,
+        "url": `${canonicalBase}/t/${t.slug}${langSuffix}`
+      }))
+    };
+    
+    const alternateLinks = `
+  <link rel="alternate" hreflang="x-default" href="${canonicalBase}/directory" />
+  <link rel="alternate" hreflang="en" href="${canonicalBase}/directory" />
+  <link rel="alternate" hreflang="es" href="${canonicalBase}/directory/es" />
+  <link rel="alternate" hreflang="fr" href="${canonicalBase}/directory/fr" />
+  <link rel="alternate" hreflang="ja" href="${canonicalBase}/directory/ja" />
+`;
+
+    const html = `<!DOCTYPE html>
+<html lang="${lang}">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="dark">
+  <title>${content.title}</title>
+  <meta name="description" content="${content.description}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="canonical" href="${canonicalUrl}" />
+  ${alternateLinks}
+  <script type="application/ld+json">
+    ${JSON.stringify(jsonLd, null, 2)}
+  </script>
+  <script>
+    document.documentElement.style.colorScheme = 'dark';
+  </script>
+</head>
+<body>
+  <!-- Floating Top Navbar -->
+  <header class="navbar">
+    <div style="display: flex; align-items: center; gap: var(--space-2);">
+      <a href="/" class="brand" style="text-decoration: none;">
+        <div class="logo-glow"></div>
+        <span class="logo-text">Trend<span class="gradient-text">Jacker</span></span>
+        <span class="version-tag">PoC</span>
+      </a>
+    </div>
+  </header>
+
+  <main style="max-width: 800px; margin: 80px auto var(--space-8) auto; padding: 0 var(--space-4);">
+    <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 2rem; margin-bottom: var(--space-2); color: var(--text-color);">${content.headerTitle}</h1>
+    <p style="color: var(--text-muted); margin-bottom: var(--space-6); font-size: 1.1rem;">${content.descriptionText}</p>
+    <ul style="list-style: none; padding: 0; display: flex; flex-direction: column; gap: var(--space-3);">
+      ${mergedTrends.map(t => `
+        <li style="padding: var(--space-3); border: 1px solid var(--border-color); border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.02); transition: background 0.2s, border-color 0.2s;">
+          <a href="/t/${t.slug}${langSuffix}" style="font-size: 1.15rem; font-weight: 600; color: var(--primary); text-decoration: none; display: block;">${t.title}</a>
+        </li>
+      `).join('')}
+    </ul>
+  </main>
+
+  <footer style="text-align: center; padding: var(--space-6) 0; border-top: 1px solid var(--border-color); margin-top: var(--space-8);">
+    <a href="/directory${langSuffix}" id="directory-link" style="color: var(--text-muted); text-decoration: none;">${content.footerLinkText}</a>
+  </footer>
+</body>
+</html>`;
+
+    const linkHeader = [
+      `<${canonicalBase}/directory${langSuffix}>; rel="canonical"`,
+      `<${canonicalBase}/directory>; rel="alternate"; hreflang="x-default"`,
+      `<${canonicalBase}/directory>; rel="alternate"; hreflang="en"`,
+      `<${canonicalBase}/directory/es>; rel="alternate"; hreflang="es"`,
+      `<${canonicalBase}/directory/fr>; rel="alternate"; hreflang="fr"`,
+      `<${canonicalBase}/directory/ja>; rel="alternate"; hreflang="ja"`
+    ].join(', ');
+    
+    reply.type('text/html').header('Link', linkHeader).send(html);
+  } catch (err) {
+    fastify.log.error(err);
+    return reply.status(500).send('Error generating directory page');
+  }
+}
+
+fastify.get('/directory', async (request, reply) => {
+  return serveDirectory(request, reply, 'en');
+});
+
+fastify.get('/directory/:lang', async (request, reply) => {
+  const { lang } = request.params;
+  const cleanLang = (lang || '').trim().toLowerCase();
+  const supported = ['es', 'fr', 'ja'];
+  if (!supported.includes(cleanLang)) {
+    return reply.redirect('/directory', 301);
+  }
+  return serveDirectory(request, reply, cleanLang);
 });
 
 // GET /api/chat-limit - Check chat limit and current counts
