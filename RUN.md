@@ -20,4 +20,12 @@ caps: agents,ui,web,human
 
 ## Verdict
 
+All checks passed successfully.
+- **[AC-1] Database helper**: PASS. Verified SQLite querying and sorted array structure returned from `getAllCachedExplanations()`.
+- **[AC-2] Directory Page Routes and Lowercase Path Normalization**: PASS. Enforces lowercase casing normalization with 301 redirects (e.g. `/Directory` redirects to `/directory`, `/directory/ES` redirects to `/directory/es`), and redirects unsupported languages to `/directory`.
+- **[AC-3] Directory SEO, Alternate Links, and JSON-LD**: PASS. Localized head tags (title, description), hreflang alternatives (x-default, en, es, fr, ja), alternate `Link` headers, and `CollectionPage` structured schema are correctly generated and verified.
+- **[AC-4] Comprehensive sitemap.xml Integration**: PASS. Correctly integrates unique trends and sitemap directory urls in all language sub-paths with all alternate language codes.
+- **[AC-5] llms.txt and llms-full.txt Sitemap Consolidation**: PASS. Correctly returns text formatting list (with source citations) and compiles full content.
+- **[AC-6] Global Footer Links and Client Translation Hydration**: PASS. Footer selector correctly targets `#directory-link` and hydrates text and href for localized directories on the frontend.
+
 ## Done
