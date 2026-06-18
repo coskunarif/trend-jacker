@@ -2172,3 +2172,65 @@ export async function getClientAchievements(clientId) {
   return result;
 }
 
+/**
+ * Retrieves all cached explanations from the database, sorted by created_at DESC.
+ * @returns {Promise<Array<{ trend: string, created_at: string, explanation: object }>>}
+ */
+export async function getAllCachedExplanations() {
+  if (firestore) {
+    try {
+      const snapshot = await firestore
+        .collection('trend_explanations')
+        .orderBy('created_at', 'desc')
+        .get();
+      const results = [];
+      for (const doc of snapshot.docs) {
+        const data = doc.data();
+        results.push({
+          trend: doc.id,
+          created_at: data.created_at || '',
+          explanation: {
+            hook: data.hook,
+            whatIsIt: data.whatIsIt,
+            whyIsItViral: data.whyIsItViral || [],
+            takeaway: data.takeaway,
+            continuationProbability: data.continuationProbability,
+            continuationRationale: data.continuationRationale
+          }
+        });
+      }
+      return results;
+    } catch (err) {
+      console.error('Firestore error in getAllCachedExplanations:', err.message);
+      return [];
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const stmt = sqliteDb.prepare('SELECT trend, explanation, created_at FROM trend_explanations ORDER BY created_at DESC');
+      const rows = stmt.all();
+      return rows.map(row => ({
+        trend: row.trend,
+        created_at: row.created_at || '',
+        explanation: JSON.parse(row.explanation)
+      }));
+    } catch (err) {
+      console.error('Local SQLite query failed for getAllCachedExplanations:', err.message);
+      return [];
+    }
+  }
+
+  // In-memory fallback
+  const list = [];
+  for (const [trend, value] of inMemoryExplanations.entries()) {
+    list.push({
+      trend: trend,
+      created_at: value.created_at || '',
+      explanation: { ...value.explanation }
+    });
+  }
+  list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return list;
+}
+

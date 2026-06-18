@@ -1,68 +1,133 @@
-# Specification: Consolidate Search Authority and Eliminate Duplicate Listings
+# SPEC: Historical Trend Content Discovery Directory
 
-Consolidate Search Engine Optimization (SEO) rankings by redirecting all non-canonical hostname and protocol variations to the canonical domain (`https://viraljacker.com/`), and remove deprecated Google sitemap ping code blocks.
+## Problem Statement
+Historical trend content exists in the database but lacks internal links or persistent sitemap representation, rendering it inaccessible to search crawlers and AI search engine discovery mechanisms. We need to implement a content discovery directory to index historical trend explanations and increase search crawler coverage.
+
+## Test Strategy
+- **Strategy Type**: Additive.
+- **Process**: The Tester will write tests first (e.g., in `tests/directory.spec.js`) to assert the behavior of the new endpoints, redirects, SEO markup, JSON-LD structure, sitemap consolidation, and translation hydration. Once tests are in place, the Builder will implement the code slices to pass the test suite.
+
+---
 
 ## Acceptance Criteria
 
-### [AC-1] Protocol Redirect (HTTP to HTTPS)
-- **Criterion**: Accessing the application via HTTP must trigger a 301 permanent redirect to the corresponding HTTPS URL.
-- **Verification**: Sending a GET request to `/` or `/t/google-gemini` with `X-Forwarded-Proto: http` or an unencrypted request protocol returns a `301 Moved Permanently` response with the `Location` header pointing to `https://viraljacker.com/` or `https://viraljacker.com/t/google-gemini`.
+### `[AC-1]` Database helper for historical trend list
+- A new function `getAllCachedExplanations()` must be exported from `db.js`.
+- It must fetch all cached explanations from the database:
+  - If `firestore` is active, query the Firestore `trend_explanations` collection and return all documents.
+  - If `sqliteDb` is active, query the `trend_explanations` table (columns: `trend`, `explanation`, `created_at`) ordered by `created_at DESC` and parse the explanation JSON string.
+  - If using in-memory fallback, return a copy of all entries in `inMemoryExplanations` sorted by `created_at` DESC.
+- The returned array must consist of objects matching the structure: `{ trend: string, created_at: string, explanation: object }`.
+- **How to test**: Import `getAllCachedExplanations` in a Node environment or test script, seed the database with mock trends, and assert that the returned array contains all seeded trends.
 
-### [AC-2] Hostname Redirect (WWW to non-WWW)
-- **Criterion**: Accessing the application via `www.viraljacker.com` must trigger a 301 permanent redirect to the corresponding canonical root domain (`viraljacker.com`).
-- **Verification**: Sending a GET request to `/` or `/t/google-gemini` with the header `Host: www.viraljacker.com` returns a `301 Moved Permanently` response with the `Location` header pointing to `https://viraljacker.com/` or `https://viraljacker.com/t/google-gemini`.
+### `[AC-2]` Directory Page Routes and Lowercase Path Normalization
+- The server must handle requests to `/directory` and `/directory/:lang`.
+- Route matching and redirection must enforce lowercase casing normalization. Any uppercase letters in path parameters (e.g. `/Directory`, `/directory/ES`, `/directory/Fr`) must trigger a 301 redirect to the fully lowercased path (e.g., `/directory`, `/directory/es`, `/directory/fr`).
+- If the `lang` parameter is passed but is not in the supported list `['es', 'fr', 'ja']` (e.g., `en`, `de`), the server must 301 redirect the request to `/directory`.
+- The directory page must render as a server-side generated semantic HTML document. It must merge trends from the database (`getAllCachedExplanations()`) with live trends (`latestTrends`), deduplicate them by their slug (lowercased, formatted via `titleToSlug`), and render a clean list of hyperlinks.
+  - On `/directory` (English/default), links must point to `/t/:slug`.
+  - On `/directory/:lang`, links must point to `/t/:slug/:lang`.
+- **How to test**: Send GET requests to mixed-case, unsupported lang, and canonical directory URLs, asserting 301 status, redirect locations, 200 status, and link structures.
 
-### [AC-3] Combined Protocol and Hostname Redirect preserving Path and Query
-- **Criterion**: Incoming requests on non-canonical hostnames (e.g., WWW) and/or non-canonical protocols (HTTP) must be permanently redirected (301) to the canonical root domain while preserving the original request path and any URL query parameters.
-- **Verification**: Sending a GET request to `/t/google-gemini?ref=viral` with both `Host: www.viraljacker.com` and `X-Forwarded-Proto: http` returns a `301 Moved Permanently` response with the `Location` header exactly equal to `https://viraljacker.com/t/google-gemini?ref=viral`.
+### `[AC-3]` Directory SEO, Alternate Links, and JSON-LD
+- The directory HTML response must contain the following tags in the `<head>`:
+  - `<title>` tag with localized title (e.g. "Historical Trends Directory | TrendJacker" for `en`, "Directorio de Tendencias Históricas | TrendJacker" for `es`, "Annuaire des Tendances Historiques | TrendJacker" for `fr`, "歴史的トレンドディレクトリ | TrendJacker" for `ja`).
+  - `<meta name="description">` with localized content.
+  - Canonical tag: `<link rel="canonical" href="https://viraljacker.com/directory[/:lang]" />` (correct host and lowercased).
+  - Alternate hreflangs for auto-discovery:
+    - `<link rel="alternate" hreflang="x-default" href="https://viraljacker.com/directory" />`
+    - `<link rel="alternate" hreflang="en" href="https://viraljacker.com/directory" />`
+    - `<link rel="alternate" hreflang="es" href="https://viraljacker.com/directory/es" />`
+    - `<link rel="alternate" hreflang="fr" href="https://viraljacker.com/directory/fr" />`
+    - `<link rel="alternate" hreflang="ja" href="https://viraljacker.com/directory/ja" />`
+  - A script tag containing Schema.org JSON-LD structured data of type `CollectionPage` or `ItemList` listing the directory name, description, canonical url, and the list of item links.
+  - Response headers must include a `Link` header containing the canonical URL as `rel="canonical"` and alternate link headers for the language variants.
+- **How to test**: Use Playwright/request assertions to fetch `/directory` and `/directory/:lang`, parse the HTML, verify tags and alternate link structures, and parse/validate the script tag's JSON-LD properties.
 
-### [AC-4] Local Development and Test Bypass
-- **Criterion**: Requests containing `localhost` or `127.0.0.1` in the Host header must bypass redirect logic to ensure local development, manual verification, and local automated test suites run without redirecting to the production domain.
-- **Verification**: Sending a GET request with `Host: localhost:3001` or `Host: 127.0.0.1:3001` returns a `200 OK` (or other appropriate status) without a 301 redirect.
+### `[AC-4]` Comprehensive sitemap.xml Integration
+- The `/sitemap.xml` endpoint must fetch all historical trends from the database using `getAllCachedExplanations()`, blend them with `latestTrends`, deduplicate by slug, and include every unique trend slug in the sitemap.
+- For each unique trend, the sitemap must include elements for all supported language variants:
+  - English at `/t/:slug` (with `xhtml:link` pointing to alternates for `x-default`, `en`, `es`, `fr`, `ja`).
+  - Spanish at `/t/:slug/es` (with corresponding alternates).
+  - French at `/t/:slug/fr` (with corresponding alternates).
+  - Japanese at `/t/:slug/ja` (with corresponding alternates).
+- The `/sitemap.xml` must also include entries for the new `/directory` and `/directory/:lang` routes (for all 4 language variants).
+- All entries must be deduplicated (no duplicate `<loc>` elements or duplicate alternate links).
+- **How to test**: Fetch `/sitemap.xml`, parse the XML using an XML parser, and assert presence of historical trend paths and unique alternate elements.
 
-### [AC-5] Google Sitemap Ping Removal
-- **Criterion**: All deprecated Google sitemap ping requests are removed from the indexing service.
-- **Verification**: The file `indexing.js` must not contain any reference to `google.com/ping`, and execution of the `pingSearchEngines` function must not trigger any console logs or external network requests to `google.com/ping`, while preserving IndexNow API submissions.
+### `[AC-5]` llms.txt and llms-full.txt Sitemap Consolidation
+- The `/llms.txt` and `/llms-full.txt` endpoints must incorporate all historical trend explanations from the database combined with `latestTrends`.
+- Both lists must be deduplicated by slug to prevent duplicate records.
+- `/llms.txt` must format links as `- [/t/${slug}.md](/t/${slug}.md) - ${desc} (Source: ...)` for all combined trends.
+- `/llms-full.txt` must compile the full markdown representation of all trends in the combined list.
+- **How to test**: Send requests to `/llms.txt` and `/llms-full.txt`, asserting the presence of historical trends and the absence of duplicate titles/headings.
+
+### `[AC-6]` Global Footer Links and Client Translation Hydration
+- A footer section must be appended to the root layout in `public/index.html` containing a link to `/directory` with `id="directory-link"`.
+- In `public/app.js`, the `UI_DICTIONARY` must be updated with `directoryLinkText` translation strings for `en`, `es`, `fr`, and `ja`.
+- The `translateUI` function must select `#directory-link`, update its text content with the translated string, and dynamically rewrite its `href` attribute to match the active language: `/directory` for English, and `/directory/:lang` for `es`, `fr`, `ja`.
+- **How to test**: Load the root page `/` in Playwright, select different languages from the language selector, and verify that `#directory-link` text and `href` reflect the selection.
 
 ---
 
 ## Interface Contract
 
-The Tester and Builder must share the following files and functions:
+1. **Database Export (`db.js`)**:
+   - `export async function getAllCachedExplanations(): Promise<Array<{ trend: string, created_at: string, explanation: object }>>`
 
-### 1. `server.js`
-- Fastify server configuration must register a hook/middleware executing early in the request lifecycle (e.g., `onRequest` hook).
-- Signature for hook/middleware:
-  ```javascript
-  fastify.addHook('onRequest', async (request, reply) => {
-    // Protocol/Host redirect logic
-  });
-  ```
-- Local dev bypass rule: Checks if `request.headers.host` matches `/localhost|127\.0\.0\.1/`.
-
-### 2. `indexing.js`
-- Export signature of `pingSearchEngines` remains unchanged:
-  ```typescript
-  export async function pingSearchEngines(slugs: string[]): Promise<{ success: boolean, urls: string[] }>
-  ```
-- Google sitemap ping block is removed.
+2. **Routes/Paths (`server.js` & `public/app.js`)**:
+   - Directory paths: `/directory` (English), `/directory/es` (Spanish), `/directory/fr` (French), `/directory/ja` (Japanese)
+   - Dynamic parameters casing: Case-insensitive match, 301 redirect to lowercase version.
+   - Root Footer link ID: `#directory-link`
+   - UI translation dictionary keys under `UI_DICTIONARY`: `directoryLinkText` (Type: string)
 
 ---
 
 ## Out of Scope
-- Implementing DNS-level redirects (e.g., Cloudflare page rules) as redirects must be handled at the application server level.
-- Redirecting other local testing ports or staging URLs unless they explicitly contain `localhost` or `127.0.0.1`.
+- Scraping or generating explanations for new trends within the directory route.
+- Interactive user voting or chat controls inside the directory list view.
+- CSS/style themes other than matching the current dashboard stylesheet.
 
 ---
 
 ## Slices
 
-### [S-1] Subtractive: Remove Deprecated Google Sitemap Ping (Independent)
-- **Target File**: `indexing.js`
-- **AC Mapping**: `[AC-5]`
-- **Description**: Delete the Google sitemap ping block from `indexing.js`.
+### `[S-1]` Database helper: `getAllCachedExplanations()`
+- Add `getAllCachedExplanations` to `db.js`.
+- Implements Firestore query, SQLite query, and memory fallback.
+- **Files**: `db.js`
+- **AC Mapped**: `[AC-1]`
+- **Dependencies**: None. (Independent)
 
-### [S-2] Refinement: Implement HTTPS and WWW Redirects in Fastify (Independent)
-- **Target File**: `server.js`
-- **AC Mapping**: `[AC-1]`, `[AC-2]`, `[AC-3]`, `[AC-4]`
-- **Description**: Add an `onRequest` Fastify hook to redirect non-canonical hostname and protocol variants to `https://viraljacker.com/` while preserving request path and query parameters, and bypassing for local testing on `localhost`/`127.0.0.1`.
+### `[S-2]` Server-side Directory route implementation & lowercasing redirects
+- Add `/directory` and `/directory/:lang` route handlers to `server.js`.
+- Add mixed-case 301 redirection logic to lowercase canonical route.
+- Serve HTML with merged `latestTrends` and historical explanations, deduplicated.
+- **Files**: `server.js`
+- **AC Mapped**: `[AC-2]`
+- **Dependencies**: `[S-1]`
+
+### `[S-3]` Directory SEO, alternates, and JSON-LD structured data
+- Inject meta tags, canonical, hreflang links, `Link` header, and JSON-LD script into the directory HTML page response.
+- **Files**: `server.js`
+- **AC Mapped**: `[AC-3]`
+- **Dependencies**: `[S-2]`
+
+### `[S-4]` Sitemap.xml historical index updates
+- Update `/sitemap.xml` to fetch database trends, merge with `latestTrends`, deduplicate, and list all locales and directory URLs.
+- **Files**: `server.js`
+- **AC Mapped**: `[AC-4]`
+- **Dependencies**: `[S-1]`
+
+### `[S-5]` llms.txt & llms-full.txt historical sitemap consolidation
+- Update `/llms.txt` and `/llms-full.txt` routes in `server.js` to merge database trends and format output.
+- **Files**: `server.js`
+- **AC Mapped**: `[AC-5]`
+- **Dependencies**: `[S-1]`
+
+### `[S-6]` Footer layout link and client-side translation hydration
+- Update `public/index.html` to add the footer element with `#directory-link`.
+- Update `public/app.js` UI_DICTIONARY translations and `translateUI` logic to dynamically target and rewrite `#directory-link`.
+- **Files**: `public/index.html`, `public/app.js`
+- **AC Mapped**: `[AC-6]`
+- **Dependencies**: None. (Independent)
