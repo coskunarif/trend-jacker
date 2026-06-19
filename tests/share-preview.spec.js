@@ -61,6 +61,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     // Open share modal
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -88,6 +91,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
 
@@ -105,6 +111,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
   test('3. Verify Pinterest layout details', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -128,6 +137,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
 
@@ -148,6 +160,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
 
@@ -156,6 +171,8 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
 
     const textInput = page.locator('#share-preview-text');
     const charCounter = page.locator('#share-char-counter');
+
+    await expect(textInput).toHaveValue('Default mock post for linkedin');
 
     await textInput.fill('Hello LinkedIn');
     // For non-X platforms, it tracks length, e.g. "14" or "LinkedIn: 14"
@@ -166,6 +183,9 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
   test('6. Verify X (Twitter) character limit validation', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -206,5 +226,139 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     const isBtnDisabled = await postBtn.isDisabled();
     const hasErrorClass = await postBtn.evaluate((el) => el.classList.contains('error') || el.classList.contains('disabled'));
     expect(isBtnDisabled || hasErrorClass).toBe(true);
+  });
+
+  // [AC-3] Share Button Loading Guards (isGenerating state)
+  test('7. Verify share buttons are disabled and styled with reduced opacity/not-allowed cursor during generation', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Mock a slow post generation API call
+    let resolveGen;
+    const genPromise = new Promise((resolve) => { resolveGen = resolve; });
+    await page.route('**/api/generate-post', async (route) => {
+      await genPromise;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ postText: 'Slowly generated post' }),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    const postBtn = page.locator('#btn-post-share');
+    const copyBtn = page.locator('#btn-copy-share');
+
+    // During generation, they should be disabled and styled with opacity: 0.5, cursor: not-allowed, pointer-events: none
+    await expect(postBtn).toBeDisabled();
+    await expect(copyBtn).toBeDisabled();
+
+    // Verify opacity, cursor and pointer-events computed styles or classes
+    const postOpacity = await postBtn.evaluate((el) => window.getComputedStyle(el).opacity);
+    const postCursor = await postBtn.evaluate((el) => window.getComputedStyle(el).cursor);
+    const postPointerEvents = await postBtn.evaluate((el) => window.getComputedStyle(el).pointerEvents);
+    expect(parseFloat(postOpacity)).toBeCloseTo(0.5, 1);
+    expect(postCursor).toBe('not-allowed');
+    expect(postPointerEvents).toBe('none');
+
+    const copyOpacity = await copyBtn.evaluate((el) => window.getComputedStyle(el).opacity);
+    const copyCursor = await copyBtn.evaluate((el) => window.getComputedStyle(el).cursor);
+    const copyPointerEvents = await copyBtn.evaluate((el) => window.getComputedStyle(el).pointerEvents);
+    expect(parseFloat(copyOpacity)).toBeCloseTo(0.5, 1);
+    expect(copyCursor).toBe('not-allowed');
+    expect(copyPointerEvents).toBe('none');
+
+    // If the user tries to type in the textarea during generation, buttons must remain disabled
+    const textInput = page.locator('#share-preview-text');
+    await textInput.fill('Editing during generation');
+    await expect(postBtn).toBeDisabled();
+    await expect(copyBtn).toBeDisabled();
+
+    // Let the generation complete
+    resolveGen();
+    // After completion, the buttons should become enabled (unless limits exceeded)
+    await expect(postBtn).not.toBeDisabled();
+    await expect(copyBtn).not.toBeDisabled();
+  });
+
+  // [AC-3] Share Button Loading Guards (hasError state)
+  test('8. Verify share buttons are disabled and styled on generation error, and cannot be prematurely enabled by editing text', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    // Mock a failing generation API call
+    await page.route('**/api/generate-post', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: 'Server error' }),
+      });
+    });
+
+    await page.goto('/');
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    const postBtn = page.locator('#btn-post-share');
+    const copyBtn = page.locator('#btn-copy-share');
+
+    // After failure, both buttons should be disabled and styled with opacity: 0.5, cursor: not-allowed, pointer-events: none
+    await expect(postBtn).toBeDisabled();
+    await expect(copyBtn).toBeDisabled();
+
+    const postOpacity = await postBtn.evaluate((el) => window.getComputedStyle(el).opacity);
+    const postCursor = await postBtn.evaluate((el) => window.getComputedStyle(el).cursor);
+    expect(parseFloat(postOpacity)).toBeCloseTo(0.5, 1);
+    expect(postCursor).toBe('not-allowed');
+
+    // If user edits text, they must NOT become enabled because hasError is still true
+    const textInput = page.locator('#share-preview-text');
+    await textInput.fill('Manual edit after error');
+    await expect(postBtn).toBeDisabled();
+    await expect(copyBtn).toBeDisabled();
+  });
+
+  // [AC-5] Visual Toast Notification
+  test('9. Verify clicking Post Now triggers clipboard copy and displays toast notification with message', async ({ page, context, browserName }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    
+    // Conditionally grant clipboard permissions in Chromium
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    }
+
+    await page.goto('/');
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    const textInput = page.locator('#share-preview-text');
+    await textInput.fill('Awesome Gemini post!');
+
+    const postBtn = page.locator('#btn-post-share');
+    const toast = page.locator('#share-toast');
+
+    // Toast should be hidden initially
+    await expect(toast).toBeHidden();
+
+    // Clicking Post Now should display toast
+    const [newPage] = await Promise.all([
+      context.waitForEvent('page'),
+      postBtn.click()
+    ]);
+
+    await expect(toast).toBeVisible();
+    await expect(toast).toHaveText('Copied post to clipboard! Redirecting...');
+
+    if (browserName === 'chromium') {
+      const clipboardText = await page.evaluate(() => navigator.clipboard.readText());
+      expect(clipboardText).toBe('Awesome Gemini post!');
+    }
   });
 });

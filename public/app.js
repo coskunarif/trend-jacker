@@ -811,6 +811,9 @@ function initApp() {
 
   let activeSharePlatform = 'x';
   let activeShareContext = 'general';
+  let isGenerating = false;
+  let hasError = false;
+  let activeGenerateId = 0;
 
   if (hasWebShare) {
     if (btnDownloadCard) {
@@ -1212,6 +1215,8 @@ function initApp() {
     const warningMsg = document.querySelector('.share-validation-warning');
     const length = text.length;
 
+    let postDisabledByLimit = false;
+
     if (charCounter) {
       if (activeSharePlatform === 'x') {
         charCounter.textContent = `${length} / 280`;
@@ -1220,26 +1225,37 @@ function initApp() {
           charCounter.classList.add('warning');
           charCounter.classList.add('limit-exceeded');
           if (warningMsg) warningMsg.classList.remove('hidden');
-          if (btnPostShare) {
-            btnPostShare.disabled = true;
-            btnPostShare.classList.add('disabled');
-          }
+          postDisabledByLimit = true;
         } else {
           charCounter.classList.remove('error', 'warning', 'limit-exceeded');
           if (warningMsg) warningMsg.classList.add('hidden');
-          if (btnPostShare) {
-            btnPostShare.disabled = false;
-            btnPostShare.classList.remove('disabled');
-          }
         }
       } else {
         charCounter.textContent = `${length}`;
         charCounter.classList.remove('error', 'warning', 'limit-exceeded');
         if (warningMsg) warningMsg.classList.add('hidden');
-        if (btnPostShare) {
-          btnPostShare.disabled = false;
-          btnPostShare.classList.remove('disabled');
-        }
+      }
+    }
+
+    // Applying isGenerating and hasError state guards
+    const isSharedDisabled = isGenerating || hasError;
+
+    if (btnCopyShare) {
+      btnCopyShare.disabled = isSharedDisabled;
+      if (isSharedDisabled) {
+        btnCopyShare.classList.add('disabled');
+      } else {
+        btnCopyShare.classList.remove('disabled');
+      }
+    }
+
+    if (btnPostShare) {
+      const shouldDisablePost = isSharedDisabled || postDisabledByLimit;
+      btnPostShare.disabled = shouldDisablePost;
+      if (shouldDisablePost) {
+        btnPostShare.classList.add('disabled');
+      } else {
+        btnPostShare.classList.remove('disabled');
       }
     }
   }
@@ -1268,6 +1284,10 @@ function initApp() {
       context: activeShareContext,
       score: currentScore
     };
+
+    const myId = ++activeGenerateId;
+    isGenerating = true;
+    hasError = false;
 
     sharePreviewText.value = 'Generating post...';
     updatePreviewAndValidation();
@@ -1302,13 +1322,17 @@ function initApp() {
         throw new Error('Failed to generate post');
       }
       const data = await response.json();
-      if (sharePreviewText.value === 'Generating post...') {
+      if (myId === activeGenerateId) {
+        isGenerating = false;
+        hasError = false;
         sharePreviewText.value = data.postText || '';
         updatePreviewAndValidation();
       }
     } catch (err) {
       console.error(err);
-      if (sharePreviewText.value === 'Generating post...') {
+      if (myId === activeGenerateId) {
+        isGenerating = false;
+        hasError = true;
         sharePreviewText.value = 'Error generating post. Please try again.';
         updatePreviewAndValidation();
       }
@@ -1390,6 +1414,28 @@ function initApp() {
     btnPostShare.addEventListener('click', () => {
       if (!currentTrend) return;
       const text = sharePreviewText.value;
+
+      // Automated Copy on Share: trigger clipboard copy asynchronously
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        try {
+          navigator.clipboard.writeText(text).catch(err => {
+            console.error('Clipboard copy rejected:', err);
+          });
+        } catch (err) {
+          console.error('Clipboard access failed:', err);
+        }
+      }
+
+      // Visual Toast Notification: display toast notification for 2 seconds
+      const shareToast = document.getElementById('share-toast');
+      if (shareToast) {
+        shareToast.textContent = 'Copied post to clipboard! Redirecting...';
+        shareToast.classList.remove('hidden');
+        setTimeout(() => {
+          shareToast.classList.add('hidden');
+        }, 2000);
+      }
+
       let shareUrl = '';
       if (activeSharePlatform === 'x') {
         shareUrl = `https://x.com/intent/tweet?text=${encodeURIComponent(text)}`;
