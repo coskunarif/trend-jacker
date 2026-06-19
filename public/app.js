@@ -861,7 +861,8 @@ function initApp() {
       triviaPlayAgain: "Play Again",
       triviaShareScore: "Share Score",
       triviaHeader: "Trivia Challenge",
-      directoryLinkText: "Historical Trends Directory"
+      directoryLinkText: "Historical Trends Directory",
+      headerDirectoryLinkText: "Historical Directory"
     },
     es: {
       whatIsIt: "¿Qué es?",
@@ -882,7 +883,8 @@ function initApp() {
       triviaPlayAgain: "Jugar de Nuevo",
       triviaShareScore: "Compartir Puntuación",
       triviaHeader: "Desafío de Trivia",
-      directoryLinkText: "Directorio de Tendencias Históricas"
+      directoryLinkText: "Directorio de Tendencias Históricas",
+      headerDirectoryLinkText: "Directorio Histórico"
     },
     fr: {
       whatIsIt: "Qu'est-ce que c'est ?",
@@ -903,7 +905,8 @@ function initApp() {
       triviaPlayAgain: "Rejouer",
       triviaShareScore: "Partager le Score",
       triviaHeader: "Défi Trivia",
-      directoryLinkText: "Annuaire des Tendances Historiques"
+      directoryLinkText: "Annuaire des Tendances Historiques",
+      headerDirectoryLinkText: "Annuaire Historique"
     },
     ja: {
       whatIsIt: "概要",
@@ -924,7 +927,8 @@ function initApp() {
       triviaPlayAgain: "もう一度プレイ",
       triviaShareScore: "スコアを共有",
       triviaHeader: "トリビアチャレンジ",
-      directoryLinkText: "歴史的トレンドディレクトリ"
+      directoryLinkText: "歴史的トレンドディレクトリ",
+      headerDirectoryLinkText: "履歴ディレクトリ"
     }
   };
 
@@ -938,6 +942,16 @@ function initApp() {
         directoryLink.setAttribute('href', '/directory');
       } else {
         directoryLink.setAttribute('href', `/directory/${lang}`);
+      }
+    }
+    
+    const headerDirectoryLink = document.getElementById('header-directory-link');
+    if (headerDirectoryLink) {
+      headerDirectoryLink.textContent = dict.headerDirectoryLinkText || "Historical Directory";
+      if (lang === 'en') {
+        headerDirectoryLink.setAttribute('href', '/directory');
+      } else {
+        headerDirectoryLink.setAttribute('href', `/directory/${lang}`);
       }
     }
     

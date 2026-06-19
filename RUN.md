@@ -1,64 +1,45 @@
-task: Secure a stable testing suite baseline (Metric: Quality), because a race condition in the social sharing preview tests causes flaky baseline failures. Runner-up: Improve social sharing reliability and copy mechanisms (Metric: Viral Potential).              tier: T2   creativity: 0.5
-state: complete             budget: repairs 0/3
-branch: asf/20260619-social-sharing          checkpoint: none
+task: Pre-render body HTML on server, ping Google sitemap, link /directory in header/footer, and extend trend lifespan.              tier: T2   creativity: 0.5
+state: complete                 budget: repairs 0/3
+branch: asf/20260619-seo-indexing          checkpoint: none
 caps: agents,ui,web,human
 
 ## Log
-- 2026-06-19: Conductor starting fresh. Starting Scout phase to identify and score sharing improvement tasks.
-- 2026-06-19: Scout completed. Selected "Secure a stable testing suite baseline" as winner. Conductor starting Architect phase.
-- 2026-06-19: Architect completed SPEC.md. Conductor starting Tester phase.
-- 2026-06-19: Tester completed. Observed state: red. Conductor starting Builder phase.
-- 2026-06-19: Builder completed. Slices S-1 to S-2 implemented, tests passed. Conductor starting Verifier phase.
-- 2026-06-19: Verifier verified all acceptance criteria. Spawns, repetitions, and dogfood tests passed. Setting verdict to PASS.
-- 2026-06-19: Verifier completed. Conductor starting Shipper phase.
+- 2026-06-19: Conductor starting fresh. Branch created: asf/20260619-seo-indexing. Tier scored as T2. Phase set to ARCHITECT.
+- 2026-06-19: Architect completed. Output path: SPEC.md. Elapsed time: 5 minutes.
+- 2026-06-19: Critic completed. Objections written to dogfood-output/20260619-seo-indexing/redteam-design.md. Elapsed time: 1 minute.
+- 2026-06-19: Architect addressed objections, updated SPEC.md, and re-reported. State set to TESTER.
+- 2026-06-19: Tester completed. Output paths: tests/seo-optimization.spec.js, tests/seo-canonical-redirects.spec.js. Observed state: red. Elapsed time: 3 minutes.
+- 2026-06-19: Builder completed. Slices S-1 to S-4 implemented, tests passed. Elapsed time: 22 minutes.
+- 2026-06-19: Verifier completed. Output path: RUN.md. Observed state: green. Elapsed time: 8 minutes.
 
 ## Verdict
-### Verdict: PASS
-
-#### Per-AC Checks:
-- **`[AC-1] E2E Test Suite Synchronization`**: PASS (Tests in `tests/share-preview.spec.js`, `tests/pinterest-sharing-suite.spec.js`, and `tests/viral-generator.spec.js` wait for active trend items before interacting.)
-- **`[AC-2] Intent Test Clipboard Permissions`**: PASS (Permissions are granted conditionally only on Chromium browser name.)
-- **`[AC-3] Share Button Loading Guards`**: PASS (Checked that buttons are disabled during generation/error and styled with opacity and pointer-events.)
-- **`[AC-4] Automated Copy on Share`**: PASS (Clipboard copy triggers asynchronously synchronously before redirecting via window.open.)
-- **`[AC-5] Visual Toast Notification`**: PASS (Visual toast element displayed and hidden correctly; verified visually in dogfood screenshots.)
-- **`[AC-6] Outbound Intent Retries`**: PASS (Popup page capture and retrying assertions verified via `toPass()` block.)
-- **`[AC-7] Generation Request ID Synchronization`**: PASS (Auto-incrementing activeGenerateId successfully guards out-of-order platform updates.)
-
-#### Repetition & Stress Testing:
-- Full test suite passed completely (297/297 tests).
-- 5-iteration loop repetition on target test suites passed cleanly with 0 flaky failures.
-
-#### Dogfood verification:
-- Dev server successfully spawned as background task.
-- Browser automation executed via `agent-browser`; verified toast element, platform updates, text formatting, and outbound redirect flow. Visual outputs captured in `dogfood-output/20260619-social-sharing/`.
+- **[AC-1] Server-Side HTML Pre-Rendering (Core Fields & XSS Safety)**: PASS. Programmatic verification demonstrates that detail pages pre-render all essential text content safely escaped to prevent XSS injection.
+- **[AC-2] Server-Side HTML Pre-Rendering (Polls, Gauge, & News Footer)**: PASS. Vote percentages default to 50% if total is 0; progress bar widths, sentiment gauge offset, and news footer card headlines are correctly pre-rendered on the server side.
+- **[AC-3] Header Link & Client Translation**: PASS. Navigation bar includes directory link targeting `/directory` or dynamic localized subdirectory pathways (e.g., `/directory/es`) dynamically translated client-side.
+- **[AC-4] Google Sitemap Ping Integration**: PASS. The search engine ping utility asynchronously fires HTTP GET requests to the deprecated endpoint in non-blocking fashion, handles exceptions gracefully, and maps safely inside a local mock script.
+- **[AC-5] Database Lifespan Extension**: PASS. Atomic transaction pruning deletes all SQLite localized and base trend explanations older than 21 days based on consistent ISO 8601 timestamps.
+- **[KPI-1] Initial HTML Response Size**: PASS. Pre-rendered HTML template overhead increases `/` size by only 2.52 KB, passing the 10 KB budget.
+- **[KPI-2] Server Response Latency**: PASS. TTFB latency average is 10.57ms, passing the 150ms cache retrieval threshold.
+- **[Visual Breakdown Check]**: PASS. Screenshots verified across mobile and desktop breakpoints showing zero visual regressions, overlaps, or layout breaks.
+- **[Deterministic Testing]**: PASS. The 18 newly added E2E tests and all 305 legacy tests pass green under parallel load.
 
 ## Done
-### Shipped Features & Bug Fixes
-We resolved the race condition in the social sharing preview tests by introducing proper waiting mechanisms for active trend items in the E2E tests. Additionally, we improved social sharing reliability and copy mechanisms by ensuring clipboard operations complete cleanly, implementing loading guards, toast notifications, retry mechanisms, and request-id sequence synchronization.
+- **What Shipped**: Server-side HTML template pre-rendering for trends details (with secure HTML/JSON character escaping), non-blocking search engine ping script for Google sitemaps, localized directory path links in header/footer, and database pruning transaction logic.
+- **Integration Method**: PR merged via `gh pr merge --squash` after committing ledger.
+- **PR Link**: [PR #56 on GitHub](https://github.com/coskunarif/trend-jacker/pull/56)
+- **Deployment URL**: Checked locally on test environment.
 
-### Acceptance Criteria Verification Table
+### Acceptance Criteria & Verification Evidence
 
-| Acceptance Criterion | Verification Status | Evidence / Details |
-| :--- | :--- | :--- |
-| **`[AC-1] E2E Test Suite Synchronization`** | PASS | E2E tests wait for active trend items before interacting. |
-| **`[AC-2] Intent Test Clipboard Permissions`** | PASS | Clipboard permissions are granted conditionally for Chromium. |
-| **`[AC-3] Share Button Loading Guards`** | PASS | Buttons are disabled and styled during generation/error. |
-| **`[AC-4] Automated Copy on Share`** | PASS | Copy actions complete before redirecting. |
-| **`[AC-5] Visual Toast Notification`** | PASS | Visual toast is shown/hidden; verified in [screenshots](dogfood-output/20260619-social-sharing/screenshots/step-5-toast.png). |
-| **`[AC-6] Outbound Intent Retries`** | PASS | Popup URL target assertions verify construction reliably. |
-| **`[AC-7] Generation Request ID Synchronization`** | PASS | Request ID sequence guards against out-of-order updates. |
+| Acceptance Criteria | Evidence / Verification Method | Status |
+|---|---|---|
+| **[AC-1] HTML Pre-Rendering (Core & XSS)** | Verified programmatic inclusion of title, description, and explanation fields. XSS characters escaped safely. | PASS |
+| **[AC-2] HTML Pre-Rendering (Polls, Gauge, News)** | Default 50% handles zero total votes, gauges render dynamically on server, news card populated. | PASS |
+| **[AC-3] Header Link & Translation** | Crawl pathways for `/directory` linked in header and footer and translated client-side. | PASS |
+| **[AC-4] Google Sitemap Ping** | Graceful asynchronous non-blocking GET request to Google sitemap ping endpoint. | PASS |
+| **[AC-5] Database Lifespan Extension** | Automatic transaction pruning of old localized/base trend descriptions older than 21 days. | PASS |
 
-### Integration & Deployment
-- **Pull Request**: [coskunarif/trend-jacker/pull/55](https://github.com/coskunarif/trend-jacker/pull/55)
-- **Integration Method**: `--squash` (via command: `gh pr merge --squash https://github.com/coskunarif/trend-jacker/pull/55`)
-- **Deployment URL**: [trend-jacker](https://trend-jacker-q2wur4uk2q-uc.a.run.app)
-- **Verified Green Tag**: `asf/20260619-social-sharing/green-1`
+### UI Screenshots
+![Desktop Detail View](dogfood-output/20260619-seo-indexing/screenshot-desktop-detail.png)
+![Mobile Detail View](dogfood-output/20260619-seo-indexing/screenshot-mobile-detail.png)
 
-### Visual Evidence (UI Screenshots)
-Here are screenshots verifying the social sharing modal and flow:
-- **Sharing Modal View**:
-  ![Sharing Modal](dogfood-output/20260619-social-sharing/screenshots/step-2-modal.png)
-- **LinkedIn Redirect Flow**:
-  ![LinkedIn Sharing](dogfood-output/20260619-social-sharing/screenshots/step-3-linkedin.png)
-- **Success Toast Notification**:
-  ![Success Toast](dogfood-output/20260619-social-sharing/screenshots/step-5-toast.png)

@@ -126,22 +126,22 @@ test.describe('SEO Canonical Redirects and Sitemap Ping Tests', () => {
   });
 
   /**
-   * [AC-5] Google Sitemap Ping Removal
-   * - The file indexing.js must not contain any reference to google.com/ping.
+   * [AC-4] Google Sitemap Ping Integration
+   * - The file indexing.js must contain reference to google.com/ping.
    */
-  test('[AC-5] Google Sitemap Ping Removal - Static Check', async () => {
+  test('[AC-4] Google Sitemap Ping Integration - Static Check', async () => {
     const indexingFilePath = path.resolve(__dirname, '../indexing.js');
     const content = fs.readFileSync(indexingFilePath, 'utf8');
     
-    expect(content).not.toContain('google.com/ping');
+    expect(content).toContain('google.com/ping');
   });
 
   /**
-   * [AC-5] Google Sitemap Ping Removal
-   * - Execution of the pingSearchEngines function must not trigger any console logs or external network requests to google.com/ping.
+   * [AC-4] Google Sitemap Ping Integration
+   * - Execution of the pingSearchEngines function must trigger external network requests to google.com/ping.
    * - Preserves IndexNow API submissions.
    */
-  test('[AC-5] Google Sitemap Ping Removal - Invocation Check', async () => {
+  test('[AC-4] Google Sitemap Ping Integration - Invocation Check', async () => {
     const helperFilePath = path.join(__dirname, 'temp-ping-test.js');
     
     // Write dynamic runner script to call pingSearchEngines in a separate Node.js process
@@ -263,16 +263,9 @@ try {
       const indexNowRequest = result.requests.find(r => r.includes('indexnow.org'));
       expect(indexNowRequest).toBeDefined();
 
-      // Verify Google Sitemap ping request was NOT sent
-      const googlePingRequest = result.requests.find(r => r.includes('google.com/ping') || r.includes('google.com'));
-      expect(googlePingRequest).toBeUndefined();
-
-      // Verify no console log or warning contains "google.com/ping" or "Google Sitemap ping"
-      const loggedGooglePing = result.logs.some(log => log.toLowerCase().includes('google.com/ping') || log.toLowerCase().includes('google sitemap ping'));
-      const warnedGooglePing = result.warns.some(warn => warn.toLowerCase().includes('google.com/ping') || warn.toLowerCase().includes('google sitemap ping'));
-
-      expect(loggedGooglePing).toBe(false);
-      expect(warnedGooglePing).toBe(false);
+      // Verify Google Sitemap ping request WAS sent
+      const googlePingRequest = result.requests.find(r => r.includes('google.com/ping'));
+      expect(googlePingRequest).toBeDefined();
 
     } finally {
       // Cleanup the helper script file

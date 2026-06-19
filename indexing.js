@@ -8,7 +8,7 @@ const APP_HOST = process.env.APP_HOST || 'viraljacker.com';
  * @param {string[]} slugs Array of trend slugs to ping
  */
 export async function pingSearchEngines(slugs) {
-  if (!slugs || slugs.length === 0) return;
+  if (!slugs || slugs.length === 0) return { success: true, urls: [] };
 
   const isTest = process.env.NODE_ENV === 'test';
   const protocol = APP_HOST.includes('localhost') || APP_HOST.includes('127.0.0.1') ? 'http' : 'https';
@@ -27,10 +27,24 @@ export async function pingSearchEngines(slugs) {
   
   console.log(`[Indexing] Attempting to ping ${urlList.length} URL(s) to IndexNow:`, urlList);
 
+  const sitemapUrl = `${protocol}://${APP_HOST}/sitemap.xml`;
+  const googlePingUrl = `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`;
+
   if (isTest) {
     console.log('[Indexing] Running in test mode. Skipping actual external HTTP pings.');
-    return { success: true, mocked: true, urls: urlList };
+    console.log(`Mock: Google sitemap ping for URL: ${sitemapUrl}`);
+    return { success: true, mocked: true, urls: urlList, googlePinged: true };
   }
+
+  // Google sitemap ping (run asynchronously/non-blocking)
+  const fetchFn = typeof globalThis.fetch === 'function' ? globalThis.fetch : fetch;
+  fetchFn(googlePingUrl)
+    .then(res => {
+      console.log(`[Indexing] Google sitemap ping response status: ${res.status}`);
+    })
+    .catch(err => {
+      console.warn(`[Indexing] Google sitemap ping failed gracefully: ${err.message}`);
+    });
 
   try {
     // 1. Submit to IndexNow API
@@ -41,7 +55,7 @@ export async function pingSearchEngines(slugs) {
       urlList: urlList
     };
 
-    const response = await fetch('https://api.indexnow.org/indexnow', {
+    const response = await fetchFn('https://api.indexnow.org/indexnow', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json; charset=utf-8'
@@ -56,10 +70,10 @@ export async function pingSearchEngines(slugs) {
       console.warn(`[Indexing] IndexNow submission returned error (Status: ${response.status}):`, errorText);
     }
 
-    return { success: response.ok, urls: urlList };
+    return { success: response.ok, urls: urlList, googlePinged: true };
   } catch (err) {
     console.error('[Indexing] Error pinging search engines:', err.message);
-    return { success: false, error: err.message, urls: urlList };
+    return { success: false, error: err.message, urls: urlList, googlePinged: true };
   }
 }
 
