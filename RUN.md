@@ -14,5 +14,7 @@ caps: agents,ui,web,human
 - 2026-06-19: Spawned local dev server on port 3005 under task id: 4694d1f3-1096-460c-8fdd-3026d253ea60/task-74
 - 2026-06-19: Scout completed dogfooding and proposed task. Terminated local dev server.
 - 2026-06-19: Scout proposed winner. Work branch created: asf/20260619-fast-indexing. State set to ARCHITECT.
+- 2026-06-19: Architect completed. Output path: SPEC.md. Elapsed time: 3 minutes.
+- 2026-06-19: Critic completed. Objections written to dogfood-output/20260619-fast-indexing/redteam-design.md. Elapsed time: 1 minute.
 
 
