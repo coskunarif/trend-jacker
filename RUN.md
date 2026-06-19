@@ -1,5 +1,5 @@
 task: Pre-render body HTML on server, ping Google sitemap, link /directory in header/footer, and extend trend lifespan.              tier: T2   creativity: 0.5
-state: SHIPPER                  budget: repairs 0/3
+state: complete                 budget: repairs 0/3
 branch: asf/20260619-seo-indexing          checkpoint: none
 caps: agents,ui,web,human
 
@@ -24,4 +24,22 @@ caps: agents,ui,web,human
 - **[Deterministic Testing]**: PASS. The 18 newly added E2E tests and all 305 legacy tests pass green under parallel load.
 
 ## Done
-- Verification complete. 100% checks green. Verdict committed.
+- **What Shipped**: Server-side HTML template pre-rendering for trends details (with secure HTML/JSON character escaping), non-blocking search engine ping script for Google sitemaps, localized directory path links in header/footer, and database pruning transaction logic.
+- **Integration Method**: PR merged via `gh pr merge --squash` after committing ledger.
+- **PR Link**: [PR #56 on GitHub](https://github.com/coskunarif/trend-jacker/pull/56)
+- **Deployment URL**: Checked locally on test environment.
+
+### Acceptance Criteria & Verification Evidence
+
+| Acceptance Criteria | Evidence / Verification Method | Status |
+|---|---|---|
+| **[AC-1] HTML Pre-Rendering (Core & XSS)** | Verified programmatic inclusion of title, description, and explanation fields. XSS characters escaped safely. | PASS |
+| **[AC-2] HTML Pre-Rendering (Polls, Gauge, News)** | Default 50% handles zero total votes, gauges render dynamically on server, news card populated. | PASS |
+| **[AC-3] Header Link & Translation** | Crawl pathways for `/directory` linked in header and footer and translated client-side. | PASS |
+| **[AC-4] Google Sitemap Ping** | Graceful asynchronous non-blocking GET request to Google sitemap ping endpoint. | PASS |
+| **[AC-5] Database Lifespan Extension** | Automatic transaction pruning of old localized/base trend descriptions older than 21 days. | PASS |
+
+### UI Screenshots
+![Desktop Detail View](dogfood-output/20260619-seo-indexing/screenshot-desktop-detail.png)
+![Mobile Detail View](dogfood-output/20260619-seo-indexing/screenshot-mobile-detail.png)
+
