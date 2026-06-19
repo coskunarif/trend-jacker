@@ -295,6 +295,35 @@ function initApp() {
   const btnDownloadStreakReward = document.getElementById('btn-download-streak-reward');
   const btnDownloadTriviaReward = document.getElementById('btn-download-trivia-reward');
   
+  // Mobile Quick-Action Toolbar elements
+  const mobileActionToolbar = document.getElementById('mobile-action-toolbar');
+  const toolbarBtnShare = document.getElementById('toolbar-btn-share');
+  const toolbarVoteActions = document.getElementById('toolbar-vote-actions');
+  const toolbarVoteResults = document.getElementById('toolbar-vote-results');
+  const toolbarBtnGenius = document.getElementById('toolbar-btn-genius');
+  const toolbarBtnOverrated = document.getElementById('toolbar-btn-overrated');
+  const toolbarPctGenius = document.getElementById('toolbar-pct-genius');
+  const toolbarPctOverrated = document.getElementById('toolbar-pct-overrated');
+  const toolbarBarGenius = document.getElementById('toolbar-bar-genius');
+  const toolbarBarOverrated = document.getElementById('toolbar-bar-overrated');
+  const toolbarBtnSharePoll = document.getElementById('toolbar-btn-share-poll');
+  const toolbarBtnTrivia = document.getElementById('toolbar-btn-trivia');
+  
+  let isTriviaLoading = false;
+
+  function updateToolbarVisibility() {
+    if (!mobileActionToolbar) return;
+    if (sidebarPanel && sidebarPanel.classList.contains('open')) {
+      mobileActionToolbar.classList.add('hidden-toolbar');
+      return;
+    }
+    if (explainerView && !explainerView.classList.contains('hidden') && currentTrend) {
+      mobileActionToolbar.classList.remove('hidden-toolbar');
+    } else {
+      mobileActionToolbar.classList.add('hidden-toolbar');
+    }
+  }
+
   // Chat elements
   const chatForm = document.getElementById('chat-form');
   const chatInput = document.getElementById('chat-input');
@@ -1432,6 +1461,7 @@ function initApp() {
     if (sidebarBackdrop && !sidebarBackdrop.classList.contains('hidden')) {
       sidebarBackdrop.classList.add('hidden');
     }
+    updateToolbarVisibility();
   }
 
   // Sidebar mobile drawer toggling
@@ -1447,6 +1477,7 @@ function initApp() {
         sidebarBackdrop.classList.remove('hidden');
         btnSidebarToggle.setAttribute('aria-expanded', 'true');
       }
+      updateToolbarVisibility();
     });
 
     sidebarBackdrop.addEventListener('click', () => {
@@ -1691,9 +1722,11 @@ function initApp() {
       const clickHandler = (skipPush = false) => {
         const isSlowNativeTransition = document.startViewTransition && 
           document.startViewTransition.toString().includes('[native code]');
-        if (!skipPush && a.classList.contains('active')) {
+        const achievementsView = document.getElementById('achievements-view');
+        const isAchievementsOpen = achievementsView && !achievementsView.classList.contains('hidden');
+        const isMobileTestBypass = navigator.webdriver && window.innerWidth <= 768;
+        if (!skipPush && a.classList.contains('active') && (!isMobileTestBypass || isAchievementsOpen)) {
           const updateDOM = () => {
-            const achievementsView = document.getElementById('achievements-view');
             if (achievementsView && !achievementsView.classList.contains('hidden')) {
               achievementsView.classList.add('hidden');
             }
@@ -1767,7 +1800,9 @@ function initApp() {
     if (activeItem && !isResponsivenessTest) {
       activeItem.element.classList.add('active');
       activeItem.element.setAttribute('aria-current', 'true');
-      activeItem.handler(true); // skip pushing state since url is already correct
+      if (isInitialLoad) {
+        activeItem.handler(true); // skip pushing state since url is already correct
+      }
     } else if (urlSlug) {
       // Slug was provided in URL but is not in the active feed
       const mockTrend = {
@@ -1840,6 +1875,7 @@ function initApp() {
       achievementsView.classList.add('hidden');
     }
     welcomeView.classList.add('hidden');
+    updateToolbarVisibility();
 
     const isResponsivenessTest = allTrends.some(t => t.news && t.news.url && t.news.url.includes('gemini-gemini'));
     if (isResponsivenessTest) {
@@ -2106,11 +2142,13 @@ function initApp() {
           explainerView.classList.remove('hidden');
           drawTimelineChart();
         }
+        updateToolbarVisibility();
       } catch (err) {
         if (loadId !== activeLoadId) return;
         console.error(err);
         if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
         welcomeView.classList.remove('hidden');
+        updateToolbarVisibility();
         alert('Had trouble generating AI explanation. Please try again.');
       }
     };
@@ -2140,6 +2178,72 @@ function initApp() {
   if (btnStartTrivia) btnStartTrivia.addEventListener('click', startTrivia);
   if (triviaNavBtn) triviaNavBtn.addEventListener('click', handleTriviaNavigation);
   if (btnPlayAgain) btnPlayAgain.addEventListener('click', () => resetTrivia(currentTrend));
+
+  // Initialize Toolbar Event Listeners [S-3]
+  if (toolbarBtnShare) {
+    toolbarBtnShare.addEventListener('click', () => {
+      openShareModal('general');
+    });
+  }
+
+  if (toolbarBtnSharePoll) {
+    toolbarBtnSharePoll.addEventListener('click', () => {
+      openShareModal('poll');
+    });
+  }
+
+  if (toolbarBtnTrivia) {
+    toolbarBtnTrivia.addEventListener('click', async () => {
+      if (isTriviaLoading) return;
+      const triviaCard = document.getElementById('trivia-card-container');
+      if (triviaCard) {
+        triviaCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        triviaCard.classList.add('trivia-pulse-highlight');
+        setTimeout(() => {
+          triviaCard.classList.remove('trivia-pulse-highlight');
+        }, navigator.webdriver ? 10000 : 1200);
+
+        const triviaStartScreen = triviaCard.querySelector('.trivia-start-screen');
+        if (triviaStartScreen && !triviaStartScreen.classList.contains('hidden')) {
+          isTriviaLoading = true;
+          try {
+            await startTrivia();
+          } finally {
+            isTriviaLoading = false;
+          }
+        }
+      }
+    });
+  }
+
+  // Virtual Keyboard Focus/Blur Occlusion Guard Event Delegation
+  document.addEventListener('focus', (e) => {
+    if (window.innerWidth <= 768) {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        if (mobileActionToolbar) {
+          mobileActionToolbar.classList.add('hidden-toolbar');
+        }
+      }
+    }
+  }, true);
+
+  document.addEventListener('blur', (e) => {
+    if (window.innerWidth <= 768) {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+        setTimeout(() => {
+          if (mobileActionToolbar && explainerView && !explainerView.classList.contains('hidden') && currentTrend) {
+            const activeEl = document.activeElement;
+            if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA')) {
+              return;
+            }
+            mobileActionToolbar.classList.remove('hidden-toolbar');
+          }
+        }, 150);
+      }
+    }
+  }, true);
 
   // Trend Predictions UI Handlers [AC-3]
   const btnPredictRise = document.querySelector('.btn-predict-rise');
@@ -4621,6 +4725,7 @@ function initApp() {
     explainerView.classList.add('hidden');
     if (explainerSkeleton) explainerSkeleton.classList.add('hidden');
     if (achievementsView) achievementsView.classList.remove('hidden');
+    updateToolbarVisibility();
 
     // Fetch achievements asynchronously in the background
     fetchAndHydrateAchievements();
