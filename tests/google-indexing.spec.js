@@ -166,6 +166,7 @@ const requests = [];
 const consoleLogs = [];
 const consoleWarns = [];
 
+const originalLog = console.log;
 console.log = (...args) => consoleLogs.push(args.join(' '));
 console.warn = (...args) => consoleWarns.push(args.join(' '));
 
@@ -175,7 +176,7 @@ globalThis.fetch = async (url, options) => {
 };
 
 const result = await pingSearchEngines(['dev-bypass']);
-console.error('RESULT_JSON:' + JSON.stringify({
+originalLog('RESULT_JSON:' + JSON.stringify({
   success: result.success,
   requests,
   logs: consoleLogs,
@@ -257,8 +258,7 @@ import path from 'node:path';
 
 const pings = [];
 // Mock pingSearchEngines
-import * as indexingModule from '../indexing.js';
-indexingModule.pingSearchEngines = async (slugs) => {
+globalThis.__mockPingSearchEngines = async (slugs) => {
   pings.push(...slugs);
   return { success: true, urls: slugs };
 };
@@ -268,7 +268,7 @@ globalThis.fetch = async (url) => {
     return {
       ok: true,
       status: 200,
-      text: async () => \\\`\${mockSitemap}\\\`
+      text: async () => ${JSON.stringify(mockSitemap)}
     };
   }
   return { ok: true, status: 200, text: async () => '' };
