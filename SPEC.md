@@ -1,82 +1,130 @@
-# SPEC.md: Stable Testing Baseline & Social Sharing Reliability
+# Specification: Server-Side Pre-Rendering, Sitemap Pinging, Header/Footer Directory Link, & Lifespan Extension
 
-This spec outlines the plan to resolve the race condition in the social sharing preview tests (securing a stable testing baseline) and to fix the reliability issues associated with social media sharing.
+This document outlines the technical specification for implementing SEO crawlability and indexing optimizations in the TrendJacker platform.
 
-## 1. Acceptance Criteria
+---
 
-*   **`[AC-1] E2E Test Suite Synchronization`**:
-    All Playwright E2E tests that interact with the share modal (in `tests/share-preview.spec.js`, `tests/pinterest-sharing-suite.spec.js`, and `tests/viral-generator.spec.js`) must wait for the active trend item to render in the DOM (`await expect(page.locator('.trend-item.active')).toBeVisible();`) after `page.goto('/')` before clicking `#btn-share-trend`. This prevents clicking before the page-load async API responses have populated the active trend.
-*   **`[AC-2] Intent Test Clipboard Permissions`**:
-    All E2E tests verifying outbound sharing intents (clicking `#btn-post-share`) must grant clipboard permissions (`await context.grantPermissions(['clipboard-read', 'clipboard-write']);`) before navigating *only* if the current browser name is `'chromium'`. If running under Firefox or WebKit, the permissions call must be skipped to prevent CDP configuration exceptions.
-*   **`[AC-3] Share Button Loading Guards`**:
-    The "Post Now" (`#btn-post-share`) and "Copy" (`#btn-copy-share`) buttons must be disabled and styled with reduced opacity (`0.5`) and a `not-allowed` cursor based on explicit internal boolean state variables (`isGenerating`, `hasError`). The state-based checks must prevent premature enabling if the user edits the textarea content, and must not depend on hardcoded textarea string matching.
-*   **`[AC-4] Automated Copy on Share`**:
-    Clicking `#btn-post-share` must trigger `navigator.clipboard.writeText` synchronously in the background *without* awaiting its resolution, immediately followed by the synchronous call to `window.open`. This prevents yielding to the event loop and losing the user gesture context, which would trigger browser popup blockers. The clipboard check must be feature-guarded (`navigator.clipboard && typeof navigator.clipboard.writeText === 'function'`) and wrapped in a `try...catch` block to handle unsecure contexts (HTTP) or permission denials gracefully.
-*   **`[AC-5] Visual Toast Notification`**:
-    Clicking `#btn-post-share` must display a clean, absolute-positioned toast notification (`#share-toast`) inside the modal with the message `"Copied post to clipboard! Redirecting..."` for 2 seconds. The toast should fade in and out smoothly.
-*   **`[AC-6] Outbound Intent Retries`**:
-    E2E tests verifying outbound intents must capture the target popup page via `context.waitForEvent('page')` and verify the constructed query parameters using retrying assertions `expect(async () => { ... }).toPass()`, avoiding awaiting full page load states to prevent timeouts under runner load.
-*   **`[AC-7] Generation Request ID Synchronization`**:
-    Social post generation must trace requests with an auto-incrementing ID (`activeGenerateId`). When an asynchronous post generation response returns, its request ID must match the active ID before updating `sharePreviewText.value` or `updatePreviewAndValidation()`. This prevents out-of-order resolution race conditions when a user quickly toggles platforms or contexts.
+## 🎨 UI/UX Mockup
 
-## 2. Performance KPIs
+Below is the mockup for the header navigation bar showcasing the new "Historical Directory" link.
 
-*   **`[KPI-1] Visual Preview Update Latency`**: Real-time rendering of typed preview text in the mockup card must execute in `< 16ms` (within a single animation frame).
-*   **`[KPI-2] Modal Open Responsiveness`**: The unified share modal must transition to visible in `< 100ms` from the click on `#btn-share-trend` once the active trend is loaded.
+![Navbar with Directory Link](/home/ubuntuadmin/.gemini/antigravity-cli/brain/69c0e454-9fd3-4bb1-a525-83736c82a936/navbar_directory_mockup_1781891446971.jpg)
 
-## 3. Interface Contract
+---
 
-### Client Assets:
-*   **`public/index.html`**:
-    *   Add `<div id="share-toast" class="share-toast hidden"></div>` inside the `#share-modal` `.modal-content` wrapper.
-*   **`public/styles.css`**:
-    *   Add styling for `.share-toast` and `.share-toast.hidden` to position it absolutely at the top center of the modal with high z-index and fade transitions.
-    *   Add styling for `.modal-btn:disabled` and `.modal-btn.disabled` to set `opacity: 0.5`, `cursor: not-allowed`, and `pointer-events: none`.
-*   **`public/app.js`**:
-    *   Maintain global/state variables: `let isGenerating = false;`, `let hasError = false;`, and `let activeGenerateId = 0;`.
-    *   Update `updatePreviewAndValidation()` to read `isGenerating` and `hasError` state flags, applying the `disabled` property and `.disabled` class to `#btn-post-share` and `#btn-copy-share`.
-    *   Modify `generatePost()` to increment `activeGenerateId` and only update the text input and trigger UI synchronization if the request's ID matches the latest ID when the fetch response resolves.
-    *   Modify the `#btn-post-share` click handler to run `navigator.clipboard.writeText()` asynchronously (without `await`) and display `#share-toast` before synchronously calling `window.open` for the platform sharing URL.
+## 🎯 Acceptance Criteria
 
-### E2E Test Suite:
-*   **`tests/share-preview.spec.js`**:
-    *   Update all tests to wait for `.trend-item.active` to be visible after navigation.
-*   **`tests/pinterest-sharing-suite.spec.js`**:
-    *   Update tests verifying sharing to wait for `.trend-item.active`.
-    *   In tests checking outbound sharing, conditionally grant clipboard permissions: `if (browserName === 'chromium') { await context.grantPermissions(['clipboard-read', 'clipboard-write']); }`.
-*   **`tests/viral-generator.spec.js`**:
-    *   Update tests verifying sharing to wait for `.trend-item.active`.
-    *   In outbound sharing test, conditionally grant clipboard permissions: `if (browserName === 'chromium') { await context.grantPermissions(['clipboard-read', 'clipboard-write']); }`.
+### `[AC-1]` Server-Side HTML Pre-Rendering (Core Fields)
+- **Verification**: Programmatic HTTP GET request to `/` or `/t/:slug` (with JS disabled/ignored) must return indexable text within the main explainer container.
+- **Requirements**:
+  - The welcome screen `#welcome-view` must have the class `hidden` added.
+  - The explainer view `#explainer-view` must have the class `hidden` removed.
+  - The header title `#detail-title` must contain the active trend name.
+  - The text container `#detail-hook` must contain the explanation's hook text.
+  - The text container `#detail-what` must contain the explanation's `whatIsIt` text.
+  - The text container `#detail-takeaway` must contain the explanation's `takeaway` text.
+  - The container `#detail-viral-tags` must contain list item spans with class `viral-tag` for each item in the `whyIsItViral` array.
 
-## 4. Out of Scope
+### `[AC-2]` Server-Side HTML Pre-Rendering (Polls & News Footer)
+- **Verification**: Programmatic extraction of the rendered HTML for polls and news elements.
+- **Requirements**:
+  - The progress bars `#bar-genius` and `#bar-overrated` must have their `style="width: XX%"` attribute preloaded with calculated percentages from database polls.
+  - The text elements `#pct-genius` and `#pct-overrated` must display the percentage texts (e.g. `65%` and `35%`).
+  - The sentiment gauge `#gauge-genius-pct` text content must display the genius percentage, and `#gauge-fill` stroke-dashoffset must be set to the corresponding percentage offset (`251.2 * (1 - geniusPct / 100)`).
+  - The `.news-footer-card` must contain pre-rendered news headline (`#detail-news-title`), publisher (`#detail-news-publisher`), snippet (`#detail-news-snippet`), blockquote `cite` and link `href` attributes set to `matchedNews.url` if news context is present.
+  - If news context is missing, the `.news-footer-card` must have the class `hidden` added.
 
-*   Modifying backend AI post generation parameters (`/api/generate-post`).
-*   Modifying frontend theme design/styles other than the sharing modal/toast and disabled button states.
-*   Integrating platform-specific native SDKs.
+### `[AC-3]` Header Link & Client Translation
+- **Verification**: E2E browser test navigating to `/` and checking the navbar layout.
+- **Requirements**:
+  - A new link with `id="header-directory-link"` must be added to the navigation bar header.
+  - The link must point to `/directory` by default (for English locale) or `/directory/:lang` for localized page visits.
+  - Client-side `translateUI(lang)` function in `public/app.js` must update `#header-directory-link` text content and `href` attribute dynamically matching the active language.
 
-## 5. Critic Objections & Resolutions
+### `[AC-4]` Google Sitemap Ping Integration
+- **Verification**: Execution of the sitemap ping script triggers a mock HTTP request to Google's ping endpoint in test mode.
+- **Requirements**:
+  - Whenever a new trend is generated/stored, `pingSearchEngines` in `indexing.js` must trigger an HTTP GET fetch request to:
+    `https://www.google.com/ping?sitemap=${encodeURIComponent(sitemapUrl)}`
+    where `sitemapUrl` is `https://<APP_HOST>/sitemap.xml` (or `http` for local hosts).
+  - A standalone CLI script `scripts/ping-sitemap.js` must be provided to trigger the sitemap ping manually.
+  - The ping must be safely bypassed in test environments (`process.env.NODE_ENV === 'test'`) and print a mock statement.
+  - Update `tests/seo-canonical-redirects.spec.js` to assert that the Google sitemap ping request **is** sent in production/mocked mode.
 
-*   **Objection 1**: Browser Popup Blocker vs. Asynchronous Clipboard Copy
-    *   *Resolution*: Trigger copy asynchronously in the background (`navigator.clipboard.writeText(text).catch(...)`) and call `window.open` synchronously immediately to satisfy user gesture activation policy.
-*   **Objection 2**: Race Condition in Concurrent Async Post Generation
-    *   *Resolution*: Trace generation requests with an auto-incrementing ID (`activeGenerateId`) and verify the ID when the response resolves before updating the preview text or validation state.
-*   **Objection 3**: Null Reference Exception on Navigator Clipboard Access
-    *   *Resolution*: Guard all clipboard write calls with feature checks (`navigator.clipboard && typeof navigator.clipboard.writeText === 'function'`) and handle any permission errors inside a `try...catch` block.
-*   **Objection 4**: Brittle UI State Guards via Hardcoded Text Value Validation
-    *   *Resolution*: Track generation and error states with read-only boolean state variables (`isGenerating`, `hasError`) in JavaScript and configure disabled buttons using those states.
-*   **Objection 5**: Non-Universal Clipboard Permissions API Support in E2E Engines
-    *   *Resolution*: Explicitly scope `context.grantPermissions` calls inside E2E tests to only execute when `browserName === 'chromium'`.
+### `[AC-5]` Database Lifespan Extension (Pruning Job)
+- **Verification**: Unit/integration tests asserting that explanations older than 21 days are pruned, while recent entries are preserved.
+- **Requirements**:
+  - A new function `pruneOldExplanations()` must be exported from `db.js` that deletes records from both `trend_explanations` and `localized_explanations` where the `created_at` timestamp is older than 21 days (3 weeks).
+  - The pruning function must be integrated into `updateTrendsCache()` to run periodically on cache refresh, ensuring a clean state while maintaining a healthy 3-week indexability window.
 
-## 6. Slices
+---
 
-### `[S-1] Core Social Sharing Reliability & Safety Guards`
-*   **Target Files**: `public/app.js`, `public/index.html`, `public/styles.css`
-*   **Acceptance Criteria**: `[AC-3]`, `[AC-4]`, `[AC-5]`, `[AC-7]`
-*   **Independent**: Yes
-*   **Description**: Add safety guards and sequential request tracing to prevent race conditions during generation. Inject the `#share-toast` notification structure and style sheet. Implement the copy-to-clipboard hook and toast activation on clicking "Post Now".
+## ⚡ Performance KPIs
 
-### `[S-2] E2E Test Suite Synchronization & Clipboard Alignment`
-*   **Target Files**: `tests/share-preview.spec.js`, `tests/pinterest-sharing-suite.spec.js`, `tests/viral-generator.spec.js`
-*   **Acceptance Criteria**: `[AC-1]`, `[AC-2]`, `[AC-6]`
-*   **Independent**: No (Depends on S-1 for clipboard operations)
-*   **Description**: Update test cases to wait for `.trend-item.active` to eliminate page-load race conditions. Add conditional clipboard permissions to all tests clicking `#btn-post-share`.
+- `[KPI-1]` Initial HTML Response Size overhead: The addition of pre-rendered HTML to the index template must not increase the overall page size of `/` by more than 10KB.
+- `[KPI-2]` Server response latency: Time to first byte (TTFB) for `/t/:slug` must remain under 150ms when serving from the database cache.
+
+---
+
+## 📝 Interface Contract
+
+The Tester, Builder, and Conductor will share the following interfaces:
+
+### File: `db.js`
+- Exported API:
+  ```typescript
+  export function pruneOldExplanations(): Promise<void>;
+  ```
+
+### File: `indexing.js`
+- Exported API (updated):
+  ```typescript
+  export function pingSearchEngines(slugs: string[]): Promise<{ success: boolean; urls: string[]; googlePinged?: boolean }>;
+  ```
+
+### File: `scripts/ping-sitemap.js`
+- Standalone CLI entry-point: runs sitemap ping using `process.env.APP_HOST`.
+
+---
+
+## 🚫 Out of Scope
+
+- Integrating Search Console OAuth authentication for API sitemap submissions.
+- Pruning user action logs, streaking logs, or trivia scores.
+- Re-generating canvas infographic cards on the server.
+
+---
+
+## 💬 Objections & Resolutions
+
+### Critic Concerns:
+- *Concern*: Pinging Google's sitemap endpoint is officially deprecated by Google since late 2023.
+- *Resolution*: While deprecated, the prompt explicitly requests pinging Google's sitemap engine directly. We will implement it exactly as requested but ensure it is handled asynchronously and gracefully handles any network failures without crashing the application.
+
+---
+
+## 🍰 Implementation Slices
+
+### `[S-1] Pre-render HTML template details on server`
+- **Files**: [server.js](file:///home/ubuntuadmin/projects/trend-jacker/server.js)
+- **Acceptance Criteria**: `[AC-1]`, `[AC-2]`
+- **Independent**: Yes
+- **Task Type**: Refinement
+
+### `[S-2] Header directory link insertion and translation`
+- **Files**: [public/index.html](file:///home/ubuntuadmin/projects/trend-jacker/public/index.html), [public/app.js](file:///home/ubuntuadmin/projects/trend-jacker/public/app.js)
+- **Acceptance Criteria**: `[AC-3]`
+- **Independent**: Yes
+- **Task Type**: Additive
+
+### `[S-3] Google Sitemap Ping Implementation`
+- **Files**: [indexing.js](file:///home/ubuntuadmin/projects/trend-jacker/indexing.js), [scripts/ping-sitemap.js](file:///home/ubuntuadmin/projects/trend-jacker/scripts/ping-sitemap.js), [tests/seo-canonical-redirects.spec.js](file:///home/ubuntuadmin/projects/trend-jacker/tests/seo-canonical-redirects.spec.js)
+- **Acceptance Criteria**: `[AC-4]`
+- **Independent**: Yes
+- **Task Type**: Additive
+
+### `[S-4] Trend Lifespan Database Pruning`
+- **Files**: [db.js](file:///home/ubuntuadmin/projects/trend-jacker/db.js), [server.js](file:///home/ubuntuadmin/projects/trend-jacker/server.js)
+- **Acceptance Criteria**: `[AC-5]`
+- **Independent**: Yes
+- **Task Type**: Additive
