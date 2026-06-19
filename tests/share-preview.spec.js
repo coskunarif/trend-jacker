@@ -172,6 +172,8 @@ test.describe('TJ-26: Unified Social Sharing Preview Interface Tests', () => {
     const textInput = page.locator('#share-preview-text');
     const charCounter = page.locator('#share-char-counter');
 
+    await expect(textInput).toHaveValue('Default mock post for linkedin');
+
     await textInput.fill('Hello LinkedIn');
     // For non-X platforms, it tracks length, e.g. "14" or "LinkedIn: 14"
     await expect(charCounter).toContainText('14');

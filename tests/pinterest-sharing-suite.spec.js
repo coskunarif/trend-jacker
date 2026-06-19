@@ -234,6 +234,9 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
 
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     // Verify presence of the dashboard section/panel
     const posterLogPanel = page.locator('#viral-poster-log, .viral-poster-log, #viral-poster-panel');
     await expect(posterLogPanel).toBeVisible();

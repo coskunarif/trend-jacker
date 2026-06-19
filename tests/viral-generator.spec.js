@@ -268,6 +268,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   test('7. Verify Redundant Button Removal', async ({ page }) => {
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     // Assert that legacy share buttons are removed from the DOM
     const legacyShareTrendBtn = page.locator('#btn-share-x');
     const legacySharePollBtn = page.locator('#btn-share-poll-x');
@@ -375,6 +378,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     });
 
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     // Vote to reveal Trend Card download button
     await page.locator('#btn-vote-genius').click();
