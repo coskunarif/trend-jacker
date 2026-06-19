@@ -780,6 +780,39 @@
     </div>
   </div>
 
+  <!-- Sticky Mobile Quick-Action Toolbar -->
+  <div id="mobile-action-toolbar" class="mobile-action-toolbar hidden-toolbar">
+    <button id="toolbar-btn-share" class="toolbar-btn" aria-label="Share trend">
+      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+      Share
+    </button>
+    
+    <div id="toolbar-sentiment-group" class="toolbar-sentiment-group">
+      <!-- Vote Actions Container -->
+      <div id="toolbar-vote-actions">
+        <button id="toolbar-btn-genius" class="toolbar-btn vote-genius">Genius ⚡</button>
+        <button id="toolbar-btn-overrated" class="toolbar-btn vote-overrated">Overrated 🥱</button>
+      </div>
+      <!-- Vote Results Container (hidden by default) -->
+      <div id="toolbar-vote-results" class="hidden">
+        <span id="toolbar-pct-genius">G: 0%</span>
+        <div class="toolbar-progress-bar-wrap">
+          <div id="toolbar-bar-genius" class="toolbar-progress-fill bar-g" style="width: 0%"></div>
+          <div id="toolbar-bar-overrated" class="toolbar-progress-fill bar-o" style="width: 0%"></div>
+        </div>
+        <span id="toolbar-pct-overrated">O: 0%</span>
+        <button id="toolbar-btn-share-poll" class="toolbar-icon-btn" aria-label="Share poll results">
+          <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="share-icon"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+        </button>
+      </div>
+    </div>
+    
+    <button id="toolbar-btn-trivia" class="toolbar-btn" aria-label="Trivia shortcut">
+      <svg aria-hidden="true" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="trivia-icon"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Trivia
+    </button>
+  </div>
+
   <footer>
     <a href="/directory" id="directory-link">Historical Trends Directory</a>
   </footer>
