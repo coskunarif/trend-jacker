@@ -126,22 +126,22 @@ test.describe('SEO Canonical Redirects and Sitemap Ping Tests', () => {
   });
 
   /**
-   * [AC-4] Google Sitemap Ping Integration
-   * - The file indexing.js must contain reference to google.com/ping.
+   * [AC-3] Google Indexing API Integration
+   * - The file indexing.js must contain reference to indexing.googleapis.com.
    */
-  test('[AC-4] Google Sitemap Ping Integration - Static Check', async () => {
+  test('[AC-3] Google Indexing API Integration - Static Check', async () => {
     const indexingFilePath = path.resolve(__dirname, '../indexing.js');
     const content = fs.readFileSync(indexingFilePath, 'utf8');
     
-    expect(content).toContain('google.com/ping');
+    expect(content).toContain('indexing.googleapis.com');
   });
 
   /**
-   * [AC-4] Google Sitemap Ping Integration
-   * - Execution of the pingSearchEngines function must trigger external network requests to google.com/ping.
+   * [AC-3] Google Indexing API Integration
+   * - Execution of the pingSearchEngines function in test mode must trigger POST requests to Google Indexing API.
    * - Preserves IndexNow API submissions.
    */
-  test('[AC-4] Google Sitemap Ping Integration - Invocation Check', async () => {
+  test('[AC-3] Google Indexing API Integration - Invocation Check', async () => {
     const helperFilePath = path.join(__dirname, 'temp-ping-test.js');
     
     // Write dynamic runner script to call pingSearchEngines in a separate Node.js process
@@ -167,7 +167,7 @@ console.warn = (...args) => {
 };
 
 const createMockRequest = (url, options, cb) => {
-  requests.push(url);
+  requests.push({ url, method: options.method || 'GET' });
   const req = new EventEmitter();
   req.write = () => {};
   req.end = () => {
@@ -217,7 +217,13 @@ https.request = function(...args) {
 };
 
 globalThis.fetch = async (url, options) => {
-  requests.push(url.toString());
+  const urlStr = url.toString();
+  requests.push({
+    url: urlStr,
+    method: options?.method || 'GET',
+    headers: options?.headers || {},
+    body: options?.body ? JSON.parse(options.body) : null
+  });
   return {
     ok: true,
     status: 200,
@@ -243,12 +249,12 @@ try {
     fs.writeFileSync(helperFilePath, helperScript, 'utf8');
 
     try {
-      // Execute the helper script in production mode (non-test mode)
+      // Execute the helper script in test mode (NODE_ENV: test)
       const stdout = execSync('node temp-ping-test.js', {
         cwd: __dirname,
         env: {
           ...process.env,
-          NODE_ENV: 'production'
+          NODE_ENV: 'test'
         }
       }).toString();
 
@@ -260,12 +266,16 @@ try {
       expect(result.success).toBe(true);
 
       // Verify IndexNow ping was sent
-      const indexNowRequest = result.requests.find(r => r.includes('indexnow.org'));
+      const indexNowRequest = result.requests.find(r => r.url.includes('indexnow.org'));
       expect(indexNowRequest).toBeDefined();
 
-      // Verify Google Sitemap ping request WAS sent
-      const googlePingRequest = result.requests.find(r => r.includes('google.com/ping'));
-      expect(googlePingRequest).toBeDefined();
+      // Verify Google Indexing API POST request was sent
+      const googleIndexingRequest = result.requests.find(r => r.url.includes('indexing.googleapis.com'));
+      expect(googleIndexingRequest).toBeDefined();
+      expect(googleIndexingRequest.method).toBe('POST');
+      expect(googleIndexingRequest.body).toBeDefined();
+      expect(googleIndexingRequest.body.url).toContain('/t/google-gemini');
+      expect(googleIndexingRequest.body.type).toBe('URL_UPDATED');
 
     } finally {
       // Cleanup the helper script file
