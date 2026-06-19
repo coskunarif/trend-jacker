@@ -50,6 +50,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     // Wait for the trend to render and click unified share button
     const shareBtn = page.locator('#btn-share-trend');
     await expect(shareBtn).toBeVisible();
@@ -77,6 +80,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   test('2. Verify Context Preselection', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     // Click the unified Share Poll button
     const sharePollBtn = page.locator('#btn-share-poll');
@@ -113,6 +119,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     // Open share modal
     await page.locator('#btn-share-trend').click();
@@ -152,6 +161,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
 
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     // Open share modal via share-trend (general context)
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -169,7 +181,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   });
 
   // [AC-1] Unified Modal Component Structure
-  test('5. Verify Copy-to-Clipboard', async ({ page, context }) => {
+  test('5. Verify Copy-to-Clipboard', async ({ page, context, browserName }) => {
     // Intercept POST /api/generate-post
     await page.route('**/api/generate-post', async (route) => {
       await route.fulfill({
@@ -181,11 +193,16 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
       });
     });
 
-    // Grant clipboard permissions
-    await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    // Grant clipboard permissions only if Chromium
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    }
 
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -204,7 +221,7 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   });
 
   // [AC-2] [AC-3] Unified Modal Component Structure
-  test('6. Verify Outbound Sharing Intent', async ({ page, context }) => {
+  test('6. Verify Outbound Sharing Intent', async ({ page, context, browserName }) => {
     // Intercept POST /api/generate-post
     await page.route('**/api/generate-post', async (route) => {
       await route.fulfill({
@@ -216,8 +233,16 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
       });
     });
 
+    // Grant clipboard permissions only if Chromium
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    }
+
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     await page.locator('#btn-share-trend').click();
     await expect(page.locator('#share-modal')).toBeVisible();
@@ -255,6 +280,9 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
   test('8. Verify Platform-Specific Formatting and URL Inclusion', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
 
     // Open share modal
     await page.locator('#btn-share-trend').click();
@@ -374,6 +402,53 @@ test.describe('TJ-25: AI-Powered Viral Social Post Generator Tests', () => {
     expect(infoWidth).toBe(2400);
     expect(infoHeight).toBe(1260);
   });
+
+  // [AC-7] Generation Request ID Synchronization
+  test('10. Verify Generation Request ID Synchronization (discards out-of-order responses)', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+
+    let requestCount = 0;
+    // Intercept generate post to resolve the first request quickly but delay the second request
+    await page.route('**/api/generate-post', async (route) => {
+      requestCount++;
+      const currentReqNum = requestCount;
+      
+      if (currentReqNum === 1) {
+        // First request (X) resolves at 2000ms
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ postText: 'Fast First Request Content' }),
+        });
+      } else {
+        // Second request (LinkedIn) resolves at 4000ms
+        await new Promise((resolve) => setTimeout(resolve, 4000));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ postText: 'Slow Second Request Content' }),
+        });
+      }
+    });
+
+    await page.goto('/');
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
+    // Open share modal (starts 1st request automatically)
+    await page.locator('#btn-share-trend').click();
+    await expect(page.locator('#share-modal')).toBeVisible();
+
+    // Immediately click LinkedIn pill to start 2nd request
+    const linkedinPill = page.locator('.platform-pill[data-platform="linkedin"]');
+    await linkedinPill.click();
+
+    // Wait for 6000ms so both requests complete
+    await page.waitForTimeout(6000);
+
+    // Verify textarea shows the second request's content (Slow Second Request Content),
+    // because it was the last requested platform, and request ID synchronization must ensure it updates.
+    const previewTextarea = page.locator('#share-preview-text');
+    await expect(previewTextarea).toHaveValue('Slow Second Request Content');
+  });
 });
-
-

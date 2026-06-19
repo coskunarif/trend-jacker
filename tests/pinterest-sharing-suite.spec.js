@@ -48,6 +48,10 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
   // [AC-1] Pinterest Share Pill & Intent in UI
   test('Verify Pinterest Share Pill and UI selection', async ({ page }) => {
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     const shareBtn = page.locator('#btn-share-trend');
     await expect(shareBtn).toBeVisible();
     await shareBtn.click();
@@ -79,8 +83,17 @@ test.describe('Pinterest Integration & Scheduled Viral Poster Suite', () => {
   });
 
   // [AC-1] [AC-3] Outbound Link Intent for Pinterest
-  test('Verify Pinterest Outbound Intent Link Formatting', async ({ page, context }) => {
+  test('Verify Pinterest Outbound Intent Link Formatting', async ({ page, context, browserName }) => {
+    // [AC-2] Intent Test Clipboard Permissions
+    if (browserName === 'chromium') {
+      await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+    }
+
     await page.goto('/');
+
+    // Wait for the active trend item to render in the DOM
+    await expect(page.locator('.trend-item.active')).toBeVisible();
+
     await page.locator('#btn-share-trend').click();
 
     await page.route('**/api/generate-post', async (route) => {
