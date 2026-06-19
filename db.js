@@ -515,7 +515,10 @@ export async function getCachedExplanation(trend) {
   if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
-      const row = stmt.get(normalizedTrend);
+      let row = stmt.get(normalizedTrend);
+      if (!row && normalizedTrend.includes(' ')) {
+        row = stmt.get(normalizedTrend.replace(/\s+/g, '-'));
+      }
       if (row && row.explanation) {
         const explanation = JSON.parse(row.explanation);
         explanation.created_at = row.created_at;
@@ -528,7 +531,10 @@ export async function getCachedExplanation(trend) {
     }
   }
 
-  const cached = inMemoryExplanations.get(normalizedTrend);
+  let cached = inMemoryExplanations.get(normalizedTrend);
+  if (!cached && normalizedTrend.includes(' ')) {
+    cached = inMemoryExplanations.get(normalizedTrend.replace(/\s+/g, '-'));
+  }
   if (cached) {
     return {
       ...cached.explanation,
@@ -622,7 +628,10 @@ export async function getLocalizedExplanation(trend, lang) {
   if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
-      const row = stmt.get(normalizedTrend, normalizedLang);
+      let row = stmt.get(normalizedTrend, normalizedLang);
+      if (!row && normalizedTrend.includes(' ')) {
+        row = stmt.get(normalizedTrend.replace(/\s+/g, '-'), normalizedLang);
+      }
       if (row) {
         return {
           title: row.title,
@@ -638,7 +647,10 @@ export async function getLocalizedExplanation(trend, lang) {
     }
   }
 
-  const cached = inMemoryLocalizedExplanations.get(`${normalizedTrend}_${normalizedLang}`);
+  let cached = inMemoryLocalizedExplanations.get(`${normalizedTrend}_${normalizedLang}`);
+  if (!cached && normalizedTrend.includes(' ')) {
+    cached = inMemoryLocalizedExplanations.get(`${normalizedTrend.replace(/\s+/g, '-')}_${normalizedLang}`);
+  }
   if (cached) {
     return {
       ...cached,
@@ -2232,5 +2244,78 @@ export async function getAllCachedExplanations() {
   }
   list.sort((a, b) => b.created_at.localeCompare(a.created_at));
   return list;
+}
+
+export async function pruneOldExplanations() {
+  const cutoffDate = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+
+  if (firestore) {
+    try {
+      const batch = firestore.batch();
+      
+      const trendsSnapshot = await firestore.collection('trend_explanations')
+        .where('created_at', '<', cutoffDate)
+        .get();
+      trendsSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      const locSnapshot = await firestore.collection('localized_explanations')
+        .where('created_at', '<', cutoffDate)
+        .get();
+      locSnapshot.forEach(doc => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      console.log(`[DB] Firestore pruning completed. Removed records older than 21 days (cutoff: ${cutoffDate})`);
+    } catch (err) {
+      console.error('[DB] Firestore pruning failed:', err.message);
+    }
+    return;
+  }
+
+  if (DatabaseSyncClass) {
+    const db = new DatabaseSyncClass(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    db.exec('PRAGMA journal_mode = WAL;');
+    
+    try {
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      
+      const stmt1 = db.prepare('DELETE FROM trend_explanations WHERE created_at < ?');
+      stmt1.run(cutoffDate);
+      
+      const stmt2 = db.prepare('DELETE FROM localized_explanations WHERE created_at < ?');
+      stmt2.run(cutoffDate);
+      
+      db.exec('COMMIT;');
+      console.log(`[DB] Local SQLite pruning transaction completed (cutoff: ${cutoffDate})`);
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {
+        // ignore
+      }
+      console.error('[DB] Local SQLite pruning failed, transaction rolled back:', err.message);
+      throw err;
+    } finally {
+      db.close();
+    }
+    return;
+  }
+
+  // In-memory fallback
+  for (const [key, value] of inMemoryExplanations.entries()) {
+    if (value.created_at < cutoffDate) {
+      inMemoryExplanations.delete(key);
+    }
+  }
+  for (const [key, value] of inMemoryLocalizedExplanations.entries()) {
+    if (value.created_at < cutoffDate) {
+      inMemoryLocalizedExplanations.delete(key);
+    }
+  }
+  console.log(`[DB] In-memory fallback pruning completed (cutoff: ${cutoffDate})`);
 }
 
