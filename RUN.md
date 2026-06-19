@@ -1,5 +1,5 @@
 task: Maximize crawl speed of newly generated trend pages to capture viral search engine traffic  tier: T2   creativity: 0.3
-state: SHIPPER                 budget: repairs 0/3
+state: complete                budget: repairs 0/3
 branch: asf/20260619-fast-indexing          checkpoint: none
 caps: agents,ui,web,human
 
@@ -42,3 +42,22 @@ caps: agents,ui,web,human
 
 ### Visual Checks
 - **Layout & Visual Regression**: Skipped (no layout, frontend, or styling changes).
+
+## Done
+
+### What Shipped
+- Integrated Google Indexing API into `indexing.js` with 3x retry limits, exponential backoff (200/400/800ms delays), and concurrency capped at 5 simultaneous HTTP requests.
+- Added mock warning bypass for local dev and standard fetch fallback in E2E tests.
+- Refactored `scripts/ping-sitemap.js` to parse, filter out static pages, and cap indexing requests to the 15 most recent trends.
+- Updated E2E test suites (`tests/google-indexing.spec.js` and `tests/seo-canonical-redirects.spec.js`) to assert new endpoint and payload structure.
+
+### Verification Table
+| Acceptance Criterion | Verification Evidence | Status |
+|---|---|---|
+| **[AC-1] Google Indexing API Integration** | Run `npx playwright test` verifying all 311 test cases passed. Interceptors validated chunks of 5 and retry loops. | PASS |
+| **[AC-2] Standalone CLI Script Update** | Local script execution correctly targets `/t/:slug` patterns and limits to 15 entries. | PASS |
+| **[AC-3] Test Suite Updates** | Tests are updated to assert on `indexing.googleapis.com` POST notifications instead of sitemap GET pings. | PASS |
+
+### Integration Details
+- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/57
+- **Integration Method**: `gh pr merge --squash`
