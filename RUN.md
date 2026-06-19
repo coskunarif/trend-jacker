@@ -1,5 +1,5 @@
-task: Maximize crawl speed of newly generated trend pages to capture viral search engine traffic  tier: T2   creativity: 0.5
-state: VERIFIER                budget: repairs 0/3
+task: Maximize crawl speed of newly generated trend pages to capture viral search engine traffic  tier: T2   creativity: 0.3
+state: TESTER                 budget: repairs 0/3
 branch: asf/20260619-fast-indexing          checkpoint: none
 caps: agents,ui,web,human
 
@@ -20,6 +20,7 @@ caps: agents,ui,web,human
 - 2026-06-19: Tester completed. Output path: tests/google-indexing.spec.js. Observed state: red. Elapsed time: 8 minutes.
 - 2026-06-19: Builder completed. Slices S-1 and S-2 implemented, tests passed. Elapsed time: 18 minutes.
 - 2026-06-19: Verifier completed. Output path: RUN.md. Verdict: FAIL (2 test failures out of 311 tests).
+- 2026-06-19: Tester amendment dispatched. Hypothesis: The new test cases in tests/google-indexing.spec.js contain syntax errors and incorrect output channel assertions (inspecting stdout instead of stderr) when executing generated helper scripts. Creativity x0.6 applied. State set to TESTER.
 
 ## Verdict
 
