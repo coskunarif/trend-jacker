@@ -22,6 +22,7 @@ caps: agents,ui,web,human
 - 2026-06-19: Verifier completed. Output path: RUN.md. Verdict: FAIL (2 test failures out of 311 tests).
 - 2026-06-19: Tester amendment dispatched. Hypothesis: The new test cases in tests/google-indexing.spec.js contain syntax errors and incorrect output channel assertions (inspecting stdout instead of stderr) when executing generated helper scripts. Creativity x0.6 applied. State set to TESTER.
 - 2026-06-19: Tester amended tests, tests passed. State set to VERIFIER.
+- 2026-06-19: Verifier completed. Output path: RUN.md. Verdict: PASS (all 311 tests passed successfully).
 
 ## Verdict
 
@@ -29,34 +30,14 @@ caps: agents,ui,web,human
 - **Lint**: Skipped (no lint configuration or script in package.json).
 - **Types**: Skipped (no typecheck configuration or script in package.json).
 - **Build**: Skipped (no build script in package.json).
-- **Test Suite**: **FAIL**
-  - Ran `npx playwright test`. 309 of 311 tests passed.
-  - 2 failures in `tests/google-indexing.spec.js`.
-
-#### Failures:
-1. **[AC-1] Local Development Bypass when no credentials exist and not in test mode**
-   - **AC Broken**: `[AC-1]`
-   - **Evidence**:
-     ```
-     Error: expect(received).toBeDefined()
-     Received: undefined
-     at /home/ubuntuadmin/projects/trend-jacker/tests/google-indexing.spec.js:199:26
-     ```
-   - **Suspected Cause**: **Test bug**. The generated test helper script `temp-dev-test.js` outputs its result using `console.error()`, but `tests/google-indexing.spec.js` executes it with `execSync()` and inspects `stdout`, which does not capture standard error output.
-2. **[AC-2] Standalone CLI Script filters and caps URLs to 15 most recent trends in production mode**
-   - **AC Broken**: `[AC-2]`
-   - **Evidence**:
-     ```
-     Error: Command failed: node temp-cli-test.js
-     SyntaxError: Invalid or unexpected token
-     at /home/ubuntuadmin/projects/trend-jacker/tests/google-indexing.spec.js:286:22
-     ```
-   - **Suspected Cause**: **Test bug**. The template literal generating `temp-cli-test.js` evaluates to code containing an escaped backtick and references `mockSitemap` which is not defined in the scope of the generated script.
+- **Test Suite**: **PASS**
+  - Ran `npx playwright test`. All 311 tests passed successfully.
 
 ### Behavioral Checks
-- **Web UI Dogfooding**: Skipped (no user-facing frontend change; functionality is backend/cron script indexing execution).
+- **Web UI Dogfooding**: Skipped (no user-facing frontend changes; changes are in indexing backend and CLI tools).
 - **Non-web CLI Script Execution**: **PASS**
-  - Manually executed `node scripts/ping-sitemap.js` which correctly fetched the sitemap, filtered non-trend static URLs, capped submissions at 15 trends (60 localized URL variants), and gracefully fell back under local-dev mode to mock Google Indexing.
+  - Verified `indexing.js` correctly maps slugs to 4 localized URLs, chunks notifications in groups of 5, handles exponential backoffs/retries, and bypasses Google APIs with warning logs in local dev mode.
+  - Verified that `scripts/ping-sitemap.js` processes sitemaps correctly, extracts/filters trend paths, limits indexing to 15 recent trends, and respects mock modes.
 
 ### Visual Checks
-- **Layout & Visual Regression**: Skipped (no frontend or styling changes).
+- **Layout & Visual Regression**: Skipped (no layout, frontend, or styling changes).
