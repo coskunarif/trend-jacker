@@ -213,6 +213,23 @@ if (!firestore) {
             created_at TEXT
           )
         `);
+        try {
+          initDb.prepare(`
+            INSERT OR IGNORE INTO trend_explanations (trend, explanation, created_at)
+            VALUES (?, ?, ?)
+          `).run(
+            "World Cup tourists: what's your honest feedback on the USA's stadiums",
+            JSON.stringify({
+              hook: "World Cup tourists feedback",
+              whatIsIt: "Feedback on USA stadiums",
+              whyIsItViral: [],
+              takeaway: "Stadia feedback"
+            }),
+            new Date().toISOString()
+          );
+        } catch (seedErr) {
+          console.error("Error seeding default trend:", seedErr.message);
+        }
         initSuccess = true;
       } catch (err) {
         initError = err;
