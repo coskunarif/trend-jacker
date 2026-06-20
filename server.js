@@ -1097,11 +1097,24 @@ async function handleTrendRequest(request, reply, slug, lang) {
     console.error('Error matching slug against live trends:', err.message);
   }
 
+  if (!isFound) {
+    try {
+      const dbTrends = await getAllCachedExplanations();
+      const dbMatch = dbTrends.find(dbT => titleToSlug(dbT.trend) === cleanSlug);
+      if (dbMatch) {
+        trendName = dbMatch.trend;
+        isFound = true;
+      }
+    } catch (dbErr) {
+      console.error('Error matching slug against DB trends:', dbErr.message);
+    }
+  }
+
   const supported = ['es', 'fr', 'ja'];
   const isLocalized = supported.includes(cleanLang);
 
   // AC-1: Invalid slugs return 404
-  if (!isFound && (isMarkdown || isLocalized)) {
+  if (!isFound) {
     return reply.status(404).send({ error: 'Trend not found' });
   }
 
