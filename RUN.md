@@ -11,5 +11,18 @@ caps: ui,web,human
 - 2026-06-20: Builder completed. Slices S-1 and S-2 implemented, tests passed. Elapsed time: 12 minutes. State set to VERIFIER.
 
 ## Verdict
+- **[AC-1] Eliminate Hard-coded Character Truncation on Reddit Trend Titles**: PASS. Verified that the 60-character truncation is removed from parser logic.
+- **[AC-2] Full & Search-friendly Slug Generation for Trend URLs**: PASS. Verified that slugs are generated with normalization, diacritics removal, 100-character boundary truncation, and Japanese/non-alphanumeric hash fallbacks.
+- **[AC-3] Dynamic Sitemap and Indexing API Synchronization**: PASS. Verified `/sitemap.xml` generates untruncated slugs, and the indexing pings target all 4 localized variants using the untruncated slug.
+- **[AC-4] UI Layout and Responsive Presentation of Long Titles**: PASS. CSS word-wrap and overflow-wrap styles prevent layout issues and horizontal scrolls at both mobile (375px) and desktop (1280px) widths.
+- **[AC-5] Firestore Document ID Hashing/Subcollection Path Collision Avoidance**: FAIL. The implementation of storing the original trend name by injecting the `trend` key into `dataToSave` inside `db.js` caused it to be included in the SQLite `explanation` JSON column. This broke the contract tested by `tests/caching.spec.js`, which expects the parsed cached explanation to match the input explanation exactly without containing the `trend` key.
+  - *Evidence*: `tests/caching.spec.js:49` fails with `expect(received).toEqual(expected)` deep equality mismatch where the received object has a `trend` key.
+  - *Suspected Cause*: Code. The `trend` field should be set at the top-level document fields in Firestore (and the `trend` column in SQLite) instead of being nested inside the serialized `explanation` JSON column.
+- **[AC-6] Persistent Search Engine Indexing Pings**: PASS. Persistent stores in SQLite/Firestore are correctly updated and checked before pinging to prevent duplicates.
+- **[AC-7] Strict 404 for Arbitrary/Fake Slugs**: PASS. Verified that non-existent slugs return a strict 404 status.
+
+- **[KPI-1] Feed Ingestion Latency**: PASS (feed ingestion and cache updates under 500ms).
+- **[KPI-2] Pre-Rendered Page Load Latency**: PASS (cached page load latency under 50ms).
 
 ## Done
+
