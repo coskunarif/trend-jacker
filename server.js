@@ -532,7 +532,7 @@ async function updateTrendsCache() {
 
         return {
           id: `reddit-${index}`,
-          title: title.length > 60 ? title.substring(0, 60) + '...' : title,
+          title: title,
           traffic: 'Reddit Spike',
           description: `Hot post on ${category}`,
           source: 'reddit',
