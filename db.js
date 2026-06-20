@@ -586,8 +586,7 @@ export async function setCachedExplanation(trend, explanation) {
     whyIsItViral: explanation.whyIsItViral || [],
     takeaway: explanation.takeaway,
     continuationProbability: explanation.continuationProbability,
-    continuationRationale: explanation.continuationRationale,
-    trend: trend
+    continuationRationale: explanation.continuationRationale
   };
 
   if (firestore) {
@@ -596,6 +595,7 @@ export async function setCachedExplanation(trend, explanation) {
       const docRef = firestore.collection('trend_explanations').doc(docId);
       await docRef.set({
         ...dataToSave,
+        trend: trend,
         created_at: createdAt
       });
       return;
