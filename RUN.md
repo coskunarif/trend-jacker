@@ -1,5 +1,5 @@
-task: Optimize search query alignment and URL readability to increase search impressions and CTR. Why now: GSC shows 122 impressions and 0 clicks due to truncated/broken trend URLs mid-word. Runner-up: Consolidate domain authority and eliminate duplicate content indexing to increase keyword rankings.  tier: T2   creativity: 0.5
-state: VERIFIER             budget: repairs 0/3
+task: Optimize search query alignment and URL readability to increase search impressions and CTR. Why now: GSC shows 122 impressions and 0 clicks due to truncated/broken trend URLs mid-word. Runner-up: Consolidate domain authority and eliminate duplicate content indexing to increase keyword rankings.  tier: T2   creativity: 0.3
+state: BUILD                budget: repairs 1/3
 branch: asf/20260620-url-readability          checkpoint: none
 caps: ui,web,human
 
@@ -9,6 +9,8 @@ caps: ui,web,human
 - 2026-06-20: Architect completed. Output path: SPEC.md. Elapsed time: 10 minutes. State set to TESTER.
 - 2026-06-20: Tester completed. Output path: tests/url-readability.spec.js. Observed state: red. Elapsed time: 6 minutes. State set to BUILD.
 - 2026-06-20: Builder completed. Slices S-1 and S-2 implemented, tests passed. Elapsed time: 12 minutes. State set to VERIFIER.
+- 2026-06-20: Verifier completed. Output path: RUN.md. Verdict: FAIL (AC-5 failed due to SQLite explanation JSON mismatch).
+- 2026-06-20: Builder repair dispatched. Hypothesis: The builder injected the 'trend' key into the data payload before saving, corrupting explanation JSON serialization in db.js. The trend should be kept outside the explanation payload in SQLite/Firestore. Creativity x0.6 applied. State set to BUILD.
 
 ## Verdict
 - **[AC-1] Eliminate Hard-coded Character Truncation on Reddit Trend Titles**: PASS. Verified that the 60-character truncation is removed from parser logic.
