@@ -1,7 +1,7 @@
 task: Optimize search query alignment and URL readability to increase search impressions and CTR. Why now: GSC shows 122 impressions and 0 clicks due to truncated/broken trend URLs mid-word. Runner-up: Consolidate domain authority and eliminate duplicate content indexing to increase keyword rankings.  tier: T2   creativity: 0.5
 state: BUILD                budget: repairs 0/3
 branch: asf/20260620-url-readability          checkpoint: none
-caps: agents,ui,web,human
+caps: ui,web,human
 
 ## Log
 - 2026-06-19: Conductor starting fresh. Leftover SPEC.md deleted. State set to SCOUT.
