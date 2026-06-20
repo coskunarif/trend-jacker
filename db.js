@@ -287,7 +287,8 @@ export async function getPollData(trend) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('polls').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('polls').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -333,7 +334,8 @@ export async function incrementVote(trend, vote, location = null) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('polls').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('polls').doc(docId);
       await docRef.set({
         [vote]: FieldValue.increment(1)
       }, { merge: true });
@@ -491,7 +493,8 @@ export async function getCachedExplanation(trend) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('trend_explanations').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -559,12 +562,14 @@ export async function setCachedExplanation(trend, explanation) {
     whyIsItViral: explanation.whyIsItViral || [],
     takeaway: explanation.takeaway,
     continuationProbability: explanation.continuationProbability,
-    continuationRationale: explanation.continuationRationale
+    continuationRationale: explanation.continuationRationale,
+    trend: trend
   };
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('trend_explanations').doc(docId);
       await docRef.set({
         ...dataToSave,
         created_at: createdAt
@@ -607,7 +612,8 @@ export async function getLocalizedExplanation(trend, lang) {
   if (firestore) {
     try {
       const docId = `${normalizedTrend}_${normalizedLang}`;
-      const docRef = firestore.collection('localized_explanations').doc(docId);
+      const hashedId = getFirestoreDocId(docId);
+      const docRef = firestore.collection('localized_explanations').doc(hashedId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -676,7 +682,8 @@ export async function setLocalizedExplanation(trend, lang, data) {
   if (firestore) {
     try {
       const docId = `${normalizedTrend}_${normalizedLang}`;
-      const docRef = firestore.collection('localized_explanations').doc(docId);
+      const hashedId = getFirestoreDocId(docId);
+      const docRef = firestore.collection('localized_explanations').doc(hashedId);
       await docRef.set({
         trend: normalizedTrend,
         lang: normalizedLang,
@@ -729,7 +736,7 @@ function getPostCacheKey(trendTitle, platform, contextType) {
   return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`.toLowerCase();
 }
 
-function getFirestoreDocId(key) {
+export function getFirestoreDocId(key) {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
 
@@ -980,7 +987,8 @@ export async function getCachedTopicImage(trend) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('topic_images').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         return doc.data().svg || null;
@@ -1021,7 +1029,8 @@ export async function setCachedTopicImage(trend, svg) {
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('topic_images').doc(docId);
       await docRef.set({
         trend: normalizedTrend,
         svg,
@@ -1220,7 +1229,9 @@ export async function getChatCount(clientId, trend) {
   const normalizedClientId = (clientId || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const doc = await firestore.collection('client_chat_counts').doc(`${normalizedClientId}_${normalizedTrend}`).get();
+      const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
+      const docId = getFirestoreDocId(rawDocId);
+      const doc = await firestore.collection('client_chat_counts').doc(docId).get();
       return doc.exists ? (doc.data().count || 0) : 0;
     } catch (err) {
       console.error(`Firestore error in getChatCount:`, err.message);
@@ -1252,7 +1263,9 @@ export async function incrementChatCount(clientId, trend) {
   const normalizedClientId = (clientId || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const docRef = firestore.collection('client_chat_counts').doc(`${normalizedClientId}_${normalizedTrend}`);
+      const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
+      const docId = getFirestoreDocId(rawDocId);
+      const docRef = firestore.collection('client_chat_counts').doc(docId);
       await docRef.set({
         client_id: normalizedClientId,
         trend: normalizedTrend,
@@ -2199,7 +2212,7 @@ export async function getAllCachedExplanations() {
       for (const doc of snapshot.docs) {
         const data = doc.data();
         results.push({
-          trend: doc.id,
+          trend: data.trend || doc.id,
           created_at: data.created_at || '',
           explanation: {
             hook: data.hook,
