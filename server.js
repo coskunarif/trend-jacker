@@ -8,7 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged, filterUnpingedSlugs } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -603,25 +603,32 @@ async function updateTrendsCache() {
   }
 
   // Trigger search engine indexing pings for newly discovered trends
-  const newSlugs = [];
+  const slugsToCheck = [];
   for (const trend of latestTrends) {
     const slug = titleToSlug(trend.title);
     if (!pingedSlugs.has(slug)) {
-      const alreadyPinged = await isSlugPinged(slug);
-      if (!alreadyPinged) {
-        newSlugs.push(slug);
-      }
-      pingedSlugs.add(slug);
+      slugsToCheck.push(slug);
     }
   }
-  if (newSlugs.length > 0) {
-    pingSearchEngines(newSlugs).then(async () => {
-      for (const slug of newSlugs) {
-        await markSlugAsPinged(slug);
+
+  if (slugsToCheck.length > 0) {
+    try {
+      const newSlugs = await filterUnpingedSlugs(slugsToCheck);
+      for (const slug of slugsToCheck) {
+        pingedSlugs.add(slug);
       }
-    }).catch(err => {
-      console.error('Failed to trigger search engine pings:', err);
-    });
+      if (newSlugs.length > 0) {
+        pingSearchEngines(newSlugs).then(async () => {
+          for (const slug of newSlugs) {
+            await markSlugAsPinged(slug);
+          }
+        }).catch(err => {
+          console.error('Failed to trigger search engine pings:', err);
+        });
+      }
+    } catch (err) {
+      console.error('Failed to filter unpinged slugs:', err.message);
+    }
   }
 
   // Prune old explanations older than 21 days (3 weeks)
@@ -681,7 +688,7 @@ function startGlobalSimulation() {
 
     let updatedPolls = null;
     try {
-      updatedPolls = await incrementVote(randomTrend.title, vote, location);
+      updatedPolls = await incrementVote(randomTrend.title, vote, location, true);
     } catch (err) {
       console.error(`Failed to increment simulated vote for "${randomTrend.title}":`, err.message);
     }

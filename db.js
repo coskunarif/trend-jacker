@@ -1,4 +1,4 @@
-import { Firestore, FieldValue } from '@google-cloud/firestore';
+import { Firestore, FieldValue, FieldPath } from '@google-cloud/firestore';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -37,6 +37,14 @@ const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
 const inMemoryClientPredictions = new Map();
 const inMemoryPingedSlugs = new Map();
+
+// Caches to minimize Firestore reads/writes in production
+const pollCache = new Map();
+const POLL_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 300000; // 5 minutes in production, 0 in tests
+
+const explanationCache = new Map();
+const EXPLANATION_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 3600000; // 1 hour in production, 0 in tests
+
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -309,6 +317,15 @@ if (!firestore) {
  */
 export async function getPollData(trend) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
+  const now = Date.now();
+  if (pollCache.has(normalizedTrend)) {
+    const cached = pollCache.get(normalizedTrend);
+    if (now - cached.cachedAt < POLL_CACHE_TTL) {
+      return { overrated: cached.overrated, genius: cached.genius };
+    }
+  }
+
+  let result = { overrated: 0, genius: 0 };
   if (firestore) {
     try {
       const docId = getFirestoreDocId(normalizedTrend);
@@ -316,46 +333,64 @@ export async function getPollData(trend) {
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
-        return {
+        result = {
           overrated: data.overrated || 0,
           genius: data.genius || 0
         };
       }
-      return { overrated: 0, genius: 0 };
     } catch (err) {
       console.error(`Firestore error in getPollData for "${normalizedTrend}":`, err.message);
     }
-  }
-
-  // SQLite fallback
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT overrated, genius FROM votes WHERE trend = ?');
       const row = stmt.get(normalizedTrend);
       if (row) {
-        return { overrated: row.overrated, genius: row.genius };
+        result = { overrated: row.overrated, genius: row.genius };
       }
-      return { overrated: 0, genius: 0 };
     } catch (err) {
       console.error(`Local SQLite query failed for "${normalizedTrend}":`, err.message);
     }
+  } else {
+    if (!inMemoryStorage.has(normalizedTrend)) {
+      inMemoryStorage.set(normalizedTrend, { overrated: 0, genius: 0 });
+    }
+    result = inMemoryStorage.get(normalizedTrend);
   }
 
-  // In-memory fallback
-  if (!inMemoryStorage.has(normalizedTrend)) {
-    inMemoryStorage.set(normalizedTrend, { overrated: 0, genius: 0 });
-  }
-  return inMemoryStorage.get(normalizedTrend);
+  pollCache.set(normalizedTrend, {
+    overrated: result.overrated,
+    genius: result.genius,
+    cachedAt: now
+  });
+  return { overrated: result.overrated, genius: result.genius };
 }
 
 /**
  * Increments the vote count for a trend (either 'overrated' or 'genius') and returns the updated counts.
  * @param {string} trend 
  * @param {'overrated'|'genius'} vote 
+ * @param {object} location
+ * @param {boolean} isSimulated
  * @returns {Promise<{overrated: number, genius: number}>}
  */
-export async function incrementVote(trend, vote, location = null) {
+export async function incrementVote(trend, vote, location = null, isSimulated = false) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
+  
+  if (isSimulated) {
+    const current = await getPollData(normalizedTrend);
+    current[vote] = (current[vote] || 0) + 1;
+    pollCache.set(normalizedTrend, {
+      overrated: current.overrated,
+      genius: current.genius,
+      cachedAt: Date.now()
+    });
+    return {
+      overrated: current.overrated,
+      genius: current.genius
+    };
+  }
+
   if (firestore) {
     try {
       const docId = getFirestoreDocId(normalizedTrend);
@@ -364,14 +399,17 @@ export async function incrementVote(trend, vote, location = null) {
         [vote]: FieldValue.increment(1)
       }, { merge: true });
 
-      const doc = await docRef.get();
-      if (doc.exists) {
-        const data = doc.data();
-        return {
-          overrated: data.overrated || 0,
-          genius: data.genius || 0
-        };
-      }
+      const current = await getPollData(normalizedTrend);
+      current[vote] = (current[vote] || 0) + 1;
+      pollCache.set(normalizedTrend, {
+        overrated: current.overrated,
+        genius: current.genius,
+        cachedAt: Date.now()
+      });
+      return {
+        overrated: current.overrated,
+        genius: current.genius
+      };
     } catch (err) {
       console.error(`Firestore error in incrementVote for "${normalizedTrend}":`, err.message);
     }
@@ -401,6 +439,11 @@ export async function incrementVote(trend, vote, location = null) {
       }
       db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(normalizedTrend, vote, timestamp, locStr);
       db.exec('COMMIT;');
+      pollCache.set(normalizedTrend, {
+        overrated: current.overrated,
+        genius: current.genius,
+        cachedAt: Date.now()
+      });
       return current;
     } catch (err) {
       try {
@@ -408,7 +451,9 @@ export async function incrementVote(trend, vote, location = null) {
       } catch (rollbackErr) {}
       console.error(`Local SQLite write failed for "${normalizedTrend}":`, err.message);
     } finally {
-      db.close();
+      try {
+        db.close();
+      } catch (closeErr) {}
     }
   }
 
@@ -418,6 +463,11 @@ export async function incrementVote(trend, vote, location = null) {
     inMemoryEvents.set(normalizedTrend, []);
   }
   inMemoryEvents.get(normalizedTrend).push({ vote, timestamp, location: locStr });
+  pollCache.set(normalizedTrend, {
+    overrated: current.overrated,
+    genius: current.genius,
+    cachedAt: Date.now()
+  });
   return current;
 }
 
@@ -515,6 +565,18 @@ export async function seedVoteEvents(trend, events) {
  */
 export async function getCachedExplanation(trend) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
+  const now = Date.now();
+  if (explanationCache.has(normalizedTrend)) {
+    const cached = explanationCache.get(normalizedTrend);
+    if (now - cached.cachedAt < EXPLANATION_CACHE_TTL) {
+      return {
+        ...cached.explanation,
+        created_at: cached.created_at
+      };
+    }
+  }
+
+  let result = null;
   if (firestore) {
     try {
       const docId = getFirestoreDocId(normalizedTrend);
@@ -522,7 +584,7 @@ export async function getCachedExplanation(trend) {
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
-        return {
+        result = {
           hook: data.hook,
           whatIsIt: data.whatIsIt,
           whyIsItViral: data.whyIsItViral || [],
@@ -532,14 +594,11 @@ export async function getCachedExplanation(trend) {
           created_at: data.created_at
         };
       }
-      return null;
     } catch (err) {
       console.error(`Firestore error in getCachedExplanation for "${normalizedTrend}":`, err.message);
       return null;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
       let row = stmt.get(normalizedTrend);
@@ -549,26 +608,35 @@ export async function getCachedExplanation(trend) {
       if (row && row.explanation) {
         const explanation = JSON.parse(row.explanation);
         explanation.created_at = row.created_at;
-        return explanation;
+        result = explanation;
       }
-      return null;
     } catch (err) {
       console.error(`Local SQLite query failed for getCachedExplanation "${normalizedTrend}":`, err.message);
       return null;
     }
+  } else {
+    let cached = inMemoryExplanations.get(normalizedTrend);
+    if (!cached && normalizedTrend.includes(' ')) {
+      cached = inMemoryExplanations.get(normalizedTrend.replace(/\s+/g, '-'));
+    }
+    if (cached) {
+      result = {
+        ...cached.explanation,
+        created_at: cached.created_at
+      };
+    }
   }
 
-  let cached = inMemoryExplanations.get(normalizedTrend);
-  if (!cached && normalizedTrend.includes(' ')) {
-    cached = inMemoryExplanations.get(normalizedTrend.replace(/\s+/g, '-'));
+  if (result) {
+    const { created_at, ...explanationData } = result;
+    explanationCache.set(normalizedTrend, {
+      explanation: explanationData,
+      created_at: created_at,
+      cachedAt: now
+    });
   }
-  if (cached) {
-    return {
-      ...cached.explanation,
-      created_at: cached.created_at
-    };
-  }
-  return null;
+
+  return result;
 }
 
 /**
@@ -588,6 +656,12 @@ export async function setCachedExplanation(trend, explanation) {
     continuationProbability: explanation.continuationProbability,
     continuationRationale: explanation.continuationRationale
   };
+
+  explanationCache.set(normalizedTrend, {
+    explanation: dataToSave,
+    created_at: createdAt,
+    cachedAt: Date.now()
+  });
 
   if (firestore) {
     try {
@@ -633,6 +707,21 @@ export async function setCachedExplanation(trend, explanation) {
 export async function getLocalizedExplanation(trend, lang) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   const normalizedLang = lang ? lang.trim().toLowerCase() : '';
+  const cacheKey = `locale:${normalizedTrend}_${normalizedLang}`;
+  const now = Date.now();
+  if (explanationCache.has(cacheKey)) {
+    const cached = explanationCache.get(cacheKey);
+    if (now - cached.cachedAt < EXPLANATION_CACHE_TTL) {
+      return {
+        title: cached.title,
+        meta_description: cached.meta_description,
+        explanation: cached.explanation,
+        created_at: cached.created_at
+      };
+    }
+  }
+
+  let result = null;
   if (firestore) {
     try {
       const docId = `${normalizedTrend}_${normalizedLang}`;
@@ -641,21 +730,18 @@ export async function getLocalizedExplanation(trend, lang) {
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
-        return {
+        result = {
           title: data.title,
           meta_description: data.meta_description,
           explanation: typeof data.explanation === 'string' ? JSON.parse(data.explanation) : data.explanation,
           created_at: data.created_at
         };
       }
-      return null;
     } catch (err) {
       console.error(`Firestore error in getLocalizedExplanation for "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return null;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const stmt = sqliteDb.prepare('SELECT title, meta_description, explanation, created_at FROM localized_explanations WHERE trend = ? AND lang = ?');
       let row = stmt.get(normalizedTrend, normalizedLang);
@@ -663,31 +749,41 @@ export async function getLocalizedExplanation(trend, lang) {
         row = stmt.get(normalizedTrend.replace(/\s+/g, '-'), normalizedLang);
       }
       if (row) {
-        return {
+        result = {
           title: row.title,
           meta_description: row.meta_description,
           explanation: JSON.parse(row.explanation),
           created_at: row.created_at
         };
       }
-      return null;
     } catch (err) {
       console.error(`Local SQLite query failed for getLocalizedExplanation "${normalizedTrend}" "${normalizedLang}":`, err.message);
       return null;
     }
+  } else {
+    let cached = inMemoryLocalizedExplanations.get(`${normalizedTrend}_${normalizedLang}`);
+    if (!cached && normalizedTrend.includes(' ')) {
+      cached = inMemoryLocalizedExplanations.get(`${normalizedTrend.replace(/\s+/g, '-')}_${normalizedLang}`);
+    }
+    if (cached) {
+      result = {
+        ...cached,
+        created_at: cached.created_at
+      };
+    }
   }
 
-  let cached = inMemoryLocalizedExplanations.get(`${normalizedTrend}_${normalizedLang}`);
-  if (!cached && normalizedTrend.includes(' ')) {
-    cached = inMemoryLocalizedExplanations.get(`${normalizedTrend.replace(/\s+/g, '-')}_${normalizedLang}`);
+  if (result) {
+    explanationCache.set(cacheKey, {
+      title: result.title,
+      meta_description: result.meta_description,
+      explanation: result.explanation,
+      created_at: result.created_at,
+      cachedAt: now
+    });
   }
-  if (cached) {
-    return {
-      ...cached,
-      created_at: cached.created_at
-    };
-  }
-  return null;
+
+  return result;
 }
 
 /**
@@ -700,8 +796,17 @@ export async function getLocalizedExplanation(trend, lang) {
 export async function setLocalizedExplanation(trend, lang, data) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   const normalizedLang = lang ? lang.trim().toLowerCase() : '';
+  const cacheKey = `locale:${normalizedTrend}_${normalizedLang}`;
   const createdAt = new Date().toISOString();
   const { title, meta_description, explanation } = data;
+
+  explanationCache.set(cacheKey, {
+    title,
+    meta_description,
+    explanation,
+    created_at: createdAt,
+    cachedAt: Date.now()
+  });
 
   if (firestore) {
     try {
@@ -2358,32 +2463,40 @@ export async function pruneOldExplanations() {
 
 export async function isSlugPinged(slug) {
   const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
+  if (inMemoryPingedSlugs.has(normalizedSlug)) {
+    return inMemoryPingedSlugs.get(normalizedSlug);
+  }
+
+  let exists = false;
   if (firestore) {
     try {
       const doc = await firestore.collection('pinged_slugs').doc(normalizedSlug).get();
-      return doc.exists;
+      exists = doc.exists;
     } catch (err) {
       console.error(`Firestore error in isSlugPinged for "${normalizedSlug}":`, err.message);
       return false;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT 1 FROM pinged_slugs WHERE slug = ?').get(normalizedSlug);
-      return !!row;
+      exists = !!row;
     } catch (err) {
       console.error(`Local SQLite query failed for isSlugPinged "${normalizedSlug}":`, err.message);
       return false;
     }
+  } else {
+    exists = inMemoryPingedSlugs.has(normalizedSlug) && !!inMemoryPingedSlugs.get(normalizedSlug);
   }
 
-  return inMemoryPingedSlugs.has(normalizedSlug);
+  inMemoryPingedSlugs.set(normalizedSlug, exists);
+  return exists;
 }
 
 export async function markSlugAsPinged(slug) {
   const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
   const createdAt = new Date().toISOString();
+  inMemoryPingedSlugs.set(normalizedSlug, true);
+
   if (firestore) {
     try {
       await firestore.collection('pinged_slugs').doc(normalizedSlug).set({
@@ -2407,7 +2520,94 @@ export async function markSlugAsPinged(slug) {
       return;
     }
   }
+}
 
-  inMemoryPingedSlugs.set(normalizedSlug, createdAt);
+export async function filterUnpingedSlugs(slugs) {
+  if (!Array.isArray(slugs) || slugs.length === 0) return [];
+  
+  const results = [];
+  const normalizedSlugs = slugs.map(s => s ? s.trim().toLowerCase() : '').filter(Boolean);
+  
+  const missingSlugs = [];
+  for (const slug of normalizedSlugs) {
+    if (inMemoryPingedSlugs.has(slug)) {
+      if (!inMemoryPingedSlugs.get(slug)) {
+        results.push(slug);
+      }
+    } else {
+      missingSlugs.push(slug);
+    }
+  }
+  
+  if (missingSlugs.length === 0) {
+    return results;
+  }
+  
+  if (firestore) {
+    try {
+      const chunks = [];
+      for (let i = 0; i < missingSlugs.length; i += 30) {
+        chunks.push(missingSlugs.slice(i, i + 30));
+      }
+      
+      const foundSlugs = new Set();
+      for (const chunk of chunks) {
+        const snapshot = await firestore.collection('pinged_slugs')
+          .where(FieldPath.documentId(), 'in', chunk)
+          .get();
+        snapshot.forEach(doc => {
+          foundSlugs.add(doc.id);
+        });
+      }
+      
+      for (const slug of missingSlugs) {
+        const isPinged = foundSlugs.has(slug);
+        inMemoryPingedSlugs.set(slug, isPinged);
+        if (!isPinged) {
+          results.push(slug);
+        }
+      }
+    } catch (err) {
+      console.error(`Firestore error in filterUnpingedSlugs:`, err.message);
+      for (const slug of missingSlugs) {
+        const alreadyPinged = await isSlugPinged(slug);
+        if (!alreadyPinged) {
+          results.push(slug);
+        }
+      }
+    }
+  } else if (sqliteDb) {
+    try {
+      const placeholders = missingSlugs.map(() => '?').join(',');
+      const stmt = sqliteDb.prepare(`SELECT slug FROM pinged_slugs WHERE slug IN (${placeholders})`);
+      const rows = stmt.all(...missingSlugs);
+      const foundSlugs = new Set(rows.map(r => r.slug));
+      
+      for (const slug of missingSlugs) {
+        const isPinged = foundSlugs.has(slug);
+        inMemoryPingedSlugs.set(slug, isPinged);
+        if (!isPinged) {
+          results.push(slug);
+        }
+      }
+    } catch (err) {
+      console.error(`Local SQLite error in filterUnpingedSlugs:`, err.message);
+      for (const slug of missingSlugs) {
+        const alreadyPinged = await isSlugPinged(slug);
+        if (!alreadyPinged) {
+          results.push(slug);
+        }
+      }
+    }
+  } else {
+    for (const slug of missingSlugs) {
+      const isPinged = inMemoryPingedSlugs.has(slug) && !!inMemoryPingedSlugs.get(slug);
+      if (!isPinged) {
+        results.push(slug);
+      }
+    }
+  }
+  
+  return results;
 }
 
