@@ -8,7 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -607,12 +607,19 @@ async function updateTrendsCache() {
   for (const trend of latestTrends) {
     const slug = titleToSlug(trend.title);
     if (!pingedSlugs.has(slug)) {
+      const alreadyPinged = await isSlugPinged(slug);
+      if (!alreadyPinged) {
+        newSlugs.push(slug);
+      }
       pingedSlugs.add(slug);
-      newSlugs.push(slug);
     }
   }
   if (newSlugs.length > 0) {
-    pingSearchEngines(newSlugs).catch(err => {
+    pingSearchEngines(newSlugs).then(async () => {
+      for (const slug of newSlugs) {
+        await markSlugAsPinged(slug);
+      }
+    }).catch(err => {
       console.error('Failed to trigger search engine pings:', err);
     });
   }

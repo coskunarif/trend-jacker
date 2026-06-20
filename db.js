@@ -36,6 +36,7 @@ const inMemoryClientTriviaScores = new Map();
 const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
 const inMemoryClientPredictions = new Map();
+const inMemoryPingedSlugs = new Map();
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -204,6 +205,12 @@ if (!firestore) {
             status TEXT,
             resolved_at TEXT,
             PRIMARY KEY (client_id, trend, prediction_date)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS pinged_slugs (
+            slug TEXT PRIMARY KEY,
+            created_at TEXT
           )
         `);
         initSuccess = true;
@@ -2330,5 +2337,60 @@ export async function pruneOldExplanations() {
     }
   }
   console.log(`[DB] In-memory fallback pruning completed (cutoff: ${cutoffDate})`);
+}
+
+export async function isSlugPinged(slug) {
+  const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
+  if (firestore) {
+    try {
+      const doc = await firestore.collection('pinged_slugs').doc(normalizedSlug).get();
+      return doc.exists;
+    } catch (err) {
+      console.error(`Firestore error in isSlugPinged for "${normalizedSlug}":`, err.message);
+      return false;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT 1 FROM pinged_slugs WHERE slug = ?').get(normalizedSlug);
+      return !!row;
+    } catch (err) {
+      console.error(`Local SQLite query failed for isSlugPinged "${normalizedSlug}":`, err.message);
+      return false;
+    }
+  }
+
+  return inMemoryPingedSlugs.has(normalizedSlug);
+}
+
+export async function markSlugAsPinged(slug) {
+  const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
+  const createdAt = new Date().toISOString();
+  if (firestore) {
+    try {
+      await firestore.collection('pinged_slugs').doc(normalizedSlug).set({
+        slug: normalizedSlug,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in markSlugAsPinged for "${normalizedSlug}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare('INSERT OR REPLACE INTO pinged_slugs (slug, created_at) VALUES (?, ?)')
+        .run(normalizedSlug, createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for markSlugAsPinged "${normalizedSlug}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryPingedSlugs.set(normalizedSlug, createdAt);
 }
 
