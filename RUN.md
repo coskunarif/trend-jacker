@@ -1,6 +1,6 @@
 task: Optimize search query alignment and URL readability to increase search impressions and CTR. Why now: GSC shows 122 impressions and 0 clicks due to truncated/broken trend URLs mid-word. Runner-up: Consolidate domain authority and eliminate duplicate content indexing to increase keyword rankings.  tier: T2   creativity: 0.3
-state: SHIP                 budget: repairs 1/3
-branch: asf/20260620-url-readability          checkpoint: none
+state: complete             budget: repairs 1/3
+branch: asf/20260620-url-readability          checkpoint: asf/20260620-url-readability/green-1
 caps: ui,web,human
 
 ## Log
@@ -28,3 +28,30 @@ caps: ui,web,human
 
 ## Done
 
+### What Shipped
+1. **Reddit Ingestion**: Removed the hardcoded 60-character title truncation from the Reddit RSS feed parser, enabling full thread titles to be ingested and indexed.
+2. **Robust Slug Generation**: Replaced simple title-to-slug mapping with accent normalization, word-boundary truncation (at 100 characters max), and base36 SHA-256 hash fallback for non-alphanumeric titles (such as Japanese).
+3. **Sitemap & Indexing**: Configured sitemap to output untruncated slugs and updated search engine index pinging logic to ping search engines for all 4 localized URL variants using the search-friendly slug.
+4. **Layout Wraps**: Added CSS wrap styles (`word-wrap: break-word` and `overflow-wrap: break-word`) to title components, preventing UI clipping and layout overflows.
+5. **Firestore Hashing**: Hashed Firestore document IDs via SHA-256, avoiding forward slash path collisions, while preserving raw trend names in the document metadata.
+6. **Ping Deduplication**: Persisted ping status in `pinged_slugs` tables/collections to avoid quota exhaustion on server restarts.
+7. **Strict 404 Route Gate**: Prevented arbitrary/fake slug exploitation by restricting dynamic explanation generation to valid live/historical cache trends.
+
+### Acceptance Criteria & Verification Evidence
+| Criterion | Description | Evidence / Verification Method |
+| :--- | :--- | :--- |
+| **[AC-1]** Reddit Ingestion | Full Reddit titles stored without 60-character truncation | Playwright unit and integration tests successfully verified long Reddit trends storage. |
+| **[AC-2]** Search-Friendly Slugs | Transliteration, max 100-char length truncation at word boundaries, non-alphanumeric hash fallbacks | Tested `titleToSlug` behavior on long sentences, Japanese unicode strings, and verified 200 details view responses. |
+| **[AC-3]** Indexing Sync | Sitemap uses untruncated slugs; Indexing API pings all 4 localized routes | Verified sitemap XML response structure and search engine ping trigger logs. |
+| **[AC-4]** UI Presentation | Clean layout wraps without overflow or horizontal scroll at 375px/1280px width | Viewport audits passed for both mobile and desktop viewports without scroll leaks. |
+| **[AC-5]** Firestore ID Hashing | SHA-256 Firestore document ID hashing to prevent subcollection path collision | Verified document creation and correct deserialization of trend metadata. |
+| **[AC-6]** Persistent Pings | Persistent cache storage to prevent duplicate indexing pings | Verified IndexNow/Google Indexing API deduplication after multiple cache updates. |
+| **[AC-7]** Strict 404 Route | Non-existent slugs return 404 status immediately | Verified GET `/t/fake-unseen-trend-slug` returns status 404. |
+
+### Integration Details
+- **PR Link**: https://github.com/coskunarif/trend-jacker/pull/58
+- **Integration Method**: `gh pr merge --squash --delete-branch`
+
+### Visual Screenshots
+![Desktop Layout](dogfood-output/20260620-url-readability/screenshots/main_page.png)
+![Mobile Layout](dogfood-output/20260620-url-readability/screenshots/mobile_main_page.png)
