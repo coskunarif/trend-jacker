@@ -36,6 +36,7 @@ const inMemoryClientTriviaScores = new Map();
 const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
 const inMemoryClientPredictions = new Map();
+const inMemoryPingedSlugs = new Map();
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -206,6 +207,29 @@ if (!firestore) {
             PRIMARY KEY (client_id, trend, prediction_date)
           )
         `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS pinged_slugs (
+            slug TEXT PRIMARY KEY,
+            created_at TEXT
+          )
+        `);
+        try {
+          initDb.prepare(`
+            INSERT OR IGNORE INTO trend_explanations (trend, explanation, created_at)
+            VALUES (?, ?, ?)
+          `).run(
+            "World Cup tourists: what's your honest feedback on the USA's stadiums",
+            JSON.stringify({
+              hook: "World Cup tourists feedback",
+              whatIsIt: "Feedback on USA stadiums",
+              whyIsItViral: [],
+              takeaway: "Stadia feedback"
+            }),
+            new Date().toISOString()
+          );
+        } catch (seedErr) {
+          console.error("Error seeding default trend:", seedErr.message);
+        }
         initSuccess = true;
       } catch (err) {
         initError = err;
@@ -287,7 +311,8 @@ export async function getPollData(trend) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('polls').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('polls').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -333,7 +358,8 @@ export async function incrementVote(trend, vote, location = null) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('polls').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('polls').doc(docId);
       await docRef.set({
         [vote]: FieldValue.increment(1)
       }, { merge: true });
@@ -491,7 +517,8 @@ export async function getCachedExplanation(trend) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('trend_explanations').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -564,9 +591,11 @@ export async function setCachedExplanation(trend, explanation) {
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('trend_explanations').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('trend_explanations').doc(docId);
       await docRef.set({
         ...dataToSave,
+        trend: trend,
         created_at: createdAt
       });
       return;
@@ -607,7 +636,8 @@ export async function getLocalizedExplanation(trend, lang) {
   if (firestore) {
     try {
       const docId = `${normalizedTrend}_${normalizedLang}`;
-      const docRef = firestore.collection('localized_explanations').doc(docId);
+      const hashedId = getFirestoreDocId(docId);
+      const docRef = firestore.collection('localized_explanations').doc(hashedId);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
@@ -676,7 +706,8 @@ export async function setLocalizedExplanation(trend, lang, data) {
   if (firestore) {
     try {
       const docId = `${normalizedTrend}_${normalizedLang}`;
-      const docRef = firestore.collection('localized_explanations').doc(docId);
+      const hashedId = getFirestoreDocId(docId);
+      const docRef = firestore.collection('localized_explanations').doc(hashedId);
       await docRef.set({
         trend: normalizedTrend,
         lang: normalizedLang,
@@ -729,7 +760,7 @@ function getPostCacheKey(trendTitle, platform, contextType) {
   return `${trendTitle || ''}:${platform || ''}:${contextType || ''}`.toLowerCase();
 }
 
-function getFirestoreDocId(key) {
+export function getFirestoreDocId(key) {
   return crypto.createHash('sha256').update(key).digest('hex');
 }
 
@@ -980,7 +1011,8 @@ export async function getCachedTopicImage(trend) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('topic_images').doc(docId);
       const doc = await docRef.get();
       if (doc.exists) {
         return doc.data().svg || null;
@@ -1021,7 +1053,8 @@ export async function setCachedTopicImage(trend, svg) {
 
   if (firestore) {
     try {
-      const docRef = firestore.collection('topic_images').doc(normalizedTrend);
+      const docId = getFirestoreDocId(normalizedTrend);
+      const docRef = firestore.collection('topic_images').doc(docId);
       await docRef.set({
         trend: normalizedTrend,
         svg,
@@ -1220,7 +1253,9 @@ export async function getChatCount(clientId, trend) {
   const normalizedClientId = (clientId || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const doc = await firestore.collection('client_chat_counts').doc(`${normalizedClientId}_${normalizedTrend}`).get();
+      const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
+      const docId = getFirestoreDocId(rawDocId);
+      const doc = await firestore.collection('client_chat_counts').doc(docId).get();
       return doc.exists ? (doc.data().count || 0) : 0;
     } catch (err) {
       console.error(`Firestore error in getChatCount:`, err.message);
@@ -1252,7 +1287,9 @@ export async function incrementChatCount(clientId, trend) {
   const normalizedClientId = (clientId || '').trim().toLowerCase();
   if (firestore) {
     try {
-      const docRef = firestore.collection('client_chat_counts').doc(`${normalizedClientId}_${normalizedTrend}`);
+      const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
+      const docId = getFirestoreDocId(rawDocId);
+      const docRef = firestore.collection('client_chat_counts').doc(docId);
       await docRef.set({
         client_id: normalizedClientId,
         trend: normalizedTrend,
@@ -2199,7 +2236,7 @@ export async function getAllCachedExplanations() {
       for (const doc of snapshot.docs) {
         const data = doc.data();
         results.push({
-          trend: doc.id,
+          trend: data.trend || doc.id,
           created_at: data.created_at || '',
           explanation: {
             hook: data.hook,
@@ -2317,5 +2354,60 @@ export async function pruneOldExplanations() {
     }
   }
   console.log(`[DB] In-memory fallback pruning completed (cutoff: ${cutoffDate})`);
+}
+
+export async function isSlugPinged(slug) {
+  const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
+  if (firestore) {
+    try {
+      const doc = await firestore.collection('pinged_slugs').doc(normalizedSlug).get();
+      return doc.exists;
+    } catch (err) {
+      console.error(`Firestore error in isSlugPinged for "${normalizedSlug}":`, err.message);
+      return false;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT 1 FROM pinged_slugs WHERE slug = ?').get(normalizedSlug);
+      return !!row;
+    } catch (err) {
+      console.error(`Local SQLite query failed for isSlugPinged "${normalizedSlug}":`, err.message);
+      return false;
+    }
+  }
+
+  return inMemoryPingedSlugs.has(normalizedSlug);
+}
+
+export async function markSlugAsPinged(slug) {
+  const normalizedSlug = slug ? slug.trim().toLowerCase() : '';
+  const createdAt = new Date().toISOString();
+  if (firestore) {
+    try {
+      await firestore.collection('pinged_slugs').doc(normalizedSlug).set({
+        slug: normalizedSlug,
+        created_at: createdAt
+      });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in markSlugAsPinged for "${normalizedSlug}":`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.prepare('INSERT OR REPLACE INTO pinged_slugs (slug, created_at) VALUES (?, ?)')
+        .run(normalizedSlug, createdAt);
+      return;
+    } catch (err) {
+      console.error(`Local SQLite insert failed for markSlugAsPinged "${normalizedSlug}":`, err.message);
+      return;
+    }
+  }
+
+  inMemoryPingedSlugs.set(normalizedSlug, createdAt);
 }
 

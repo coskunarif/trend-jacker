@@ -8,7 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -35,11 +35,19 @@ function getApiKey() {
 }
 
 function titleToSlug(title) {
-  return title.toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-');
+  if (!title) return '';
+  let slug = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+  let hash = 0;
+  if (!/[a-z0-9]/.test(slug))
+    for (let i = 0; i < title.length; i++)
+      hash = (hash << 5) - hash + title.charCodeAt(i);
+  if (!/[a-z0-9]/.test(slug))
+    return 'trend-' + (hash >>> 0).toString(36);
+  if (slug.length > 100)
+    slug = slug.substring(0, 100).lastIndexOf('-') !== -1
+      ? slug.substring(0, slug.substring(0, 100).lastIndexOf('-'))
+      : slug.substring(0, 100);
+  return slug;
 }
 
 function escapeHtml(text) {
@@ -532,7 +540,7 @@ async function updateTrendsCache() {
 
         return {
           id: `reddit-${index}`,
-          title: title.length > 60 ? title.substring(0, 60) + '...' : title,
+          title: title,
           traffic: 'Reddit Spike',
           description: `Hot post on ${category}`,
           source: 'reddit',
@@ -599,12 +607,19 @@ async function updateTrendsCache() {
   for (const trend of latestTrends) {
     const slug = titleToSlug(trend.title);
     if (!pingedSlugs.has(slug)) {
+      const alreadyPinged = await isSlugPinged(slug);
+      if (!alreadyPinged) {
+        newSlugs.push(slug);
+      }
       pingedSlugs.add(slug);
-      newSlugs.push(slug);
     }
   }
   if (newSlugs.length > 0) {
-    pingSearchEngines(newSlugs).catch(err => {
+    pingSearchEngines(newSlugs).then(async () => {
+      for (const slug of newSlugs) {
+        await markSlugAsPinged(slug);
+      }
+    }).catch(err => {
       console.error('Failed to trigger search engine pings:', err);
     });
   }
@@ -1082,11 +1097,24 @@ async function handleTrendRequest(request, reply, slug, lang) {
     console.error('Error matching slug against live trends:', err.message);
   }
 
+  if (!isFound) {
+    try {
+      const dbTrends = await getAllCachedExplanations();
+      const dbMatch = dbTrends.find(dbT => titleToSlug(dbT.trend) === cleanSlug);
+      if (dbMatch) {
+        trendName = dbMatch.trend;
+        isFound = true;
+      }
+    } catch (dbErr) {
+      console.error('Error matching slug against DB trends:', dbErr.message);
+    }
+  }
+
   const supported = ['es', 'fr', 'ja'];
   const isLocalized = supported.includes(cleanLang);
 
   // AC-1: Invalid slugs return 404
-  if (!isFound && (isMarkdown || isLocalized)) {
+  if (!isFound) {
     return reply.status(404).send({ error: 'Trend not found' });
   }
 

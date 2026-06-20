@@ -323,6 +323,8 @@ body {
   font-weight: 600;
   font-size: 0.92rem;
   color: var(--text-heading);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .source-badge {

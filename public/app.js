@@ -834,11 +834,19 @@ function initApp() {
 
   // Slug generator helper
   function titleToSlug(title) {
-    return title.toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .trim()
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+    if (!title) return '';
+    let slug = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+    let hash = 0;
+    if (!/[a-z0-9]/.test(slug))
+      for (let i = 0; i < title.length; i++)
+        hash = (hash << 5) - hash + title.charCodeAt(i);
+    if (!/[a-z0-9]/.test(slug))
+      return 'trend-' + (hash >>> 0).toString(36);
+    if (slug.length > 100)
+      slug = slug.substring(0, 100).lastIndexOf('-') !== -1
+        ? slug.substring(0, slug.substring(0, 100).lastIndexOf('-'))
+        : slug.substring(0, 100);
+    return slug;
   }
 
   const UI_DICTIONARY = {
