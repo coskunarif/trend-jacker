@@ -45,6 +45,10 @@ const POLL_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 300000; // 5 minute
 const explanationCache = new Map();
 const EXPLANATION_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 3600000; // 1 hour in production, 0 in tests
 
+let allExplanationsCache = null;
+let allExplanationsCacheTime = 0;
+const ALL_EXPLANATIONS_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 300000; // 5 minutes in production, 0 in tests
+
 let sqliteDb = null;
 let DatabaseSyncClass = null;
 const dbPath = path.join(__dirname, 'polls.db');
@@ -648,6 +652,7 @@ export async function getCachedExplanation(trend) {
 export async function setCachedExplanation(trend, explanation) {
   const normalizedTrend = trend ? trend.trim().toLowerCase() : '';
   const createdAt = new Date().toISOString();
+  allExplanationsCache = null;
   const dataToSave = {
     hook: explanation.hook,
     whatIsIt: explanation.whatIsIt,
@@ -2331,6 +2336,11 @@ export async function getClientAchievements(clientId) {
  * @returns {Promise<Array<{ trend: string, created_at: string, explanation: object }>>}
  */
 export async function getAllCachedExplanations() {
+  const now = Date.now();
+  if (allExplanationsCache && (now - allExplanationsCacheTime < ALL_EXPLANATIONS_CACHE_TTL)) {
+    return allExplanationsCache;
+  }
+
   if (firestore) {
     try {
       const snapshot = await firestore
@@ -2353,6 +2363,8 @@ export async function getAllCachedExplanations() {
           }
         });
       }
+      allExplanationsCache = results;
+      allExplanationsCacheTime = now;
       return results;
     } catch (err) {
       console.error('Firestore error in getAllCachedExplanations:', err.message);
@@ -2364,11 +2376,14 @@ export async function getAllCachedExplanations() {
     try {
       const stmt = sqliteDb.prepare('SELECT trend, explanation, created_at FROM trend_explanations ORDER BY created_at DESC');
       const rows = stmt.all();
-      return rows.map(row => ({
+      const results = rows.map(row => ({
         trend: row.trend,
         created_at: row.created_at || '',
         explanation: JSON.parse(row.explanation)
       }));
+      allExplanationsCache = results;
+      allExplanationsCacheTime = now;
+      return results;
     } catch (err) {
       console.error('Local SQLite query failed for getAllCachedExplanations:', err.message);
       return [];
@@ -2385,11 +2400,15 @@ export async function getAllCachedExplanations() {
     });
   }
   list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  
+  allExplanationsCache = list;
+  allExplanationsCacheTime = now;
   return list;
 }
 
 export async function pruneOldExplanations() {
   const cutoffDate = new Date(Date.now() - 21 * 24 * 60 * 60 * 1000).toISOString();
+  allExplanationsCache = null;
 
   if (firestore) {
     try {
