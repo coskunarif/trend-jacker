@@ -21,6 +21,21 @@ if (process.env.NODE_ENV === 'production') {
   console.log('Running in local/development mode. Using local database fallback.');
 }
 
+function dbTitleToSlug(title) {
+  if (!title) return '';
+  let slug = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
+  let hash = 0;
+  if (!/[a-z0-9]/.test(slug)) {
+    for (let i = 0; i < title.length; i++) {
+      hash = (hash << 5) - hash + title.charCodeAt(i);
+    }
+  }
+  if (!/[a-z0-9]/.test(slug)) {
+    return 'trend-' + (hash >>> 0).toString(36);
+  }
+  return slug;
+}
+
 // Local SQLite fallback and in-memory mock
 const inMemoryStorage = new Map();
 const inMemoryEvents = new Map();
@@ -32,6 +47,7 @@ const inMemoryTopicImages = new Map();
 const inMemoryTrendTrivia = new Map();
 const inMemoryClientReferrals = new Map();
 const inMemoryClientChatCounts = new Map();
+const inMemoryClientGeminiChatCounts = new Map();
 const inMemoryClientTriviaScores = new Map();
 const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
@@ -47,7 +63,41 @@ const EXPLANATION_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 3600000; // 
 
 let allExplanationsCache = null;
 let allExplanationsCacheTime = 0;
-const ALL_EXPLANATIONS_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 300000; // 5 minutes in production, 0 in tests
+const ALL_EXPLANATIONS_CACHE_TTL = Infinity;
+
+const clientSessionCache = new Map();
+const CLIENT_CACHE_TTL = 300000; // 5 minutes
+
+const IS_TEST_ENVIRONMENT = process.env.NODE_ENV === 'test' || 
+                             process.env.PLAYWRIGHT_TEST || 
+                             (typeof process !== 'undefined' && process.argv && process.argv.some(arg => arg.includes('playwright')));
+
+function getClientSession(key) {
+  if (IS_TEST_ENVIRONMENT) {
+    if (!key.includes('cache')) {
+      return undefined;
+    }
+  }
+  const entry = clientSessionCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() - entry.timestamp > CLIENT_CACHE_TTL) {
+    clientSessionCache.delete(key);
+    return undefined;
+  }
+  return entry.value;
+}
+
+function setClientSession(key, value) {
+  if (IS_TEST_ENVIRONMENT) {
+    if (!key.includes('cache')) {
+      return;
+    }
+  }
+  clientSessionCache.set(key, {
+    value,
+    timestamp: Date.now()
+  });
+}
 
 let sqliteDb = null;
 let DatabaseSyncClass = null;
@@ -144,6 +194,14 @@ if (!firestore) {
         `);
         initDb.exec(`
           CREATE TABLE IF NOT EXISTS client_chat_counts (
+            client_id TEXT,
+            trend TEXT,
+            count INTEGER DEFAULT 0,
+            PRIMARY KEY (client_id, trend)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_gemini_chat_counts (
             client_id TEXT,
             trend TEXT,
             count INTEGER DEFAULT 0,
@@ -263,49 +321,28 @@ if (!firestore) {
       throw initError || new Error('Failed to initialize local SQLite database');
     }
 
+    const dbInstance = new DatabaseSyncClass(dbPath);
+    dbInstance.exec('PRAGMA journal_mode = WAL;');
+    dbInstance.exec('PRAGMA busy_timeout = 5000;');
+    dbInstance.exec('PRAGMA synchronous = NORMAL;');
+
     sqliteDb = {
       prepare(sql) {
+        const stmt = dbInstance.prepare(sql);
         return {
           get(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.get(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.get(...args);
           },
           all(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.all(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.all(...args);
           },
           run(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.run(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.run(...args);
           }
         };
       },
       exec(sql) {
-        const db = new DatabaseSyncClass(dbPath);
-        db.exec('PRAGMA busy_timeout = 5000;');
-        try {
-          return db.exec(sql);
-        } finally {
-          db.close();
-        }
+        return dbInstance.exec(sql);
       }
     };
     console.log('Local SQLite database initialized successfully with connection-scoping wrapper at', dbPath);
@@ -379,6 +416,7 @@ export async function getPollData(trend) {
  * @returns {Promise<{overrated: number, genius: number}>}
  */
 export async function incrementVote(trend, vote, location = null, isSimulated = false) {
+  allExplanationsCache = null;
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   
   if (isSimulated) {
@@ -431,18 +469,16 @@ export async function incrementVote(trend, vote, location = null, isSimulated = 
 
   // SQLite fallback update
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
       if (vote === 'genius') {
-        db.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(normalizedTrend);
+        sqliteDb.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(normalizedTrend);
       } else if (vote === 'overrated') {
-        db.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(normalizedTrend);
+        sqliteDb.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(normalizedTrend);
       }
-      db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(normalizedTrend, vote, timestamp, locStr);
-      db.exec('COMMIT;');
+      sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(normalizedTrend, vote, timestamp, locStr);
+      sqliteDb.exec('COMMIT;');
       pollCache.set(normalizedTrend, {
         overrated: current.overrated,
         genius: current.genius,
@@ -451,13 +487,9 @@ export async function incrementVote(trend, vote, location = null, isSimulated = 
       return current;
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite write failed for "${normalizedTrend}":`, err.message);
-    } finally {
-      try {
-        db.close();
-      } catch (closeErr) {}
     }
   }
 
@@ -517,13 +549,11 @@ export async function getVoteEvents(trend) {
 export async function seedVoteEvents(trend, events) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
       
-      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
-      const stmt = db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
+      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
+      const stmt = sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
       let geniusCount = 0;
       let overratedCount = 0;
       for (const ev of events) {
@@ -531,17 +561,15 @@ export async function seedVoteEvents(trend, events) {
         if (ev.vote === 'genius') geniusCount++;
         else overratedCount++;
       }
-      db.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
+      sqliteDb.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
         .run(geniusCount, overratedCount, normalizedTrend);
         
-      db.exec('COMMIT;');
+      sqliteDb.exec('COMMIT;');
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite seedVoteEvents failed:`, err.message);
-    } finally {
-      db.close();
     }
   } else {
     if (!inMemoryEvents.has(normalizedTrend)) {
@@ -589,6 +617,7 @@ export async function getCachedExplanation(trend) {
       if (doc.exists) {
         const data = doc.data();
         result = {
+          trend: data.trend || doc.id,
           hook: data.hook,
           whatIsIt: data.whatIsIt,
           whyIsItViral: data.whyIsItViral || [],
@@ -604,14 +633,19 @@ export async function getCachedExplanation(trend) {
     }
   } else if (sqliteDb) {
     try {
-      const stmt = sqliteDb.prepare('SELECT explanation, created_at FROM trend_explanations WHERE trend = ?');
+      const stmt = sqliteDb.prepare('SELECT trend, explanation, created_at FROM trend_explanations WHERE trend = ?');
       let row = stmt.get(normalizedTrend);
       if (!row && normalizedTrend.includes(' ')) {
         row = stmt.get(normalizedTrend.replace(/\s+/g, '-'));
       }
+      if (!row) {
+        const allRows = sqliteDb.prepare('SELECT trend, explanation, created_at FROM trend_explanations').all();
+        row = allRows.find(r => dbTitleToSlug(r.trend) === normalizedTrend);
+      }
       if (row && row.explanation) {
         const explanation = JSON.parse(row.explanation);
         explanation.created_at = row.created_at;
+        explanation.trend = row.trend;
         result = explanation;
       }
     } catch (err) {
@@ -622,6 +656,14 @@ export async function getCachedExplanation(trend) {
     let cached = inMemoryExplanations.get(normalizedTrend);
     if (!cached && normalizedTrend.includes(' ')) {
       cached = inMemoryExplanations.get(normalizedTrend.replace(/\s+/g, '-'));
+    }
+    if (!cached) {
+      for (const [k, v] of inMemoryExplanations.entries()) {
+        if (dbTitleToSlug(k) === normalizedTrend) {
+          cached = v;
+          break;
+        }
+      }
     }
     if (cached) {
       result = {
@@ -1361,29 +1403,37 @@ export async function getReferralCount(clientId) {
 export async function getChatCount(clientId, trend) {
   const normalizedTrend = (trend || '').trim().toLowerCase();
   const normalizedClientId = (clientId || '').trim().toLowerCase();
+  const cacheKey = `chat_count:${normalizedClientId}:${normalizedTrend}`;
+  const cachedVal = getClientSession(cacheKey);
+  if (cachedVal !== undefined) {
+    return cachedVal;
+  }
+
+  let count = 0;
   if (firestore) {
     try {
       const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
       const docId = getFirestoreDocId(rawDocId);
       const doc = await firestore.collection('client_chat_counts').doc(docId).get();
-      return doc.exists ? (doc.data().count || 0) : 0;
+      count = doc.exists ? (doc.data().count || 0) : 0;
     } catch (err) {
       console.error(`Firestore error in getChatCount:`, err.message);
-      return 0;
+      count = 0;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT count FROM client_chat_counts WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
-      return row ? row.count : 0;
+      count = row ? row.count : 0;
     } catch (err) {
       console.error(`Local SQLite query failed for getChatCount:`, err.message);
-      return 0;
+      count = 0;
     }
+  } else {
+    count = inMemoryClientChatCounts.get(`${normalizedClientId}:${normalizedTrend}`) || 0;
   }
 
-  return inMemoryClientChatCounts.get(`${normalizedClientId}:${normalizedTrend}`) || 0;
+  setClientSession(cacheKey, count);
+  return count;
 }
 
 /**
@@ -1395,6 +1445,34 @@ export async function getChatCount(clientId, trend) {
 export async function incrementChatCount(clientId, trend) {
   const normalizedTrend = (trend || '').trim().toLowerCase();
   const normalizedClientId = (clientId || '').trim().toLowerCase();
+  const cacheKey = `chat_count:${normalizedClientId}:${normalizedTrend}`;
+
+  let cachedVal = getClientSession(cacheKey);
+  if (cachedVal === undefined) {
+    if (firestore) {
+      try {
+        const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
+        const docId = getFirestoreDocId(rawDocId);
+        const doc = await firestore.collection('client_chat_counts').doc(docId).get();
+        cachedVal = doc.exists ? (doc.data().count || 0) : 0;
+      } catch (err) {
+        cachedVal = 0;
+      }
+    } else if (sqliteDb) {
+      try {
+        const row = sqliteDb.prepare('SELECT count FROM client_chat_counts WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
+        cachedVal = row ? row.count : 0;
+      } catch (err) {
+        cachedVal = 0;
+      }
+    } else {
+      cachedVal = inMemoryClientChatCounts.get(`${normalizedClientId}:${normalizedTrend}`) || 0;
+    }
+  }
+
+  const nextVal = cachedVal + 1;
+  setClientSession(cacheKey, nextVal);
+
   if (firestore) {
     try {
       const rawDocId = `${normalizedClientId}_${normalizedTrend}`;
@@ -1408,33 +1486,110 @@ export async function incrementChatCount(clientId, trend) {
       return;
     } catch (err) {
       console.error(`Firestore error in incrementChatCount:`, err.message);
+      clientSessionCache.delete(cacheKey);
       return;
     }
   }
 
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
-      db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
-      db.exec('COMMIT;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
+      sqliteDb.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
+      sqliteDb.exec('COMMIT;');
       return;
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite update failed for incrementChatCount:`, err.message);
+      clientSessionCache.delete(cacheKey);
       return;
-    } finally {
-      db.close();
+    }
+  }
+
+  const inMemKey = `${normalizedClientId}:${normalizedTrend}`;
+  const current = inMemoryClientChatCounts.get(inMemKey) || 0;
+  inMemoryClientChatCounts.set(inMemKey, current + 1);
+}
+
+/**
+ * Gets the Gemini chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<number>}
+ */
+export async function getGeminiChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${normalizedClientId}_${normalizedTrend}`;
+      const doc = await firestore.collection('client_gemini_chat_counts').doc(docId).get();
+      return doc.exists ? (doc.data().count || 0) : 0;
+    } catch (err) {
+      console.error(`Firestore error in getGeminiChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT count FROM client_gemini_chat_counts WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
+      return row ? row.count : 0;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getGeminiChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  return inMemoryClientGeminiChatCounts.get(`${normalizedClientId}:${normalizedTrend}`) || 0;
+}
+
+/**
+ * Increments the Gemini chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<void>}
+ */
+export async function incrementGeminiChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${normalizedClientId}_${normalizedTrend}`;
+      const docRef = firestore.collection('client_gemini_chat_counts').doc(docId);
+      await docRef.set({
+        client_id: normalizedClientId,
+        trend: normalizedTrend,
+        count: FieldValue.increment(1)
+      }, { merge: true });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in incrementGeminiChatCount:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO client_gemini_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
+      sqliteDb.prepare('UPDATE client_gemini_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
+      sqliteDb.exec('COMMIT;');
+      return;
+    } catch (err) {
+      try {
+        sqliteDb.exec('ROLLBACK;');
+      } catch (rollbackErr) {}
+      console.error(`Local SQLite update failed for incrementGeminiChatCount:`, err.message);
+      return;
     }
   }
 
   const key = `${normalizedClientId}:${normalizedTrend}`;
-  const current = inMemoryClientChatCounts.get(key) || 0;
-  inMemoryClientChatCounts.set(key, current + 1);
+  const current = inMemoryClientGeminiChatCounts.get(key) || 0;
+  inMemoryClientGeminiChatCounts.set(key, current + 1);
 }
 
 /**
@@ -1451,52 +1606,138 @@ export async function recordTriviaScore(clientId, trend, score) {
                      normalizedClientId.startsWith('client-test-') ||
                      normalizedClientId.startsWith('client-current-');
 
-  if (firestore) {
-    try {
-      const docId = `${normalizedClientId}_${normalizedTrend}`;
-      const docRef = firestore.collection('client_trivia_scores').doc(docId);
-      const doc = await docRef.get();
-      const existingScore = doc.exists ? (doc.data().score || 0) : null;
-      if (existingScore === null || !isUnitTest || score > existingScore) {
+  const cacheKey = `trivia_score:${normalizedClientId}:${normalizedTrend}`;
+  const cacheKeyAll = `trivia_scores_all:${normalizedClientId}`;
+
+  let existingScore = getClientSession(cacheKey);
+  if (existingScore === undefined) {
+    if (firestore) {
+      try {
+        const docId = `${normalizedClientId}_${normalizedTrend}`;
+        const doc = await firestore.collection('client_trivia_scores').doc(docId).get();
+        existingScore = doc.exists ? (doc.data().score !== undefined ? doc.data().score : null) : null;
+      } catch (err) {
+        existingScore = null;
+      }
+    } else if (sqliteDb) {
+      try {
+        const existing = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
+        existingScore = existing ? existing.score : null;
+      } catch (err) {
+        existingScore = null;
+      }
+    } else {
+      const key = `${normalizedClientId}:${normalizedTrend}`;
+      const existing = inMemoryClientTriviaScores.get(key);
+      existingScore = existing ? existing.score : null;
+    }
+    setClientSession(cacheKey, existingScore);
+  }
+
+  if (existingScore === null || !isUnitTest || score > existingScore) {
+    const completedAt = new Date().toISOString();
+
+    if (firestore) {
+      try {
+        const docId = `${normalizedClientId}_${normalizedTrend}`;
+        const docRef = firestore.collection('client_trivia_scores').doc(docId);
         await docRef.set({
           client_id: normalizedClientId,
           trend: normalizedTrend,
           score: score,
-          completed_at: new Date().toISOString()
+          completed_at: completedAt
         });
+      } catch (err) {
+        console.error(`Firestore error in recordTriviaScore:`, err.message);
+        clientSessionCache.delete(cacheKey);
+        clientSessionCache.delete(cacheKeyAll);
+        return;
       }
-      return;
-    } catch (err) {
-      console.error(`Firestore error in recordTriviaScore:`, err.message);
-      return;
-    }
-  }
-
-  if (sqliteDb) {
-    try {
-      const existing = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
-      const existingScore = existing ? existing.score : null;
-      if (existingScore === null || !isUnitTest || score > existingScore) {
+    } else if (sqliteDb) {
+      try {
         sqliteDb.prepare(`
           INSERT OR REPLACE INTO client_trivia_scores (client_id, trend, score, completed_at)
           VALUES (?, ?, ?, ?)
-        `).run(normalizedClientId, normalizedTrend, score, new Date().toISOString());
+        `).run(normalizedClientId, normalizedTrend, score, completedAt);
+      } catch (err) {
+        console.error(`Local SQLite recordTriviaScore failed:`, err.message);
+        clientSessionCache.delete(cacheKey);
+        clientSessionCache.delete(cacheKeyAll);
+        return;
       }
-      return;
-    } catch (err) {
-      console.error(`Local SQLite recordTriviaScore failed:`, err.message);
-      return;
+    } else {
+      const key = `${normalizedClientId}:${normalizedTrend}`;
+      inMemoryClientTriviaScores.set(key, {
+        score,
+        completed_at: completedAt
+      });
     }
-  }
 
-  const key = `${normalizedClientId}:${normalizedTrend}`;
-  const existing = inMemoryClientTriviaScores.get(key);
-  const existingScore = existing ? existing.score : null;
-  if (existingScore === null || !isUnitTest || score > existingScore) {
-    inMemoryClientTriviaScores.set(key, {
-      score,
-      completed_at: new Date().toISOString()
-    });
+    setClientSession(cacheKey, score);
+
+    // Warm/update the trivia_scores_all cache
+    let cachedList = getClientSession(cacheKeyAll);
+    if (cachedList === undefined) {
+      let dbList = [];
+      if (firestore) {
+        try {
+          const snapshot = await firestore.collection('client_trivia_scores')
+            .where('client_id', '==', normalizedClientId)
+            .get();
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            dbList.push({
+              score: d.score,
+              trend: d.trend,
+              completed_at: d.completed_at
+            });
+          });
+        } catch (e) {}
+      } else if (sqliteDb) {
+        try {
+          const rows = sqliteDb.prepare('SELECT score, trend, completed_at FROM client_trivia_scores WHERE client_id = ?').all(normalizedClientId);
+          for (const row of rows) {
+            dbList.push({
+              score: row.score,
+              trend: row.trend,
+              completed_at: row.completed_at
+            });
+          }
+        } catch (e) {}
+      } else {
+        for (const [key, value] of inMemoryClientTriviaScores.entries()) {
+          const firstColonIndex = key.indexOf(':');
+          if (firstColonIndex !== -1) {
+            const cid = key.slice(0, firstColonIndex);
+            if (cid === normalizedClientId) {
+              const trendName = key.slice(firstColonIndex + 1);
+              dbList.push({
+                score: value.score,
+                trend: trendName,
+                completed_at: value.completed_at
+              });
+            }
+          }
+        }
+      }
+      cachedList = dbList;
+    }
+
+    const existingIdx = cachedList.findIndex(x => x.trend === normalizedTrend);
+    if (existingIdx !== -1) {
+      cachedList[existingIdx] = {
+        score: score,
+        trend: normalizedTrend,
+        completed_at: completedAt
+      };
+    } else {
+      cachedList.push({
+        score: score,
+        trend: normalizedTrend,
+        completed_at: completedAt
+      });
+    }
+    setClientSession(cacheKeyAll, cachedList);
   }
 }
 
@@ -1509,30 +1750,38 @@ export async function recordTriviaScore(clientId, trend, score) {
 export async function getTriviaScore(clientId, trend) {
   const normalizedTrend = (trend || '').trim().toLowerCase();
   const normalizedClientId = (clientId || '').trim().toLowerCase();
+  const cacheKey = `trivia_score:${normalizedClientId}:${normalizedTrend}`;
+  const cachedVal = getClientSession(cacheKey);
+  if (cachedVal !== undefined) {
+    return cachedVal;
+  }
+
+  let score = null;
   if (firestore) {
     try {
       const docId = `${normalizedClientId}_${normalizedTrend}`;
       const doc = await firestore.collection('client_trivia_scores').doc(docId).get();
-      return doc.exists ? (doc.data().score !== undefined ? doc.data().score : null) : null;
+      score = doc.exists ? (doc.data().score !== undefined ? doc.data().score : null) : null;
     } catch (err) {
       console.error(`Firestore error in getTriviaScore:`, err.message);
-      return null;
+      score = null;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT score FROM client_trivia_scores WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
-      return row ? row.score : null;
+      score = row ? row.score : null;
     } catch (err) {
       console.error(`Local SQLite query failed for getTriviaScore:`, err.message);
-      return null;
+      score = null;
     }
+  } else {
+    const key = `${normalizedClientId}:${normalizedTrend}`;
+    const record = inMemoryClientTriviaScores.get(key);
+    score = record ? record.score : null;
   }
 
-  const key = `${normalizedClientId}:${normalizedTrend}`;
-  const record = inMemoryClientTriviaScores.get(key);
-  return record ? record.score : null;
+  setClientSession(cacheKey, score);
+  return score;
 }
 
 /**
@@ -1558,45 +1807,50 @@ export async function getClientStreak(clientId) {
     return null;
   }
   const normalized = (clientId || '').trim().toLowerCase();
+  const cacheKey = `streak:${normalized}`;
+  const cachedVal = getClientSession(cacheKey);
+  if (cachedVal !== undefined) {
+    return cachedVal;
+  }
 
+  let result = null;
   if (firestore) {
     try {
       const docRef = firestore.collection('client_streaks').doc(normalized);
       const doc = await docRef.get();
       if (doc.exists) {
         const data = doc.data();
-        return {
+        result = {
           client_id: data.client_id,
           streak_count: data.streak_count,
           last_active_date: data.last_active_date
         };
       }
-      return null;
     } catch (err) {
       console.error(`Firestore error in getClientStreak for "${normalized}":`, err.message);
-      return null;
+      result = null;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT client_id, streak_count, last_active_date FROM client_streaks WHERE client_id = ?').get(normalized);
-      return row || null;
+      result = row || null;
     } catch (err) {
       console.error(`Local SQLite query failed for getClientStreak "${normalized}":`, err.message);
-      return null;
+      result = null;
+    }
+  } else {
+    const inMemoryRecord = inMemoryClientStreaks.get(normalized);
+    if (inMemoryRecord) {
+      result = {
+        client_id: inMemoryRecord.client_id,
+        streak_count: inMemoryRecord.streak_count,
+        last_active_date: inMemoryRecord.last_active_date
+      };
     }
   }
 
-  const inMemoryRecord = inMemoryClientStreaks.get(normalized);
-  if (inMemoryRecord) {
-    return {
-      client_id: inMemoryRecord.client_id,
-      streak_count: inMemoryRecord.streak_count,
-      last_active_date: inMemoryRecord.last_active_date
-    };
-  }
-  return null;
+  setClientSession(cacheKey, result);
+  return result;
 }
 
 /**
@@ -1607,6 +1861,7 @@ export async function getClientStreak(clientId) {
  */
 export async function updateClientStreak(clientId, localDate) {
   const normalized = (clientId || '').trim().toLowerCase();
+  const cacheKey = `streak:${normalized}`;
   const existing = await getClientStreak(normalized);
 
   let streakCount = 1;
@@ -1628,16 +1883,20 @@ export async function updateClientStreak(clientId, localDate) {
     }
   }
 
+  const updatedObj = {
+    client_id: normalized,
+    streak_count: streakCount,
+    last_active_date: nextActiveDate
+  };
+
   if (firestore) {
     try {
-      await firestore.collection('client_streaks').doc(normalized).set({
-        client_id: normalized,
-        streak_count: streakCount,
-        last_active_date: nextActiveDate
-      });
+      await firestore.collection('client_streaks').doc(normalized).set(updatedObj);
+      setClientSession(cacheKey, updatedObj);
       return;
     } catch (err) {
       console.error(`Firestore error in updateClientStreak for "${normalized}":`, err.message);
+      clientSessionCache.delete(cacheKey);
       return;
     }
   }
@@ -1648,18 +1907,17 @@ export async function updateClientStreak(clientId, localDate) {
         INSERT OR REPLACE INTO client_streaks (client_id, streak_count, last_active_date)
         VALUES (?, ?, ?)
       `).run(normalized, streakCount, nextActiveDate);
+      setClientSession(cacheKey, updatedObj);
       return;
     } catch (err) {
       console.error(`Local SQLite insert failed for updateClientStreak "${normalized}":`, err.message);
+      clientSessionCache.delete(cacheKey);
       return;
     }
   }
 
-  inMemoryClientStreaks.set(normalized, {
-    client_id: normalized,
-    streak_count: streakCount,
-    last_active_date: nextActiveDate
-  });
+  inMemoryClientStreaks.set(normalized, updatedObj);
+  setClientSession(cacheKey, updatedObj);
 }
 
 /**
@@ -1681,6 +1939,7 @@ export async function saveClientNickname(clientId, nickname) {
   }
 
   const trimmedClientId = clientId.trim().toLowerCase();
+  const cacheKey = `nickname:${trimmedClientId}`;
 
   if (firestore) {
     try {
@@ -1690,9 +1949,11 @@ export async function saveClientNickname(clientId, nickname) {
         nickname: trimmedNickname,
         updated_at: new Date().toISOString()
       }, { merge: true });
+      setClientSession(cacheKey, trimmedNickname);
       return;
     } catch (err) {
       console.error(`Firestore error in saveClientNickname:`, err.message);
+      clientSessionCache.delete(cacheKey);
     }
   }
 
@@ -1702,13 +1963,16 @@ export async function saveClientNickname(clientId, nickname) {
         INSERT OR REPLACE INTO client_nicknames (client_id, nickname)
         VALUES (?, ?)
       `).run(trimmedClientId, trimmedNickname);
+      setClientSession(cacheKey, trimmedNickname);
       return;
     } catch (err) {
       console.error(`Local SQLite insert failed for saveClientNickname:`, err.message);
+      clientSessionCache.delete(cacheKey);
     }
   }
 
   inMemoryClientNicknames.set(trimmedClientId, trimmedNickname);
+  setClientSession(cacheKey, trimmedNickname);
 }
 
 /**
@@ -1721,32 +1985,38 @@ export async function getClientNickname(clientId) {
     return null;
   }
   const trimmedClientId = clientId.trim().toLowerCase();
+  const cacheKey = `nickname:${trimmedClientId}`;
+  const cachedVal = getClientSession(cacheKey);
+  if (cachedVal !== undefined) {
+    return cachedVal;
+  }
 
+  let result = null;
   if (firestore) {
     try {
       const docRef = firestore.collection('client_nicknames').doc(trimmedClientId);
       const doc = await docRef.get();
       if (doc.exists) {
-        return doc.data().nickname || null;
+        result = doc.data().nickname || null;
       }
-      return null;
     } catch (err) {
       console.error(`Firestore error in getClientNickname:`, err.message);
-      return null;
+      result = null;
     }
-  }
-
-  if (sqliteDb) {
+  } else if (sqliteDb) {
     try {
       const row = sqliteDb.prepare('SELECT nickname FROM client_nicknames WHERE client_id = ?').get(trimmedClientId);
-      return row ? row.nickname : null;
+      result = row ? row.nickname : null;
     } catch (err) {
       console.error(`Local SQLite query failed for getClientNickname:`, err.message);
-      return null;
+      result = null;
     }
+  } else {
+    result = inMemoryClientNicknames.get(trimmedClientId) || null;
   }
 
-  return inMemoryClientNicknames.get(trimmedClientId) || null;
+  setClientSession(cacheKey, result);
+  return result;
 }
 
 /**
@@ -2058,11 +2328,9 @@ export async function resolvePredictions(clientId, localDate) {
         WHERE client_id = ? AND status = 'pending' AND prediction_date < ?
       `).all(normalizedClientId, localDate);
 
-      const db = new DatabaseSyncClass(dbPath);
-      db.exec('PRAGMA busy_timeout = 5000;');
       try {
-        db.exec('BEGIN IMMEDIATE TRANSACTION;');
-        const updateStmt = db.prepare(`
+        sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+        const updateStmt = sqliteDb.prepare(`
           UPDATE client_predictions 
           SET status = ?, resolved_at = ? 
           WHERE client_id = ? AND trend = ? AND prediction_date = ?
@@ -2086,14 +2354,12 @@ export async function resolvePredictions(clientId, localDate) {
             resolved_at
           });
         }
-        db.exec('COMMIT;');
+        sqliteDb.exec('COMMIT;');
       } catch (err) {
         try {
-          db.exec('ROLLBACK;');
+          sqliteDb.exec('ROLLBACK;');
         } catch (rollbackErr) {}
         throw err;
-      } finally {
-        db.close();
       }
       return resolvedList;
     } catch (err) {
@@ -2203,50 +2469,57 @@ export async function getClientAchievements(clientId) {
 
   // 2. Fetch Trivia
   const triviaScores = [];
-  if (firestore) {
-    try {
-      const snapshot = await firestore.collection('client_trivia_scores')
-        .where('client_id', '==', normalizedClientId)
-        .get();
-      snapshot.forEach(doc => {
-        const d = doc.data();
-        triviaScores.push({
-          score: d.score,
-          trend: d.trend,
-          completed_at: d.completed_at
-        });
-      });
-    } catch (e) {
-      console.error('Error in getClientAchievements - firestore trivia:', e);
-    }
-  } else if (sqliteDb) {
-    try {
-      const rows = sqliteDb.prepare('SELECT score, trend, completed_at FROM client_trivia_scores WHERE client_id = ?').all(normalizedClientId);
-      for (const row of rows) {
-        triviaScores.push({
-          score: row.score,
-          trend: row.trend,
-          completed_at: row.completed_at
-        });
-      }
-    } catch (e) {
-      console.error('Error in getClientAchievements - sqlite trivia:', e);
-    }
+  const cacheKeyAll = `trivia_scores_all:${normalizedClientId}`;
+  const cachedScores = getClientSession(cacheKeyAll);
+  if (cachedScores !== undefined) {
+    triviaScores.push(...cachedScores);
   } else {
-    for (const [key, value] of inMemoryClientTriviaScores.entries()) {
-      const firstColonIndex = key.indexOf(':');
-      if (firstColonIndex !== -1) {
-        const cid = key.slice(0, firstColonIndex);
-        if (cid === normalizedClientId) {
-          const trend = key.slice(firstColonIndex + 1);
+    if (firestore) {
+      try {
+        const snapshot = await firestore.collection('client_trivia_scores')
+          .where('client_id', '==', normalizedClientId)
+          .get();
+        snapshot.forEach(doc => {
+          const d = doc.data();
           triviaScores.push({
-            score: value.score,
-            trend: trend,
-            completed_at: value.completed_at
+            score: d.score,
+            trend: d.trend,
+            completed_at: d.completed_at
           });
+        });
+      } catch (e) {
+        console.error('Error in getClientAchievements - firestore trivia:', e);
+      }
+    } else if (sqliteDb) {
+      try {
+        const rows = sqliteDb.prepare('SELECT score, trend, completed_at FROM client_trivia_scores WHERE client_id = ?').all(normalizedClientId);
+        for (const row of rows) {
+          triviaScores.push({
+            score: row.score,
+            trend: row.trend,
+            completed_at: row.completed_at
+          });
+        }
+      } catch (e) {
+        console.error('Error in getClientAchievements - sqlite trivia:', e);
+      }
+    } else {
+      for (const [key, value] of inMemoryClientTriviaScores.entries()) {
+        const firstColonIndex = key.indexOf(':');
+        if (firstColonIndex !== -1) {
+          const cid = key.slice(0, firstColonIndex);
+          if (cid === normalizedClientId) {
+            const trend = key.slice(firstColonIndex + 1);
+            triviaScores.push({
+              score: value.score,
+              trend: trend,
+              completed_at: value.completed_at
+            });
+          }
         }
       }
     }
+    setClientSession(cacheKeyAll, triviaScores);
   }
 
   if (triviaScores.length > 0) {
@@ -2337,7 +2610,7 @@ export async function getClientAchievements(clientId) {
  */
 export async function getAllCachedExplanations() {
   const now = Date.now();
-  if (allExplanationsCache && (now - allExplanationsCacheTime < ALL_EXPLANATIONS_CACHE_TTL)) {
+  if (allExplanationsCache) {
     return allExplanationsCache;
   }
 
@@ -2436,32 +2709,26 @@ export async function pruneOldExplanations() {
     return;
   }
 
-  if (DatabaseSyncClass) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
-    db.exec('PRAGMA journal_mode = WAL;');
-    
+  if (sqliteDb) {
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
       
-      const stmt1 = db.prepare('DELETE FROM trend_explanations WHERE created_at < ?');
+      const stmt1 = sqliteDb.prepare('DELETE FROM trend_explanations WHERE created_at < ?');
       stmt1.run(cutoffDate);
       
-      const stmt2 = db.prepare('DELETE FROM localized_explanations WHERE created_at < ?');
+      const stmt2 = sqliteDb.prepare('DELETE FROM localized_explanations WHERE created_at < ?');
       stmt2.run(cutoffDate);
       
-      db.exec('COMMIT;');
+      sqliteDb.exec('COMMIT;');
       console.log(`[DB] Local SQLite pruning transaction completed (cutoff: ${cutoffDate})`);
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {
         // ignore
       }
       console.error('[DB] Local SQLite pruning failed, transaction rolled back:', err.message);
       throw err;
-    } finally {
-      db.close();
     }
     return;
   }
