@@ -47,7 +47,7 @@ const EXPLANATION_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 3600000; // 
 
 let allExplanationsCache = null;
 let allExplanationsCacheTime = 0;
-const ALL_EXPLANATIONS_CACHE_TTL = process.env.NODE_ENV === 'test' ? 0 : 300000; // 5 minutes in production, 0 in tests
+const ALL_EXPLANATIONS_CACHE_TTL = Infinity;
 
 let sqliteDb = null;
 let DatabaseSyncClass = null;
@@ -379,6 +379,7 @@ export async function getPollData(trend) {
  * @returns {Promise<{overrated: number, genius: number}>}
  */
 export async function incrementVote(trend, vote, location = null, isSimulated = false) {
+  allExplanationsCache = null;
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   
   if (isSimulated) {
@@ -2337,7 +2338,7 @@ export async function getClientAchievements(clientId) {
  */
 export async function getAllCachedExplanations() {
   const now = Date.now();
-  if (allExplanationsCache && (now - allExplanationsCacheTime < ALL_EXPLANATIONS_CACHE_TTL)) {
+  if (allExplanationsCache) {
     return allExplanationsCache;
   }
 
