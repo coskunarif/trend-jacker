@@ -8,7 +8,7 @@ import { parseStringPromise } from 'xml2js';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import sharp from 'sharp';
 
-import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged, filterUnpingedSlugs } from './db.js';
+import { getPollData, incrementVote, getVoteEvents, seedVoteEvents, getCachedExplanation, setCachedExplanation, getLocalizedExplanation, setLocalizedExplanation, getCachedChatResponse, setCachedChatResponse, getCachedGeneratedPost, setCachedGeneratedPost, insertViralPost, getViralPostHistory, getCachedTopicImage, setCachedTopicImage, getTrendTrivia, setTrendTrivia, recordReferral, getReferralCount, getChatCount, incrementChatCount, recordTriviaScore, getTriviaScore, updateClientStreak, getClientStreak, saveClientNickname, getClientNickname, getTriviaLeaderboard, recordPrediction, getClientPredictions, resolvePredictions, getPredictionBonus, getClientAchievements, getAllCachedExplanations, pruneOldExplanations, isSlugPinged, markSlugAsPinged, filterUnpingedSlugs, getGeminiChatCount, incrementGeminiChatCount } from './db.js';
 import { pingSearchEngines, getIndexNowKey } from './indexing.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -1111,6 +1111,12 @@ async function handleTrendRequest(request, reply, slug, lang) {
       if (dbMatch) {
         trendName = dbMatch.trend;
         isFound = true;
+      } else {
+        const directExpl = await getCachedExplanation(cleanSlug);
+        if (directExpl) {
+          trendName = directExpl.trend || cleanSlug.split('-').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+          isFound = true;
+        }
       }
     } catch (dbErr) {
       console.error('Error matching slug against DB trends:', dbErr.message);
@@ -2360,15 +2366,26 @@ fastify.post('/api/chat', async (request, reply) => {
 
   const truncatedHistory = Array.isArray(history) ? history.slice(-4) : [];
 
-  // Check cache first
+  // Check cache first (bypass cache when enforcing the Gemini chat cap to ensure it counts actual uncached calls)
   const cachedResponse = await getCachedChatResponse(normalizedTrend, query, truncatedHistory);
-  if (cachedResponse !== null) {
+  if (cachedResponse !== null && request.headers['x-enforce-gemini-cap'] !== 'true') {
     return { reply: cachedResponse };
+  }
+
+  const enforceGeminiCap = (process.env.NODE_ENV !== 'test') || (request.headers['x-enforce-gemini-cap'] === 'true');
+  if (enforceGeminiCap && normalizedClientId) {
+    const geminiChatCount = await getGeminiChatCount(normalizedClientId, normalizedTrend);
+    if (geminiChatCount >= 5) {
+      return reply.status(403).send({ error: 'limit_reached', allowedLimit: 5 });
+    }
   }
 
   if (process.env.NODE_ENV === 'test') {
     const mockReply = 'This is a mock reply for: ' + query;
     await setCachedChatResponse(normalizedTrend, query, truncatedHistory, mockReply);
+    if (enforceGeminiCap && normalizedClientId) {
+      await incrementGeminiChatCount(normalizedClientId, normalizedTrend);
+    }
     return { reply: mockReply };
   }
 
@@ -2407,6 +2424,9 @@ Response:`;
     const replyText = result.response.text();
     const finalReply = replyText.trim();
     await setCachedChatResponse(normalizedTrend, query, truncatedHistory, finalReply);
+    if (enforceGeminiCap && normalizedClientId) {
+      await incrementGeminiChatCount(normalizedClientId, normalizedTrend);
+    }
     return { reply: finalReply };
   } catch (err) {
     fastify.log.error(err);
