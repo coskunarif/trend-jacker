@@ -32,6 +32,7 @@ const inMemoryTopicImages = new Map();
 const inMemoryTrendTrivia = new Map();
 const inMemoryClientReferrals = new Map();
 const inMemoryClientChatCounts = new Map();
+const inMemoryClientGeminiChatCounts = new Map();
 const inMemoryClientTriviaScores = new Map();
 const inMemoryClientNicknames = new Map();
 export const inMemoryClientStreaks = new Map();
@@ -164,6 +165,14 @@ if (!firestore) {
         `);
         initDb.exec(`
           CREATE TABLE IF NOT EXISTS client_chat_counts (
+            client_id TEXT,
+            trend TEXT,
+            count INTEGER DEFAULT 0,
+            PRIMARY KEY (client_id, trend)
+          )
+        `);
+        initDb.exec(`
+          CREATE TABLE IF NOT EXISTS client_gemini_chat_counts (
             client_id TEXT,
             trend TEXT,
             count INTEGER DEFAULT 0,
@@ -1494,6 +1503,89 @@ export async function incrementChatCount(clientId, trend) {
   const inMemKey = `${normalizedClientId}:${normalizedTrend}`;
   const current = inMemoryClientChatCounts.get(inMemKey) || 0;
   inMemoryClientChatCounts.set(inMemKey, current + 1);
+}
+
+/**
+ * Gets the Gemini chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<number>}
+ */
+export async function getGeminiChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${normalizedClientId}_${normalizedTrend}`;
+      const doc = await firestore.collection('client_gemini_chat_counts').doc(docId).get();
+      return doc.exists ? (doc.data().count || 0) : 0;
+    } catch (err) {
+      console.error(`Firestore error in getGeminiChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  if (sqliteDb) {
+    try {
+      const row = sqliteDb.prepare('SELECT count FROM client_gemini_chat_counts WHERE client_id = ? AND trend = ?').get(normalizedClientId, normalizedTrend);
+      return row ? row.count : 0;
+    } catch (err) {
+      console.error(`Local SQLite query failed for getGeminiChatCount:`, err.message);
+      return 0;
+    }
+  }
+
+  return inMemoryClientGeminiChatCounts.get(`${normalizedClientId}:${normalizedTrend}`) || 0;
+}
+
+/**
+ * Increments the Gemini chat count for a client and trend.
+ * @param {string} clientId
+ * @param {string} trend
+ * @returns {Promise<void>}
+ */
+export async function incrementGeminiChatCount(clientId, trend) {
+  const normalizedTrend = (trend || '').trim().toLowerCase();
+  const normalizedClientId = (clientId || '').trim().toLowerCase();
+  if (firestore) {
+    try {
+      const docId = `${normalizedClientId}_${normalizedTrend}`;
+      const docRef = firestore.collection('client_gemini_chat_counts').doc(docId);
+      await docRef.set({
+        client_id: normalizedClientId,
+        trend: normalizedTrend,
+        count: FieldValue.increment(1)
+      }, { merge: true });
+      return;
+    } catch (err) {
+      console.error(`Firestore error in incrementGeminiChatCount:`, err.message);
+      return;
+    }
+  }
+
+  if (sqliteDb) {
+    const db = new DatabaseSyncClass(dbPath);
+    db.exec('PRAGMA busy_timeout = 5000;');
+    try {
+      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      db.prepare('INSERT OR IGNORE INTO client_gemini_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
+      db.prepare('UPDATE client_gemini_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
+      db.exec('COMMIT;');
+      return;
+    } catch (err) {
+      try {
+        db.exec('ROLLBACK;');
+      } catch (rollbackErr) {}
+      console.error(`Local SQLite update failed for incrementGeminiChatCount:`, err.message);
+      return;
+    } finally {
+      db.close();
+    }
+  }
+
+  const key = `${normalizedClientId}:${normalizedTrend}`;
+  const current = inMemoryClientGeminiChatCounts.get(key) || 0;
+  inMemoryClientGeminiChatCounts.set(key, current + 1);
 }
 
 /**
