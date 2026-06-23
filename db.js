@@ -321,49 +321,28 @@ if (!firestore) {
       throw initError || new Error('Failed to initialize local SQLite database');
     }
 
+    const dbInstance = new DatabaseSyncClass(dbPath);
+    dbInstance.exec('PRAGMA journal_mode = WAL;');
+    dbInstance.exec('PRAGMA busy_timeout = 5000;');
+    dbInstance.exec('PRAGMA synchronous = NORMAL;');
+
     sqliteDb = {
       prepare(sql) {
+        const stmt = dbInstance.prepare(sql);
         return {
           get(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.get(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.get(...args);
           },
           all(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.all(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.all(...args);
           },
           run(...args) {
-            const db = new DatabaseSyncClass(dbPath);
-            db.exec('PRAGMA busy_timeout = 5000;');
-            try {
-              const stmt = db.prepare(sql);
-              return stmt.run(...args);
-            } finally {
-              db.close();
-            }
+            return stmt.run(...args);
           }
         };
       },
       exec(sql) {
-        const db = new DatabaseSyncClass(dbPath);
-        db.exec('PRAGMA busy_timeout = 5000;');
-        try {
-          return db.exec(sql);
-        } finally {
-          db.close();
-        }
+        return dbInstance.exec(sql);
       }
     };
     console.log('Local SQLite database initialized successfully with connection-scoping wrapper at', dbPath);
@@ -490,18 +469,16 @@ export async function incrementVote(trend, vote, location = null, isSimulated = 
 
   // SQLite fallback update
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
       if (vote === 'genius') {
-        db.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(normalizedTrend);
+        sqliteDb.prepare('UPDATE votes SET genius = genius + 1 WHERE trend = ?').run(normalizedTrend);
       } else if (vote === 'overrated') {
-        db.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(normalizedTrend);
+        sqliteDb.prepare('UPDATE votes SET overrated = overrated + 1 WHERE trend = ?').run(normalizedTrend);
       }
-      db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(normalizedTrend, vote, timestamp, locStr);
-      db.exec('COMMIT;');
+      sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)').run(normalizedTrend, vote, timestamp, locStr);
+      sqliteDb.exec('COMMIT;');
       pollCache.set(normalizedTrend, {
         overrated: current.overrated,
         genius: current.genius,
@@ -510,13 +487,9 @@ export async function incrementVote(trend, vote, location = null, isSimulated = 
       return current;
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite write failed for "${normalizedTrend}":`, err.message);
-    } finally {
-      try {
-        db.close();
-      } catch (closeErr) {}
     }
   }
 
@@ -576,13 +549,11 @@ export async function getVoteEvents(trend) {
 export async function seedVoteEvents(trend, events) {
   const normalizedTrend = trend ? trend.toLowerCase() : '';
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
       
-      db.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
-      const stmt = db.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
+      sqliteDb.prepare('INSERT OR IGNORE INTO votes (trend, overrated, genius) VALUES (?, 0, 0)').run(normalizedTrend);
+      const stmt = sqliteDb.prepare('INSERT INTO vote_events (trend, vote, timestamp, location) VALUES (?, ?, ?, ?)');
       let geniusCount = 0;
       let overratedCount = 0;
       for (const ev of events) {
@@ -590,17 +561,15 @@ export async function seedVoteEvents(trend, events) {
         if (ev.vote === 'genius') geniusCount++;
         else overratedCount++;
       }
-      db.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
+      sqliteDb.prepare('UPDATE votes SET genius = genius + ?, overrated = overrated + ? WHERE trend = ?')
         .run(geniusCount, overratedCount, normalizedTrend);
         
-      db.exec('COMMIT;');
+      sqliteDb.exec('COMMIT;');
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite seedVoteEvents failed:`, err.message);
-    } finally {
-      db.close();
     }
   } else {
     if (!inMemoryEvents.has(normalizedTrend)) {
@@ -1523,23 +1492,19 @@ export async function incrementChatCount(clientId, trend) {
   }
 
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
-      db.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
-      db.exec('COMMIT;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO client_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
+      sqliteDb.prepare('UPDATE client_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
+      sqliteDb.exec('COMMIT;');
       return;
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite update failed for incrementChatCount:`, err.message);
       clientSessionCache.delete(cacheKey);
       return;
-    } finally {
-      db.close();
     }
   }
 
@@ -1607,22 +1572,18 @@ export async function incrementGeminiChatCount(clientId, trend) {
   }
 
   if (sqliteDb) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
-      db.prepare('INSERT OR IGNORE INTO client_gemini_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
-      db.prepare('UPDATE client_gemini_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
-      db.exec('COMMIT;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.prepare('INSERT OR IGNORE INTO client_gemini_chat_counts (client_id, trend, count) VALUES (?, ?, 0)').run(normalizedClientId, normalizedTrend);
+      sqliteDb.prepare('UPDATE client_gemini_chat_counts SET count = count + 1 WHERE client_id = ? AND trend = ?').run(normalizedClientId, normalizedTrend);
+      sqliteDb.exec('COMMIT;');
       return;
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {}
       console.error(`Local SQLite update failed for incrementGeminiChatCount:`, err.message);
       return;
-    } finally {
-      db.close();
     }
   }
 
@@ -2367,11 +2328,9 @@ export async function resolvePredictions(clientId, localDate) {
         WHERE client_id = ? AND status = 'pending' AND prediction_date < ?
       `).all(normalizedClientId, localDate);
 
-      const db = new DatabaseSyncClass(dbPath);
-      db.exec('PRAGMA busy_timeout = 5000;');
       try {
-        db.exec('BEGIN IMMEDIATE TRANSACTION;');
-        const updateStmt = db.prepare(`
+        sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
+        const updateStmt = sqliteDb.prepare(`
           UPDATE client_predictions 
           SET status = ?, resolved_at = ? 
           WHERE client_id = ? AND trend = ? AND prediction_date = ?
@@ -2395,14 +2354,12 @@ export async function resolvePredictions(clientId, localDate) {
             resolved_at
           });
         }
-        db.exec('COMMIT;');
+        sqliteDb.exec('COMMIT;');
       } catch (err) {
         try {
-          db.exec('ROLLBACK;');
+          sqliteDb.exec('ROLLBACK;');
         } catch (rollbackErr) {}
         throw err;
-      } finally {
-        db.close();
       }
       return resolvedList;
     } catch (err) {
@@ -2752,32 +2709,26 @@ export async function pruneOldExplanations() {
     return;
   }
 
-  if (DatabaseSyncClass) {
-    const db = new DatabaseSyncClass(dbPath);
-    db.exec('PRAGMA busy_timeout = 5000;');
-    db.exec('PRAGMA journal_mode = WAL;');
-    
+  if (sqliteDb) {
     try {
-      db.exec('BEGIN IMMEDIATE TRANSACTION;');
+      sqliteDb.exec('BEGIN IMMEDIATE TRANSACTION;');
       
-      const stmt1 = db.prepare('DELETE FROM trend_explanations WHERE created_at < ?');
+      const stmt1 = sqliteDb.prepare('DELETE FROM trend_explanations WHERE created_at < ?');
       stmt1.run(cutoffDate);
       
-      const stmt2 = db.prepare('DELETE FROM localized_explanations WHERE created_at < ?');
+      const stmt2 = sqliteDb.prepare('DELETE FROM localized_explanations WHERE created_at < ?');
       stmt2.run(cutoffDate);
       
-      db.exec('COMMIT;');
+      sqliteDb.exec('COMMIT;');
       console.log(`[DB] Local SQLite pruning transaction completed (cutoff: ${cutoffDate})`);
     } catch (err) {
       try {
-        db.exec('ROLLBACK;');
+        sqliteDb.exec('ROLLBACK;');
       } catch (rollbackErr) {
         // ignore
       }
       console.error('[DB] Local SQLite pruning failed, transaction rolled back:', err.message);
       throw err;
-    } finally {
-      db.close();
     }
     return;
   }
